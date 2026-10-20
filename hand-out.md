@@ -52,6 +52,10 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   - In-game puntengeschiedenis (ronde per ronde popup sheet).
   - "Wie mag beginnen?": Ronde 1 willekeurig gekozen met dobbelsteen-knop, daarna opvolgend met de klok mee ("om de beurt").
 * [`BeverbendeScoreView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/BeverbendeScoreView.swift): Rondegeschiedenis sheet en startspeler-indicator.
+* [`JattenSetupView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenSetupView.swift) & [`JattenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenGameView.swift):
+  - Aantal rondes keuze verwijderd (spel stopt immers zodra iemand 6 dezelfde heeft).
+  - Prominente `🏆 6 dezelfde!` knop op elke spelerskaart voor directe winst en overgang naar `WinnaarView`.
+  - Startspeler-indicator ("Wie mag beginnen?") voor de steelvolgorde.
 * [`WinnaarView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/WinnaarView.swift): Eindscherm met animaties, podium en automatische opslag naar `ScoreManager`.
 
 ---

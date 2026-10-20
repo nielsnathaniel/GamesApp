@@ -116,11 +116,29 @@ struct SettingsView: View {
                 Section(header: Label("Spelregels Quick Reference", systemImage: "book.closed.fill")) {
                     DisclosureGroup("Balzakken Regels") {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("• Einde bij 100 strafpunten (minste punten wint)")
-                            Text("• Precies 69 punten: strafpunten gaan terug naar 50!")
-                            Text("• Precies 99 punten: strafpunten gaan terug naar 75!")
-                            Text("• Valse Balzak: 25 strafpunten")
-                            Text("• Juiste Balzak: 0 punten deze ronde")
+                            Text("• Doel: Minste punten overhouden (einde bij 100 strafpunten)")
+                            Text("• Kaarten: Balzakken van -1 (Bruisbal) t/m 11 (Blauwe Bal)")
+                            Text("• De Swinger: Ruil je hand met een tegenspeler (0 pt als een ander Balzak roept)")
+                            Text("• De Lul: Tegenstander pakt 2 kaarten (10 strafpunten als een ander Balzak roept!)")
+                            Text("• BALZAK! roepen: Alleen tijdens je beurt met 5 punten of minder (zonder actiekaart)")
+                            Text("• Goeie Balzak!: Roeper noteert 0 punten, overige spelers noteren handpunten")
+                            Text("• Valse Balzak!: Roeper krijgt 25 strafpunten! Laagste speler noteert 0 punten")
+                            Text("• Precies 69 punten: Strafpunten gaan terug naar 50!")
+                            Text("• Precies 99 punten: Strafpunten gaan terug naar 75!")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+
+                    DisclosureGroup("Jatten Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Doel: Als eerste 6 kaarten van dezelfde waarde verzamelen!")
+                            Text("• Einde: Het spel stopt direct zodra iemand 6 dezelfde heeft")
+                            Text("• Beurt 1: Leg 1 kaart uit je hand open in je verzameling")
+                            Text("• Beurt 2: Steel kaarten blind uit de hand van 1 tegenstander")
+                            Text("• Pas op: Trek je 2 dezelfde waarden tijdens het jatten? Beurt voorbij en buit terug!")
+                            Text("• Oplichter: Steel 1 open kaart naar keuze uit de verzameling van het slachtoffer")
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)

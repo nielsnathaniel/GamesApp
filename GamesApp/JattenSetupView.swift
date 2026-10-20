@@ -3,7 +3,6 @@ import SwiftUI
 struct JattenSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
     @State private var aantalSpelers: Int = 3
-    @State private var aantalRondes: Int = 5
     @State private var spelers: [String] = Array(repeating: "", count: 5)
     @State private var showAlert = false
     @FocusState private var focusedField: Int?
@@ -51,29 +50,25 @@ struct JattenSetupView: View {
                 }
                 .padding()
 
-                // Aantal rondes
-                Text("Aantal Rondes")
-                    .font(.headline)
-                HStack {
-                    Button(action: {
-                        if aantalRondes > 1 { aantalRondes -= 1 }
-                    }) {
-                        Image(systemName: "minus.circle")
-                            .font(.title)
-                            .foregroundColor(.red)
-                    }
-                    Text("\(aantalRondes)")
+                // Speluitleg / info kaart
+                HStack(spacing: 10) {
+                    Image(systemName: "trophy.fill")
                         .font(.title2)
-                        .fontWeight(.bold)
-                        .frame(width: 50)
-                    Button(action: {
-                        if aantalRondes < 15 { aantalRondes += 1 }
-                    }) {
-                        Image(systemName: "plus.circle")
-                            .font(.title)
-                            .foregroundColor(.green)
+                        .foregroundColor(.purple)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Speldoel")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                        Text("Het spel stopt zodra een speler als eerste 6 kaarten van dezelfde waarde verzameld heeft!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(12)
+                .padding(.horizontal)
                 .padding(.bottom, 12)
 
                 // Invoervelden voor spelersnamen met dropdown voorstellen
@@ -92,7 +87,7 @@ struct JattenSetupView: View {
                 Spacer(minLength: 20)
 
                 // Start spel knop
-                NavigationLink(destination: JattenGameView(spelers: spelers.prefix(aantalSpelers).map { Player(name: $0) }, aantalRondes: aantalRondes)) {
+                NavigationLink(destination: JattenGameView(spelers: spelers.prefix(aantalSpelers).map { Player(name: $0) })) {
                     Text("Start Spel")
                         .font(.title2)
                         .fontWeight(.bold)
