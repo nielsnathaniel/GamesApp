@@ -1,0 +1,221 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @ObservedObject private var scoreManager = ScoreManager.shared
+    @State private var showClearHistoryAlert: Bool = false
+    @State private var showClearPlayersAlert: Bool = false
+    @State private var showAddPlayerAlert: Bool = false
+    @State private var newPlayerName: String = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // 1. Spelersbeheer
+                Section(header: Label("Opgeslagen Spelers", systemImage: "person.2.fill")) {
+                    let players = scoreManager.fetchPlayerNames()
+                    if players.isEmpty {
+                        Text("Geen opgeslagen spelers.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(players, id: \.self) { player in
+                            HStack {
+                                Image(systemName: "person.circle.fill")
+                                    .foregroundColor(.blue)
+                                Text(player)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        .onDelete { indexSet in
+                            for idx in indexSet {
+                                if idx < players.count {
+                                    scoreManager.deletePlayer(name: players[idx])
+                                }
+                            }
+                        }
+                    }
+
+                    Button(action: {
+                        newPlayerName = ""
+                        showAddPlayerAlert = true
+                    }) {
+                        Label("Speler handmatig toevoegen", systemImage: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                    }
+                }
+
+                // 2. Spelgeschiedenis overzicht
+                Section(header: Label("Geschiedenis van Potjes", systemImage: "clock.arrow.circlepath")) {
+                    let games = scoreManager.playedGames
+                    if games.isEmpty {
+                        Text("Nog geen gespeelde potjes opgeslagen.")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(games.reversed()) { game in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(game.gameName)
+                                        .font(.headline)
+                                    Spacer()
+                                    Text(game.date, style: .date)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                if !game.winner.isEmpty {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "crown.fill")
+                                            .foregroundColor(.yellow)
+                                        Text("Winnaar: \(game.winner)")
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.primary)
+                                    }
+                                }
+
+                                // Scores
+                                HStack {
+                                    ForEach(game.scores) { sc in
+                                        Text("\(sc.playerName): \(sc.score)")
+                                            .font(.caption2)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color(UIColor.tertiarySystemGroupedBackground))
+                                            .cornerRadius(6)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .onDelete { indexSet in
+                            let reversedGames = Array(games.reversed())
+                            for idx in indexSet {
+                                if idx < reversedGames.count {
+                                    scoreManager.deleteGame(id: reversedGames[idx].id)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Gegevensbeheer & Reset acties
+                Section(header: Label("Gegevensbeheer", systemImage: "trash.fill")) {
+                    Button(role: .destructive, action: {
+                        showClearHistoryAlert = true
+                    }) {
+                        Label("Spelgeschiedenis & scores wissen", systemImage: "arrow.counterclockwise")
+                    }
+
+                    Button(role: .destructive, action: {
+                        showClearPlayersAlert = true
+                    }) {
+                        Label("Alle opgeslagen spelers wissen", systemImage: "person.crop.circle.badge.minus")
+                    }
+                }
+
+                // 4. Speluitleg & Regels
+                Section(header: Label("Spelregels Quick Reference", systemImage: "book.closed.fill")) {
+                    DisclosureGroup("Balzakken Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Einde bij 100 strafpunten (minste punten wint)")
+                            Text("• Precies 69 punten: strafpunten gaan terug naar 50!")
+                            Text("• Precies 99 punten: strafpunten gaan terug naar 75!")
+                            Text("• Valse Balzak: 25 strafpunten")
+                            Text("• Juiste Balzak: 0 punten deze ronde")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+
+                    DisclosureGroup("Duizenden Kaartwaardes") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Joker = 25 punten")
+                            Text("• Aas = 20 punten")
+                            Text("• Heer / Vrouw / Boer / 10 = 10 punten")
+                            Text("• Kaarten 4 t/m 9 = 5 punten")
+                            Text("• Schoppen 3 = 100 strafpunten (bij verlies)")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+
+                    DisclosureGroup("Beverbende Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Laagste totaalscore na alle rondes wint")
+                            Text("• Waarde van kaarten: 0 t/m 9")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+
+                    DisclosureGroup("Crockinole Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Puntenverschil per ronde gaat naar de rondewinnaar")
+                            Text("• 100 punten nodig om een set te winnen")
+                            Text("• Wie als eerste 3 sets wint, wint de wedstrijd!")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                // 5. Over GamesApp
+                Section(header: Label("Over GamesApp", systemImage: "info.circle.fill")) {
+                    HStack {
+                        Text("Versie")
+                        Spacer()
+                        Text("1.0 (iOS 18+)")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Ondersteunde Spellen")
+                        Spacer()
+                        Text("7 spellen")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Instellingen")
+            .onAppear {
+                scoreManager.refresh()
+            }
+            .alert("Nieuwe Speler Toevoegen", isPresented: $showAddPlayerAlert) {
+                TextField("Spelersnaam", text: $newPlayerName)
+                Button("Opslaan") {
+                    let trimmed = newPlayerName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        scoreManager.savePlayerName(trimmed)
+                    }
+                }
+                Button("Annuleer", role: .cancel) {}
+            }
+            .confirmationDialog(
+                "Weet je zeker dat je alle spelgeschiedenis wilt wissen?",
+                isPresented: $showClearHistoryAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Geschiedenis wissen", role: .destructive) {
+                    scoreManager.clearHistory()
+                }
+                Button("Annuleer", role: .cancel) {}
+            }
+            .confirmationDialog(
+                "Weet je zeker dat je alle opgeslagen spelers wilt wissen?",
+                isPresented: $showClearPlayersAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Spelers wissen", role: .destructive) {
+                    scoreManager.clearAllPlayers()
+                }
+                Button("Annuleer", role: .cancel) {}
+            }
+        }
+    }
+}
+
+#Preview {
+    SettingsView()
+}

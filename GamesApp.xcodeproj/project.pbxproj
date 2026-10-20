@@ -35,16 +35,6 @@
 			path = GamesApp;
 			sourceTree = "<group>";
 		};
-		DE74B1A32CF1E95400B4F992 /* GamesAppTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = GamesAppTests;
-			sourceTree = "<group>";
-		};
-		DE74B1AD2CF1E95400B4F992 /* GamesAppUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = GamesAppUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,8 +66,6 @@
 			isa = PBXGroup;
 			children = (
 				DE74B1922CF1E95100B4F992 /* GamesApp */,
-				DE74B1A32CF1E95400B4F992 /* GamesAppTests */,
-				DE74B1AD2CF1E95400B4F992 /* GamesAppUITests */,
 				DE74B1912CF1E95100B4F992 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,9 +118,6 @@
 			dependencies = (
 				DE74B1A22CF1E95400B4F992 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				DE74B1A32CF1E95400B4F992 /* GamesAppTests */,
-			);
 			name = GamesAppTests;
 			packageProductDependencies = (
 			);
@@ -153,9 +138,6 @@
 			dependencies = (
 				DE74B1AC2CF1E95400B4F992 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				DE74B1AD2CF1E95400B4F992 /* GamesAppUITests */,
-			);
 			name = GamesAppUITests;
 			packageProductDependencies = (
 			);
@@ -171,7 +153,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1610;
-				LastUpgradeCheck = 1610;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					DE74B18F2CF1E95100B4F992 = {
 						CreatedOnToolsVersion = 16.1;
@@ -195,6 +177,8 @@
 			);
 			mainGroup = DE74B1872CF1E95100B4F992;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DE74B1912CF1E95100B4F992 /* Products */;
 			projectDirPath = "";
@@ -304,6 +288,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -327,6 +312,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -367,6 +353,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -383,6 +370,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -396,7 +384,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"GamesApp/Preview Content\"";
-				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -425,7 +412,6 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"GamesApp/Preview Content\"";
-				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -452,8 +438,8 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.nnbp.GamesAppTests;
@@ -471,8 +457,8 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.1;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.nnbp.GamesAppTests;
@@ -489,7 +475,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.nnbp.GamesAppUITests;
@@ -506,7 +491,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = ARHS2R6PNJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = nl.nnbp.GamesAppUITests;
