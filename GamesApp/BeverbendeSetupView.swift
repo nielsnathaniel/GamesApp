@@ -66,7 +66,7 @@ struct BeverbendeSetupView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding()
-                .onChange(of: speelwijze) { newValue in
+                .onChange(of: speelwijze) { _, newValue in
                     if newValue == .gelijkAanAantalSpelers {
                         aantalRondes = aantalSpelers
                     }

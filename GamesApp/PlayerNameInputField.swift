@@ -30,11 +30,11 @@ struct PlayerNameInputField: View {
                     isShowingDropdown = false
                     onSubmit?()
                 }
-                .onChange(of: text) { _ in
+                .onChange(of: text) { _, _ in
                     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                     isShowingDropdown = !trimmed.isEmpty && !filteredSuggestions.isEmpty
                 }
-                .onChange(of: isFocused) { focused in
+                .onChange(of: isFocused) { _, focused in
                     if focused {
                         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                         isShowingDropdown = !trimmed.isEmpty && !filteredSuggestions.isEmpty
