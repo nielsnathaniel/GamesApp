@@ -17,11 +17,9 @@ struct CrockinoleSetupView: View {
     @State private var spelerZwart: String = ""
 
     // 2 vs 2 Teams
-    @State private var teamWitNaam: String = ""
     @State private var spelerWit1: String = ""
     @State private var spelerWit2: String = ""
 
-    @State private var teamZwartNaam: String = ""
     @State private var spelerZwart1: String = ""
     @State private var spelerZwart2: String = ""
 
@@ -29,10 +27,8 @@ struct CrockinoleSetupView: View {
     @State private var showNewPlayerAlert: Bool = false
     @State private var newPlayerNameInput: String = ""
 
-    // Berekende teamnamen
+    // Berekende teamnamen op basis van de spelers
     private var effectiveTeamWitNaam: String {
-        let trimmed = teamWitNaam.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { return trimmed }
         let p1 = spelerWit1.trimmingCharacters(in: .whitespacesAndNewlines)
         let p2 = spelerWit2.trimmingCharacters(in: .whitespacesAndNewlines)
         if !p1.isEmpty && !p2.isEmpty { return "\(p1) & \(p2)" }
@@ -40,8 +36,6 @@ struct CrockinoleSetupView: View {
     }
 
     private var effectiveTeamZwartNaam: String {
-        let trimmed = teamZwartNaam.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { return trimmed }
         let p1 = spelerZwart1.trimmingCharacters(in: .whitespacesAndNewlines)
         let p2 = spelerZwart2.trimmingCharacters(in: .whitespacesAndNewlines)
         if !p1.isEmpty && !p2.isEmpty { return "\(p1) & \(p2)" }
@@ -277,9 +271,6 @@ struct CrockinoleSetupView: View {
                         .foregroundColor(.blue)
                 }
 
-                TextField("Teamnaam (optioneel, bv. The Shooters)", text: $teamWitNaam)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Speler 1 (Wit)")
@@ -327,9 +318,6 @@ struct CrockinoleSetupView: View {
                         .fontWeight(.semibold)
                         .foregroundColor(.orange)
                 }
-
-                TextField("Teamnaam (optioneel, bv. De Bullseyes)", text: $teamZwartNaam)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
 
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 4) {

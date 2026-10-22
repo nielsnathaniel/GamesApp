@@ -34,13 +34,18 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
 ```
 
 ### Belangrijke Bestanden:
-* [`ContentView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ContentView.swift): TabView configuratie (Spellen, Statistieken, Instellingen).
-* [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers`, winnaars, H2H-statistieken en Balzakken leaderboards.
+* [`ContentView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ContentView.swift): TabView configuratie (Spellen, Statistieken, Instellingen) inclusief interactieve sorteeropties voor het spellenaanbod:
+  - **Populair**: Sorteert spellen op basis van het aantal gespeelde potjes (meest gespeeld bovenaan) met een subtiele vlam-badge (`🔥 Xx`) en speelfrequentie.
+  - **Toegevoegd**: Behoudt de standaard/oorspronkelijke volgorde van de spellen.
+  - **Alfabetisch**: Sorteert de spellen op alfabetische volgorde (A-Z).
+  - De geselecteerde sorteervoorkeur wordt bewaard via `@AppStorage`.
+* [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers`, winnaars, H2H-statistieken, 2v2 Duo-statistieken en Balzakken leaderboards.
 * [`StatisticsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/StatisticsView.swift): Gloednieuw statistiekenscherm met:
   1. *Overzicht:* KPI-tegels (totale potjes, actieve spelers, records) & populariteitsgrafieken.
   2. *Spelers & Rangen:* Podium (🥇, 🥈, 🥉), winpercentages en ranglijsten.
   3. *Wie wint van wie?:* Head-to-head rivaliteiten met filter per spel.
-  4. *Balzakken 🎯:* Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, ranglijst juiste vs foute balzakken).
+  4. *Duo's 🤝:* Partner-chemie en droomteams ranking voor Crokinole 2v2.
+  5. *Balzakken 🎯:* Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, ranglijst juiste vs foute balzakken).
 * [`SettingsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SettingsView.swift): Volledig gerenoveerd:
   - *Spelersbeheer:* Namen toevoegen, lijst bekijken, swipe-to-delete.
   - *Geschiedenis van Potjes:* Chronologische lijst met scores en swipe-to-delete.
@@ -48,14 +53,14 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   - *Spelregels Quick Reference:* Inklapbare handleidingen voor de spellen.
 * [`BalzakkenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/BalzakkenGameView.swift):
   - Knoppen zijn vereenvoudigd naar puur de getallen: `-1`, `+1`, `+5`, `+11`.
-  - Registratie van Juiste Balzakken (`BALZAK! (0)`) en Foute Balzakken (`Valse Balzak (+25)`).
+  - Registratie van Juiste Balzakken (`BALZAK! (0)`) en Foute Balzakken (`Valse Balzak (+25)`). Balzakstatistieken worden per ronde geregistreerd zodat herhaaldelijk klikken niet tot dubbeltelling leidt.
   - In-game puntengeschiedenis (ronde per ronde popup sheet).
   - "Wie mag beginnen?": Ronde 1 willekeurig gekozen met dobbelsteen-knop, daarna opvolgend met de klok mee ("om de beurt").
 * [`BeverbendeScoreView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/BeverbendeScoreView.swift): Rondegeschiedenis sheet en startspeler-indicator.
 * [`CrockinoleSetupView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/CrockinoleSetupView.swift) & [`CrockinoleGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/CrockinoleGameView.swift):
   - Keuze tussen 1 vs 1 en 2 vs 2 (Teams).
   - Spelers kiezen uit bestaande spelers (quick chips / suggesties) of direct toevoegen.
-  - Team Wit & Team Zwart met eigen teamnaam en 2 spelers per team.
+  - Teamnamen worden automatisch afgeleid van de gekozen spelers (bijv. "Niels & Tom") — overbodige tekstvelden voor teamnamen zijn geëlimineerd.
   - Schietvolgorde-indicator ("Aan de beurt om te schieten") voor 2v2 wedstrijden.
 * [`JattenSetupView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenSetupView.swift) & [`JattenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenGameView.swift):
   - Aantal rondes keuze verwijderd (spel stopt immers zodra iemand 6 dezelfde heeft).
