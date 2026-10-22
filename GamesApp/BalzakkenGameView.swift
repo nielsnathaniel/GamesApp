@@ -13,11 +13,18 @@ struct BalzakkenGameView: View {
     var spelers: [Player]
     var eindscore: Int = 100
 
+    enum RondeBalzakStatus {
+        case geen
+        case juisteBalzak
+        case valseBalzak
+    }
+
     @State private var huidigeRonde: Int = 1
     @State private var rondeScores: [Int] = []
     @State private var totaleScores: [Int] = []
     @State private var juisteBalzakken: [Int] = []
     @State private var fouteBalzakken: [Int] = []
+    @State private var rondeStatus: [RondeBalzakStatus] = []
     @State private var startSpelerIndex: Int = 0
     @State private var rondeGeschiedenis: [BalzakkenRondeEntry] = []
     @State private var toonGeschiedenisSheet: Bool = false
@@ -165,6 +172,18 @@ struct BalzakkenGameView: View {
                                             Text("⚠️ \(fouteBalzakken[safe: index] ?? 0)")
                                                 .font(.caption2)
                                                 .foregroundColor(.red)
+
+                                            if rondeStatus[safe: index] == .juisteBalzak {
+                                                Text("• 👑 BALZAK! (0)")
+                                                    .font(.caption2)
+                                                    .fontWeight(.bold)
+                                                    .foregroundColor(.yellow)
+                                            } else if rondeStatus[safe: index] == .valseBalzak {
+                                                Text("• ⚠️ Valse (+25)")
+                                                    .font(.caption2)
+                                                    .fontWeight(.bold)
+                                                    .foregroundColor(.red)
+                                            }
                                         }
                                     }
 
@@ -190,45 +209,67 @@ struct BalzakkenGameView: View {
                                     // Knoppen voor BALZAK en VALSE BALZAK
                                     HStack(spacing: 10) {
                                         Button(action: {
-                                            if index < rondeScores.count {
-                                                rondeScores[index] = 0
-                                                if index < juisteBalzakken.count {
-                                                    juisteBalzakken[index] += 1
+                                            if index < rondeScores.count && index < rondeStatus.count {
+                                                if rondeStatus[index] == .juisteBalzak {
+                                                    // Klik nogmaals om te deselecteren
+                                                    rondeStatus[index] = .geen
+                                                    rondeScores[index] = 0
+                                                } else {
+                                                    rondeScores[index] = 0
+                                                    rondeStatus[index] = .juisteBalzak
                                                 }
                                             }
                                         }) {
-                                            HStack {
+                                            HStack(spacing: 6) {
                                                 Image(systemName: "crown.fill")
                                                 Text("BALZAK! (0)")
                                                     .fontWeight(.bold)
+                                                if rondeStatus[safe: index] == .juisteBalzak {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                }
                                             }
                                             .font(.footnote)
                                             .frame(maxWidth: .infinity)
                                             .padding(.vertical, 10)
-                                            .background(Color.yellow.opacity(0.95))
-                                            .foregroundColor(.black)
+                                            .background(rondeStatus[safe: index] == .juisteBalzak ? Color.yellow : Color.yellow.opacity(0.35))
+                                            .foregroundColor(rondeStatus[safe: index] == .juisteBalzak ? Color.black : Color.primary)
                                             .cornerRadius(8)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(rondeStatus[safe: index] == .juisteBalzak ? Color.orange : Color.clear, lineWidth: 2)
+                                            )
                                         }
 
                                         Button(action: {
-                                            if index < rondeScores.count {
-                                                rondeScores[index] = 25
-                                                if index < fouteBalzakken.count {
-                                                    fouteBalzakken[index] += 1
+                                            if index < rondeScores.count && index < rondeStatus.count {
+                                                if rondeStatus[index] == .valseBalzak {
+                                                    // Klik nogmaals om te deselecteren
+                                                    rondeStatus[index] = .geen
+                                                    rondeScores[index] = 0
+                                                } else {
+                                                    rondeScores[index] = 25
+                                                    rondeStatus[index] = .valseBalzak
                                                 }
                                             }
                                         }) {
-                                            HStack {
+                                            HStack(spacing: 6) {
                                                 Image(systemName: "exclamationmark.triangle.fill")
                                                 Text("Valse Balzak (+25)")
                                                     .fontWeight(.bold)
+                                                if rondeStatus[safe: index] == .valseBalzak {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                }
                                             }
                                             .font(.footnote)
                                             .frame(maxWidth: .infinity)
                                             .padding(.vertical, 10)
-                                            .background(Color.red)
-                                            .foregroundColor(.white)
+                                            .background(rondeStatus[safe: index] == .valseBalzak ? Color.red : Color.red.opacity(0.2))
+                                            .foregroundColor(rondeStatus[safe: index] == .valseBalzak ? Color.white : Color.red)
                                             .cornerRadius(8)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(rondeStatus[safe: index] == .valseBalzak ? Color.red : Color.clear, lineWidth: 2)
+                                            )
                                         }
                                     }
 
@@ -242,10 +283,13 @@ struct BalzakkenGameView: View {
                                             .fontWeight(.bold)
                                             .foregroundColor(.red)
 
-                                        if (rondeScores[safe: index] ?? 0) != 0 {
+                                        if (rondeScores[safe: index] ?? 0) != 0 || rondeStatus[safe: index] != .geen {
                                             Button(action: {
                                                 if index < rondeScores.count {
                                                     rondeScores[index] = 0
+                                                }
+                                                if index < rondeStatus.count {
+                                                    rondeStatus[index] = .geen
                                                 }
                                             }) {
                                                 Image(systemName: "xmark.circle.fill")
@@ -261,6 +305,9 @@ struct BalzakkenGameView: View {
                                             if index < rondeScores.count {
                                                 rondeScores[index] = max(-1, rondeScores[index] - 1)
                                             }
+                                            if index < rondeStatus.count {
+                                                rondeStatus[index] = .geen
+                                            }
                                         }
                                         .font(.headline)
                                         .frame(maxWidth: .infinity)
@@ -272,6 +319,9 @@ struct BalzakkenGameView: View {
                                         Button("+1") {
                                             if index < rondeScores.count {
                                                 rondeScores[index] += 1
+                                            }
+                                            if index < rondeStatus.count {
+                                                rondeStatus[index] = .geen
                                             }
                                         }
                                         .font(.headline)
@@ -285,6 +335,9 @@ struct BalzakkenGameView: View {
                                             if index < rondeScores.count {
                                                 rondeScores[index] += 5
                                             }
+                                            if index < rondeStatus.count {
+                                                rondeStatus[index] = .geen
+                                            }
                                         }
                                         .font(.headline)
                                         .frame(maxWidth: .infinity)
@@ -296,6 +349,9 @@ struct BalzakkenGameView: View {
                                         Button("+11") {
                                             if index < rondeScores.count {
                                                 rondeScores[index] += 11
+                                            }
+                                            if index < rondeStatus.count {
+                                                rondeStatus[index] = .geen
                                             }
                                         }
                                         .font(.headline)
@@ -345,6 +401,7 @@ struct BalzakkenGameView: View {
                 totaleScores = Array(repeating: 0, count: spelers.count)
                 juisteBalzakken = Array(repeating: 0, count: spelers.count)
                 fouteBalzakken = Array(repeating: 0, count: spelers.count)
+                rondeStatus = Array(repeating: .geen, count: spelers.count)
                 isExpanded = Array(repeating: false, count: spelers.count)
                 if !spelers.isEmpty {
                     startSpelerIndex = Int.random(in: 0..<spelers.count)
@@ -446,6 +503,19 @@ struct BalzakkenGameView: View {
             if i < rondeScores.count && i < totaleScores.count {
                 totaleScores[i] += rondeScores[i]
 
+                // Alleen HIER bij het afronden van de ronde registreren we de balzakken voor de statistieken:
+                if rondeStatus[safe: i] == .juisteBalzak {
+                    if i < juisteBalzakken.count {
+                        juisteBalzakken[i] += 1
+                    }
+                    specialEvents.append("🎯 \(spelers[i].name) had een Goeie Balzak! (0 pt)")
+                } else if rondeStatus[safe: i] == .valseBalzak {
+                    if i < fouteBalzakken.count {
+                        fouteBalzakken[i] += 1
+                    }
+                    specialEvents.append("⚠️ \(spelers[i].name) had een Valse Balzak! (+25 pt)")
+                }
+
                 // Speciale regel: precies 69 punten -> terug naar 50 punten!
                 if totaleScores[i] == 69 {
                     totaleScores[i] = 50
@@ -473,6 +543,7 @@ struct BalzakkenGameView: View {
 
         huidigeRonde += 1
         rondeScores = Array(repeating: 0, count: spelers.count)
+        rondeStatus = Array(repeating: .geen, count: spelers.count)
         withAnimation {
             isExpanded = Array(repeating: false, count: spelers.count)
         }
