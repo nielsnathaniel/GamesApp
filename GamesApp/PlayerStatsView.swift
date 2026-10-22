@@ -136,6 +136,30 @@ struct PlayerStatsView: View {
                     }
                 }
             }
+
+            // Beste Team Partners
+            let partners = scoreManager.bestPartners(for: playerName)
+            if !partners.isEmpty {
+                Section(header: Text("Team Partners 🤝")) {
+                    ForEach(partners) { part in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(part.partnerName)
+                                    .font(.headline)
+                                Text("\(part.winsTogether) van de \(part.gamesTogether) potjes gewonnen")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text("\(String(format: "%.0f%%", part.winRate)) win")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(part.winRate >= 50 ? .green : .orange)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
         }
         .navigationTitle(playerName)
         .navigationBarTitleDisplayMode(.inline)

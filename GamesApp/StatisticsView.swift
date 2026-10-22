@@ -4,11 +4,13 @@ struct StatisticsView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
     @State private var selectedSegment: StatSegment = .overzicht
     @State private var selectedGameFilter: String = "Alle Spellen"
+    @State private var selectedPartnerPlayer: String = ""
 
     enum StatSegment: String, CaseIterable, Identifiable {
         case overzicht = "Overzicht"
         case spelers = "Spelers"
-        case rivaliteiten = "Wie wint van wie?"
+        case teams = "Duo's 🤝"
+        case rivaliteiten = "Wie wint?"
         case balzakken = "Balzakken 🎯"
 
         var id: String { self.rawValue }
@@ -41,6 +43,8 @@ struct StatisticsView: View {
                             overviewSection
                         case .spelers:
                             playersLeaderboardSection
+                        case .teams:
+                            teamsSection
                         case .rivaliteiten:
                             rivalriesSection
                         case .balzakken:
@@ -546,6 +550,328 @@ struct StatisticsView: View {
                 .background(Color(UIColor.secondarySystemGroupedBackground))
                 .cornerRadius(16)
             }
+        }
+    }
+
+    // MARK: - 5. TEAMS & DUO'S
+
+    private var teamsSection: some View {
+        VStack(spacing: 20) {
+            let teamStats = scoreManager.teamLeaderboard()
+            let teamPlayers = scoreManager.allPlayersWithTeamHistory()
+
+            if teamStats.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "person.2.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundColor(.blue.opacity(0.8))
+                        .padding(.top, 20)
+
+                    Text("Nog Geen Teamwedstrijden")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text("Speel een 2 tegen 2 wedstrijd bij Crokinole om duo-statistieken, partnerchemie en de teamranglijst te ontgrendelen!")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+
+                    NavigationLink(destination: CrockinoleSetupView()) {
+                        HStack {
+                            Image(systemName: "circle.circle.fill")
+                            Text("Start Crokinole Teamwedstrijd")
+                        }
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.blue)
+                        .cornerRadius(12)
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+            } else {
+                // 1. Gouden Dream Team Banner (Beste Duo)
+                if let bestDuo = teamStats.first {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Image(systemName: "crown.fill")
+                                .foregroundColor(.yellow)
+                                .font(.title2)
+                            Text("DREAM TEAM VAN DE APP")
+                                .font(.caption)
+                                .fontWeight(.heavy)
+                                .foregroundColor(.orange)
+                            Spacer()
+                            Text("Beste Duo")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.yellow.opacity(0.2))
+                                .foregroundColor(.orange)
+                                .cornerRadius(6)
+                        }
+
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(bestDuo.displayName)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                Text("Spelers: \(bestDuo.playerNames.joined(separator: " & "))")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(String(format: "%.0f%%", bestDuo.winRate))")
+                                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.blue)
+                                Text("Winstpercentage")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        HStack(spacing: 12) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trophy.fill")
+                                    .foregroundColor(.yellow)
+                                Text("\(bestDuo.won)x gewonnen")
+                                    .fontWeight(.semibold)
+                            }
+                            .font(.caption)
+
+                            Text("•")
+                                .foregroundColor(.secondary)
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "gamecontroller.fill")
+                                    .foregroundColor(.blue)
+                                Text("\(bestDuo.played) potjes totaal")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [Color.yellow.opacity(0.18), Color.blue.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.yellow.opacity(0.4), lineWidth: 1.5)
+                    )
+                    .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+                }
+
+                // 2. Partner Chemie ("Met wie speel jij het beste?")
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.purple)
+                        Text("Partner Chemie")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                    }
+
+                    Text("Kies een speler om te zien met welke medespeler hij of zij de hoogste winstkans heeft:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    // Horizontale scrollbare spelers-knoppen
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(teamPlayers, id: \.self) { pName in
+                                let isSelected = (selectedPartnerPlayer == pName || (selectedPartnerPlayer.isEmpty && pName == teamPlayers.first))
+                                Button(action: {
+                                    selectedPartnerPlayer = pName
+                                }) {
+                                    Text(pName)
+                                        .font(.subheadline)
+                                        .fontWeight(isSelected ? .bold : .medium)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(isSelected ? Color.purple : Color(UIColor.tertiarySystemGroupedBackground))
+                                        .foregroundColor(isSelected ? .white : .primary)
+                                        .cornerRadius(20)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    // Toon resultaten voor geselecteerde speler
+                    let activePlayer = selectedPartnerPlayer.isEmpty ? (teamPlayers.first ?? "") : selectedPartnerPlayer
+                    let partners = scoreManager.bestPartners(for: activePlayer)
+
+                    if partners.isEmpty {
+                        Text("Geen partnergeschiedenis gevonden voor \(activePlayer).")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        VStack(spacing: 10) {
+                            ForEach(partners) { part in
+                                partnerCard(player: activePlayer, partner: part)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+
+                // 3. Alle Teams Ranglijst (Leaderboard)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Image(systemName: "list.number")
+                            .foregroundColor(.blue)
+                        Text("Duo Ranglijst")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                    }
+
+                    ForEach(Array(teamStats.enumerated()), id: \.element.id) { index, team in
+                        HStack(spacing: 12) {
+                            // Rang / medaille
+                            ZStack {
+                                Circle()
+                                    .fill(rankColor(for: index).opacity(0.15))
+                                    .frame(width: 34, height: 34)
+
+                                if index == 0 {
+                                    Text("🥇").font(.subheadline)
+                                } else if index == 1 {
+                                    Text("🥈").font(.subheadline)
+                                } else if index == 2 {
+                                    Text("🥉").font(.subheadline)
+                                } else {
+                                    Text("\(index + 1)")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(team.displayName)
+                                    .font(.headline)
+                                Text(team.playerNames.joined(separator: " & "))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(String(format: "%.0f%%", team.winRate)) win")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(team.winRate >= 50 ? .green : .secondary)
+
+                                Text("\(team.won)W - \(team.played - team.won)V")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+
+                        if index < teamStats.count - 1 {
+                            Divider()
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+            }
+        }
+    }
+
+    private func partnerCard(player: String, partner: PartnerSynergyStat) -> some View {
+        VStack(spacing: 6) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.2.fill")
+                        .foregroundColor(.purple)
+                    Text(partner.partnerName)
+                        .font(.headline)
+                }
+
+                Spacer()
+
+                synergyBadge(winRate: partner.winRate)
+            }
+
+            ProgressView(value: partner.winRate, total: 100.0)
+                .tint(synergyColor(winRate: partner.winRate))
+
+            HStack {
+                Text("\(partner.winsTogether) van de \(partner.gamesTogether) potjes gewonnen")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Text("\(String(format: "%.0f%%", partner.winRate)) winst")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(synergyColor(winRate: partner.winRate))
+            }
+        }
+        .padding(12)
+        .background(Color(UIColor.tertiarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+
+    private func synergyBadge(winRate: Double) -> some View {
+        let (label, color, icon): (String, Color, String) = {
+            if winRate >= 75 {
+                return ("Onverslaanbaar", .green, "crown.fill")
+            } else if winRate >= 50 {
+                return ("Gouden Duo", .blue, "star.fill")
+            } else {
+                return ("Uitdaging", .orange, "flame")
+            }
+        }()
+
+        return HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(label)
+        }
+        .font(.system(size: 10, weight: .bold))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(color.opacity(0.15))
+        .foregroundColor(color)
+        .cornerRadius(6)
+    }
+
+    private func synergyColor(winRate: Double) -> Color {
+        if winRate >= 60 { return .green }
+        if winRate >= 45 { return .blue }
+        return .orange
+    }
+
+    private func rankColor(for index: Int) -> Color {
+        switch index {
+        case 0: return .yellow
+        case 1: return .gray
+        case 2: return .brown
+        default: return .blue
         }
     }
 

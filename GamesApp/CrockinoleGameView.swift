@@ -1,7 +1,11 @@
 import SwiftUI
 
 struct CrockinoleGameView: View {
-    var spelers: [String] = ["Wit", "Zwart"]
+    var isTeamMode: Bool = false
+    var teamWitNaam: String = "Wit"
+    var teamWitSpelers: [String] = ["Wit"]
+    var teamZwartNaam: String = "Zwart"
+    var teamZwartSpelers: [String] = ["Zwart"]
     var puntenMethode: String = "Alles"
 
     // Ronde-invoer scores [Wit, Zwart]
@@ -12,44 +16,129 @@ struct CrockinoleGameView: View {
     @State private var totaleScores: [Int] = [0, 0]
     @State private var huidigeRonde: Int = 1
     @State private var showWinnaarView: Bool = false
-    @State private var winnaar: String?
+    @State private var winnaarTeam: String?
 
-    // Selecties voor de rekentool
-    @State private var selectedPlayerIndex: Int = 0 // 0 = Wit, 1 = Zwart
+    // Schietvolgorde (Wit 1 -> Zwart 1 -> Wit 2 -> Zwart 2)
+    @State private var huidigeSchutterIndex: Int = 0
+
+    // Selecties voor de score-invoer (0 = Wit, 1 = Zwart)
+    @State private var selectedTeamIndex: Int = 0
     @State private var selectedPoints: Int = 5
 
     let beschikbarePunten = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+
+    init(spelers: [String] = ["Wit", "Zwart"], puntenMethode: String = "Alles") {
+        self.isTeamMode = false
+        self.teamWitNaam = spelers.indices.contains(0) ? spelers[0] : "Wit"
+        self.teamWitSpelers = [self.teamWitNaam]
+        self.teamZwartNaam = spelers.indices.contains(1) ? spelers[1] : "Zwart"
+        self.teamZwartSpelers = [self.teamZwartNaam]
+        self.puntenMethode = puntenMethode
+    }
+
+    init(
+        isTeamMode: Bool,
+        teamWitNaam: String,
+        teamWitSpelers: [String],
+        teamZwartNaam: String,
+        teamZwartSpelers: [String],
+        puntenMethode: String = "Alles"
+    ) {
+        self.isTeamMode = isTeamMode
+        self.teamWitNaam = teamWitNaam
+        self.teamWitSpelers = teamWitSpelers
+        self.teamZwartNaam = teamZwartNaam
+        self.teamZwartSpelers = teamZwartSpelers
+        self.puntenMethode = puntenMethode
+    }
+
+    // Volgorde van schutters in een 2v2 potje
+    private var schuttersVolgorde: [String] {
+        if isTeamMode {
+            var list: [String] = []
+            if let w1 = teamWitSpelers[safe: 0] { list.append("\(w1) (⚪ Wit)") }
+            if let z1 = teamZwartSpelers[safe: 0] { list.append("\(z1) (⚫ Zwart)") }
+            if let w2 = teamWitSpelers[safe: 1] { list.append("\(w2) (⚪ Wit)") }
+            if let z2 = teamZwartSpelers[safe: 1] { list.append("\(z2) (⚫ Zwart)") }
+            return list
+        } else {
+            return ["\(teamWitNaam) (⚪ Wit)", "\(teamZwartNaam) (⚫ Zwart)"]
+        }
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 // Header
                 VStack(spacing: 4) {
-                    Text("Crockinole")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    Text("Ronde \(huidigeRonde)")
-                        .font(.title3)
+                    HStack {
+                        Image(systemName: "circle.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("Crokinole")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                    }
+                    Text("Ronde \(huidigeRonde) • Eerste team met 3 sets wint!")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                .padding(.top, 8)
+                .padding(.top, 4)
 
-                // 1. Speler-tegels (Wit & Zwart)
-                HStack(spacing: 16) {
-                    ForEach(0..<min(spelers.count, 2), id: \.self) { index in
-                        playerTile(for: index)
+                // Schietvolgorde Banner (als teammodus actief is)
+                if isTeamMode {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .foregroundColor(.blue)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Aan de beurt om te schieten:")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(schuttersVolgorde[safe: huidigeSchutterIndex % max(1, schuttersVolgorde.count)] ?? "")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                        }
+
+                        Spacer()
+
+                        Button(action: {
+                            withAnimation {
+                                huidigeSchutterIndex = (huidigeSchutterIndex + 1) % max(1, schuttersVolgorde.count)
+                            }
+                        }) {
+                            Text("Volgende")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.blue.opacity(0.12))
+                                .foregroundColor(.blue)
+                                .cornerRadius(8)
+                        }
                     }
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+
+                // 1. Team/Speler Tegels (Wit & Zwart)
+                HStack(spacing: 14) {
+                    teamTile(index: 0, isWit: true)
+                    teamTile(index: 1, isWit: false)
                 }
                 .padding(.horizontal)
 
-                // Statusbalkje met actieve speler en optie tot reset van deze ronde
+                // Statusbalkje met actieve selectie en reset-optie
                 HStack {
-                    Text("Geselecteerd: ")
+                    Text("Puntentoewijzing aan: ")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    + Text(spelers[safe: selectedPlayerIndex] ?? "Speler")
+                    + Text(selectedTeamIndex == 0 ? teamWitNaam : teamZwartNaam)
                         .font(.subheadline)
                         .fontWeight(.bold)
+                        .foregroundColor(.primary)
 
                     Spacer()
 
@@ -68,9 +157,9 @@ struct CrockinoleGameView: View {
                 Divider()
                     .padding(.horizontal)
 
-                // 2. Puntentegels (5, 10, 15, 20, 25, 30, 35, 40, 45, 50)
+                // 2. Puntentegels
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Kies punten")
+                    Text("Kies punten van deze ronde")
                         .font(.headline)
                         .padding(.horizontal)
 
@@ -83,7 +172,7 @@ struct CrockinoleGameView: View {
                                     .font(.title3)
                                     .fontWeight(.bold)
                                     .frame(maxWidth: .infinity)
-                                    .frame(height: 50)
+                                    .frame(height: 48)
                                     .background(selectedPoints == punten ? Color.blue : Color(UIColor.secondarySystemBackground))
                                     .foregroundColor(selectedPoints == punten ? .white : .primary)
                                     .cornerRadius(10)
@@ -97,15 +186,15 @@ struct CrockinoleGameView: View {
                     .padding(.horizontal)
                 }
 
-                // 3. Knop Toevoegen
+                // 3. Knop Punten Toevoegen
                 Button(action: {
-                    if selectedPlayerIndex < scores.count {
-                        scores[selectedPlayerIndex] += selectedPoints
+                    if selectedTeamIndex < scores.count {
+                        scores[selectedTeamIndex] += selectedPoints
                     }
                 }) {
                     HStack {
                         Image(systemName: "plus.circle.fill")
-                        Text("\(selectedPoints) punten toevoegen aan \(spelers[safe: selectedPlayerIndex] ?? "")")
+                        Text("\(selectedPoints) punten toevoegen aan \(selectedTeamIndex == 0 ? teamWitNaam : teamZwartNaam)")
                             .fontWeight(.semibold)
                     }
                     .font(.headline)
@@ -118,7 +207,7 @@ struct CrockinoleGameView: View {
                 }
                 .padding(.horizontal)
 
-                // 4. Knop Ronde beëindigen
+                // 4. Knop Ronde beëindigen (Berekent het differentieel conform officiële regels)
                 Button(action: {
                     berekenRondeEnBeëindig()
                 }) {
@@ -142,11 +231,34 @@ struct CrockinoleGameView: View {
             }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
-            if let winnaar = winnaar {
+            if isTeamMode {
+                let winnerName = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
+                let entries = [
+                    WinnaarTeamEntry(
+                        teamName: teamWitNaam,
+                        playerNames: teamWitSpelers,
+                        score: setScores[0],
+                        isWinner: setScores[0] >= 3
+                    ),
+                    WinnaarTeamEntry(
+                        teamName: teamZwartNaam,
+                        playerNames: teamZwartSpelers,
+                        score: setScores[1],
+                        isWinner: setScores[1] >= 3
+                    )
+                ]
                 WinnaarView(
                     gameName: "Crockinole",
-                    winnaarNaam: winnaar,
-                    spelersNamen: spelers,
+                    winningTeamName: winnerName,
+                    teams: entries,
+                    isLowestScoreWins: false
+                )
+            } else {
+                let winnerName = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
+                WinnaarView(
+                    gameName: "Crockinole",
+                    winnaarNaam: winnerName,
+                    spelersNamen: [teamWitNaam, teamZwartNaam],
                     scores: setScores,
                     isLowestScoreWins: false
                 )
@@ -154,25 +266,35 @@ struct CrockinoleGameView: View {
         }
     }
 
-    // Spelertegel voor Wit of Zwart
-    private func playerTile(for index: Int) -> some View {
-        let isSelected = selectedPlayerIndex == index
-        let naam = spelers[safe: index] ?? "Speler \(index + 1)"
-        let isWit = index == 0 || naam.lowercased() == "wit"
+    // Team / Speler Tegel
+    private func teamTile(index: Int, isWit: Bool) -> some View {
+        let isSelected = selectedTeamIndex == index
+        let title = isWit ? teamWitNaam : teamZwartNaam
+        let players = isWit ? teamWitSpelers : teamZwartSpelers
 
         return Button(action: {
-            selectedPlayerIndex = index
+            selectedTeamIndex = index
         }) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Circle()
                         .fill(isWit ? Color.white : Color.black)
                         .frame(width: 20, height: 20)
                         .overlay(Circle().stroke(Color.gray, lineWidth: 1))
 
-                    Text(naam)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+
+                        if isTeamMode {
+                            Text(players.joined(separator: " & "))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
 
                     Spacer()
 
@@ -196,10 +318,10 @@ struct CrockinoleGameView: View {
 
                 HStack {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Totaal:")
+                        Text("Set-voortgang:")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        Text("\(totaleScores[safe: index] ?? 0) pt")
+                        Text("\(totaleScores[safe: index] ?? 0) / 100 pt")
                             .font(.caption)
                             .fontWeight(.semibold)
                     }
@@ -207,12 +329,12 @@ struct CrockinoleGameView: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 1) {
-                        Text("Sets:")
+                        Text("Sets gewonnen:")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                         Text("\(setScores[safe: index] ?? 0) / 3")
                             .font(.caption)
-                            .fontWeight(.semibold)
+                            .fontWeight(.bold)
                             .foregroundColor(.orange)
                     }
                 }
@@ -229,7 +351,7 @@ struct CrockinoleGameView: View {
         }
     }
 
-    // Crokinole puntentelling conform officiële regels
+    // Crokinole differentieel puntentelling conform regels
     private func berekenRondeEnBeëindig() {
         let score0 = scores.indices.contains(0) ? scores[0] : 0
         let score1 = scores.indices.contains(1) ? scores[1] : 0
@@ -241,28 +363,39 @@ struct CrockinoleGameView: View {
             let diff = score1 - score0
             totaleScores[1] += diff
         }
-        // Bij gelijkspel: geen punten toegekend
 
-        // Controleer of een speler 100 punten heeft bereikt om een set te winnen
-        for i in 0..<min(spelers.count, 2) {
+        // Controleer of een team 100 punten heeft bereikt in de set
+        for i in 0..<2 {
             if totaleScores[i] >= 100 {
                 setScores[i] += 1
-                totaleScores[i] = 0 // Reset set-totaal na winnen van de set
+                totaleScores[i] = 0
             }
         }
 
-        // Controleer of een speler 3 sets heeft gewonnen
-        if let winnaarIndex = setScores.firstIndex(where: { $0 >= 3 }) {
-            winnaar = spelers[winnaarIndex]
+        // Controleer of een team 3 sets heeft gewonnen
+        if setScores.contains(where: { $0 >= 3 }) {
+            winnaarTeam = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
             showWinnaarView = true
         }
 
         // Reset ronde-invoer voor de volgende ronde
         scores = [0, 0]
         huidigeRonde += 1
+
+        if isTeamMode {
+            huidigeSchutterIndex = (huidigeSchutterIndex + 1) % max(1, schuttersVolgorde.count)
+        }
     }
 }
 
 #Preview {
-    CrockinoleGameView(spelers: ["Wit", "Zwart"], puntenMethode: "Alles")
+    NavigationStack {
+        CrockinoleGameView(
+            isTeamMode: true,
+            teamWitNaam: "The Aces",
+            teamWitSpelers: ["Niels", "Tom"],
+            teamZwartNaam: "The Kings",
+            teamZwartSpelers: ["Lisa", "Sam"]
+        )
+    }
 }

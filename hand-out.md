@@ -52,6 +52,11 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   - In-game puntengeschiedenis (ronde per ronde popup sheet).
   - "Wie mag beginnen?": Ronde 1 willekeurig gekozen met dobbelsteen-knop, daarna opvolgend met de klok mee ("om de beurt").
 * [`BeverbendeScoreView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/BeverbendeScoreView.swift): Rondegeschiedenis sheet en startspeler-indicator.
+* [`CrockinoleSetupView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/CrockinoleSetupView.swift) & [`CrockinoleGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/CrockinoleGameView.swift):
+  - Keuze tussen 1 vs 1 en 2 vs 2 (Teams).
+  - Spelers kiezen uit bestaande spelers (quick chips / suggesties) of direct toevoegen.
+  - Team Wit & Team Zwart met eigen teamnaam en 2 spelers per team.
+  - Schietvolgorde-indicator ("Aan de beurt om te schieten") voor 2v2 wedstrijden.
 * [`JattenSetupView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenSetupView.swift) & [`JattenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenGameView.swift):
   - Aantal rondes keuze verwijderd (spel stopt immers zodra iemand 6 dezelfde heeft).
   - Prominente `🏆 6 dezelfde!` knop op elke spelerskaart voor directe winst en overgang naar `WinnaarView`.

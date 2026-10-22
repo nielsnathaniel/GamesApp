@@ -32,12 +32,89 @@ struct PlayerScore: Identifiable, Codable {
     }
 }
 
+struct GameTeam: Identifiable, Codable {
+    var id: UUID = UUID()
+    let teamName: String
+    let playerNames: [String]
+    let score: Int
+    let isWinner: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, teamName, playerNames, score, isWinner
+    }
+
+    init(id: UUID = UUID(), teamName: String, playerNames: [String], score: Int, isWinner: Bool) {
+        self.id = id
+        self.teamName = teamName
+        self.playerNames = playerNames
+        self.score = score
+        self.isWinner = isWinner
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.teamName = try container.decode(String.self, forKey: .teamName)
+        self.playerNames = try container.decode([String].self, forKey: .playerNames)
+        self.score = try container.decode(Int.self, forKey: .score)
+        self.isWinner = try container.decode(Bool.self, forKey: .isWinner)
+    }
+}
+
 struct PlayedGame: Identifiable, Codable {
     var id: UUID = UUID()
     let date: Date
     let gameName: String
     let scores: [PlayerScore]
     let winner: String
+    var teams: [GameTeam]? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case id, date, gameName, scores, winner, teams
+    }
+
+    init(id: UUID = UUID(), date: Date, gameName: String, scores: [PlayerScore], winner: String, teams: [GameTeam]? = nil) {
+        self.id = id
+        self.date = date
+        self.gameName = gameName
+        self.scores = scores
+        self.winner = winner
+        self.teams = teams
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.date = try container.decode(Date.self, forKey: .date)
+        self.gameName = try container.decode(String.self, forKey: .gameName)
+        self.scores = try container.decode([PlayerScore].self, forKey: .scores)
+        self.winner = try container.decode(String.self, forKey: .winner)
+        self.teams = try container.decodeIfPresent([GameTeam].self, forKey: .teams)
+    }
+}
+
+struct TeamStat: Identifiable {
+    var id: String { teamKey }
+    let teamKey: String
+    let displayName: String
+    let playerNames: [String]
+    let played: Int
+    let won: Int
+    let totalScore: Int
+    var winRate: Double {
+        played > 0 ? (Double(won) / Double(played)) * 100.0 : 0.0
+    }
+}
+
+struct PartnerSynergyStat: Identifiable {
+    var id: String { partnerName }
+    let partnerName: String
+    let gamesTogether: Int
+    let winsTogether: Int
+    let lossesTogether: Int
+    var winRate: Double {
+        gamesTogether > 0 ? (Double(winsTogether) / Double(gamesTogether)) * 100.0 : 0.0
+    }
 }
 
 struct Score: Identifiable, Codable {
@@ -311,6 +388,67 @@ class ScoreManager: ObservableObject {
         persistScores(existingScores)
     }
 
+    func saveTeamGame(
+        gameName: String,
+        teams: [(teamName: String, playerNames: [String], score: Int, isWinner: Bool)]
+    ) {
+        let now = Date()
+        var existingGames = fetchGames()
+        var existingScores = fetchScores()
+
+        let winningTeam = teams.first(where: { $0.isWinner })
+        let winnerTitle = winningTeam?.teamName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        var gameTeams: [GameTeam] = []
+        var playerScores: [PlayerScore] = []
+
+        for t in teams {
+            let cleanTeamName = t.teamName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanPlayers = t.playerNames.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+
+            let effectiveName = cleanTeamName.isEmpty ? cleanPlayers.joined(separator: " & ") : cleanTeamName
+            let teamEntry = GameTeam(
+                teamName: effectiveName,
+                playerNames: cleanPlayers,
+                score: t.score,
+                isWinner: t.isWinner
+            )
+            gameTeams.append(teamEntry)
+
+            for pName in cleanPlayers {
+                savePlayerName(pName)
+
+                let ps = PlayerScore(
+                    playerName: pName,
+                    score: t.score,
+                    isWinner: t.isWinner
+                )
+                playerScores.append(ps)
+
+                let scoreEntry = Score(
+                    date: now,
+                    gameName: gameName,
+                    playerName: pName,
+                    score: t.score,
+                    isWinner: t.isWinner
+                )
+                existingScores.append(scoreEntry)
+            }
+        }
+
+        let defaultWinner = gameTeams.first(where: { $0.isWinner })?.teamName ?? ""
+        let game = PlayedGame(
+            date: now,
+            gameName: gameName,
+            scores: playerScores,
+            winner: winnerTitle.isEmpty ? defaultWinner : winnerTitle,
+            teams: gameTeams
+        )
+        existingGames.append(game)
+        persistGames(existingGames)
+        persistScores(existingScores)
+    }
+
     func deleteGame(id: UUID) {
         var games = fetchGames()
         games.removeAll { $0.id == id }
@@ -566,5 +704,111 @@ class ScoreManager: ObservableObject {
             }
             return $0.fouteBalzakken < $1.fouteBalzakken
         }
+    }
+
+    // MARK: - Team & Partner Statistieken
+
+    func teamLeaderboard(gameFilter: String? = nil) -> [TeamStat] {
+        var teamMap: [String: (displayName: String, playerNames: [String], played: Int, won: Int, totalScore: Int)] = [:]
+
+        var relevantGames = playedGames.filter { $0.teams != nil && !($0.teams!.isEmpty) }
+        if let filter = gameFilter, !filter.isEmpty, filter != "Alle Spellen" {
+            relevantGames = relevantGames.filter { $0.gameName.caseInsensitiveCompare(filter) == .orderedSame }
+        }
+
+        for game in relevantGames {
+            guard let teams = game.teams else { continue }
+            for team in teams {
+                let sortedPlayers = team.playerNames.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+                guard sortedPlayers.count >= 2 else { continue }
+                let teamKey = sortedPlayers.joined(separator: " & ")
+                let current = teamMap[teamKey] ?? (
+                    displayName: team.teamName.isEmpty ? teamKey : team.teamName,
+                    playerNames: sortedPlayers,
+                    played: 0,
+                    won: 0,
+                    totalScore: 0
+                )
+                teamMap[teamKey] = (
+                    displayName: current.displayName,
+                    playerNames: sortedPlayers,
+                    played: current.played + 1,
+                    won: current.won + (team.isWinner ? 1 : 0),
+                    totalScore: current.totalScore + team.score
+                )
+            }
+        }
+
+        return teamMap.map { key, val in
+            TeamStat(
+                teamKey: key,
+                displayName: val.displayName,
+                playerNames: val.playerNames,
+                played: val.played,
+                won: val.won,
+                totalScore: val.totalScore
+            )
+        }.sorted {
+            if $0.won != $1.won {
+                return $0.won > $1.won
+            }
+            if $0.winRate != $1.winRate {
+                return $0.winRate > $1.winRate
+            }
+            return $0.played > $1.played
+        }
+    }
+
+    func bestPartners(for playerName: String) -> [PartnerSynergyStat] {
+        var partnerMap: [String: (games: Int, wins: Int, losses: Int)] = [:]
+
+        for game in playedGames {
+            guard let teams = game.teams else { continue }
+            for team in teams {
+                let hasPlayer = team.playerNames.contains { $0.caseInsensitiveCompare(playerName) == .orderedSame }
+                guard hasPlayer && team.playerNames.count >= 2 else { continue }
+
+                for partner in team.playerNames {
+                    guard partner.caseInsensitiveCompare(playerName) != .orderedSame else { continue }
+                    let cur = partnerMap[partner] ?? (games: 0, wins: 0, losses: 0)
+                    partnerMap[partner] = (
+                        games: cur.games + 1,
+                        wins: cur.wins + (team.isWinner ? 1 : 0),
+                        losses: cur.losses + (team.isWinner ? 0 : 1)
+                    )
+                }
+            }
+        }
+
+        return partnerMap.map { partner, data in
+            PartnerSynergyStat(
+                partnerName: partner,
+                gamesTogether: data.games,
+                winsTogether: data.wins,
+                lossesTogether: data.losses
+            )
+        }.sorted {
+            if $0.winRate != $1.winRate {
+                return $0.winRate > $1.winRate
+            }
+            return $0.gamesTogether > $1.gamesTogether
+        }
+    }
+
+    func allPlayersWithTeamHistory() -> [String] {
+        var set = Set<String>()
+        for game in playedGames {
+            guard let teams = game.teams else { continue }
+            for team in teams where team.playerNames.count >= 2 {
+                for p in team.playerNames {
+                    set.insert(p)
+                }
+            }
+        }
+        return set.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    func bestOverallDuo() -> TeamStat? {
+        return teamLeaderboard().first
     }
 }
