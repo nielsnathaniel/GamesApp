@@ -62,6 +62,10 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   - Spelers kiezen uit bestaande spelers (quick chips / suggesties) of direct toevoegen.
   - Teamnamen worden automatisch afgeleid van de gekozen spelers (bijv. "Niels & Tom") — overbodige tekstvelden voor teamnamen zijn geëlimineerd.
   - Schietvolgorde-indicator ("Aan de beurt om te schieten") voor 2v2 wedstrijden.
+  - **In-game telwijze aanpassen:** Tijdens het spelen kan op ieder gewenst moment geswitcht worden tussen:
+    - **Alles (Direct):** Direct punten toevoegen via presets (5, 10, 15, ..., 50 pt).
+    - **Berekend (Per schijf):** Schijf voor schijf tellen per ring (Centrum 20 pt, Binnenring 15 pt, Middenring 10 pt, Buitenring 5 pt) met handige steppers en automatische subtotalen.
+  - Duidelijke preview op de "Ronde beëindigen" knop die direct toont hoeveel differentiële punten er naar welk team gaan.
 * [`JattenSetupView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenSetupView.swift) & [`JattenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenGameView.swift):
   - Aantal rondes keuze verwijderd (spel stopt immers zodra iemand 6 dezelfde heeft).
   - Prominente `🏆 6 dezelfde!` knop op elke spelerskaart voor directe winst en overgang naar `WinnaarView`.
