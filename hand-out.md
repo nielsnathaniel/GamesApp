@@ -68,8 +68,9 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   - Duidelijke preview op de "Ronde beëindigen" knop die direct toont hoeveel differentiële punten er naar welk team gaan.
 * [`JattenSetupView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenSetupView.swift) & [`JattenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/JattenGameView.swift):
   - Aantal rondes keuze verwijderd (spel stopt immers zodra iemand 6 dezelfde heeft).
+  - **Puntentelling en `+` invoerknoppen verwijderd:** Jatten kent geen punten per ronde. De overbodige `+` knop en het dropdown-invoerscherm (`-1`, `+1`, `+5`, `+10`) zijn volledig weggehaald.
   - Prominente `🏆 6 dezelfde!` knop op elke spelerskaart voor directe winst en overgang naar `WinnaarView`.
-  - Startspeler-indicator ("Wie mag beginnen?") voor de steelvolgorde.
+  - Startspeler-indicator ("Wie mag beginnen?") en steelbeurt-indicator ("Aan de beurt") om de steelvolgorde bij te houden.
 * [`WinnaarView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/WinnaarView.swift): Eindscherm met animaties, podium en automatische opslag naar `ScoreManager`.
 
 ---

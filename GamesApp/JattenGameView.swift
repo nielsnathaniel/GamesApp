@@ -5,13 +5,11 @@ struct JattenGameView: View {
 
     @State private var huidigeRonde: Int = 1
     @State private var startSpelerIndex: Int = 0
-    @State private var rondeScores: [Int] = []
-    @State private var totaleScores: [Int] = []
-    @State private var isExpanded: [Bool] = []
     @State private var showWinnaarView: Bool = false
     @State private var winnaar: Player?
     @State private var showZesDezelfdeAlert: Bool = false
     @State private var geselecteerdeWinnaarIndex: Int?
+    @State private var showHandmatigAfrondenSheet: Bool = false
 
     var huidigeStarterIndex: Int {
         guard !spelers.isEmpty else { return 0 }
@@ -43,7 +41,7 @@ struct JattenGameView: View {
                         .foregroundColor(.purple)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Begint deze ronde:")
+                        Text("Aan de beurt om te jatten:")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Text(spelers[safe: huidigeStarterIndex]?.name ?? "Speler 1")
@@ -87,152 +85,95 @@ struct JattenGameView: View {
                 // Spelers lijst
                 VStack(spacing: 12) {
                     ForEach(spelers.indices, id: \.self) { index in
-                        VStack(spacing: 0) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack(spacing: 6) {
-                                        Text(spelers[index].name)
-                                            .font(.headline)
-                                        if index == huidigeStarterIndex {
-                                            Text("Begint")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color.green.opacity(0.15))
-                                                .foregroundColor(.green)
-                                                .cornerRadius(6)
-                                        }
-                                    }
-                                    Text("Totaal: \(totaleScores[safe: index] ?? 0) pt")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                        HStack {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    Circle()
+                                        .fill(index == huidigeStarterIndex ? Color.purple.opacity(0.2) : Color.gray.opacity(0.12))
+                                        .frame(width: 44, height: 44)
+
+                                    Image(systemName: index == huidigeStarterIndex ? "hand.raised.fill" : "person.fill")
+                                        .foregroundColor(index == huidigeStarterIndex ? .purple : .gray)
+                                        .font(.system(size: 20))
                                 }
 
-                                Spacer()
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(spelers[index].name)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
 
-                                // Knop 6 dezelfde! Direct winnen
-                                Button(action: {
-                                    geselecteerdeWinnaarIndex = index
-                                    showZesDezelfdeAlert = true
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "crown.fill")
-                                        Text("6 dezelfde!")
-                                    }
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 7)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [Color.orange, Color.purple],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .cornerRadius(8)
-                                    .shadow(color: Color.purple.opacity(0.3), radius: 3, x: 0, y: 2)
-                                }
-
-                                // Uitklappen knop voor score-invoer
-                                Button(action: {
-                                    if index < isExpanded.count {
-                                        withAnimation {
-                                            isExpanded[index].toggle()
-                                        }
-                                    }
-                                }) {
-                                    Image(systemName: (index < isExpanded.count && isExpanded[index]) ? "chevron.up.circle.fill" : "plus.circle.fill")
-                                        .font(.title3)
-                                        .foregroundColor(.purple)
-                                }
-                                .padding(.leading, 6)
-                            }
-                            .padding()
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(12)
-
-                            // Uitgeklapt invoergedeelte
-                            if index < isExpanded.count && isExpanded[index] {
-                                VStack(spacing: 10) {
-                                    HStack {
-                                        Text("Punten / Kaarten deze ronde:")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        Spacer()
-                                        Text("\(rondeScores[safe: index] ?? 0)")
-                                            .font(.title2)
-                                            .fontWeight(.bold)
+                                    if index == huidigeStarterIndex {
+                                        Text("Aan de beurt")
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
                                             .foregroundColor(.purple)
-                                    }
-
-                                    // Snelle knoppen
-                                    HStack(spacing: 10) {
-                                        Button("-1") {
-                                            if index < rondeScores.count && rondeScores[index] > 0 {
-                                                rondeScores[index] -= 1
-                                            }
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .tint(.red)
-
-                                        Spacer()
-
-                                        Button("+1") {
-                                            if index < rondeScores.count {
-                                                rondeScores[index] += 1
-                                            }
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(.purple.opacity(0.8))
-
-                                        Button("+5") {
-                                            if index < rondeScores.count {
-                                                rondeScores[index] += 5
-                                            }
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(.purple)
-
-                                        Button("+10") {
-                                            if index < rondeScores.count {
-                                                rondeScores[index] += 10
-                                            }
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(.purple)
+                                    } else {
+                                        Text("Wacht op beurt")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
                                     }
                                 }
-                                .padding()
-                                .background(Color(UIColor.tertiarySystemBackground))
+                            }
+
+                            Spacer()
+
+                            // Knop 6 dezelfde! Direct winnen
+                            Button(action: {
+                                geselecteerdeWinnaarIndex = index
+                                showZesDezelfdeAlert = true
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "crown.fill")
+                                    Text("6 dezelfde!")
+                                        .fontWeight(.bold)
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.orange, Color.purple],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
                                 .cornerRadius(10)
-                                .padding(.horizontal, 4)
-                                .padding(.top, 4)
+                                .shadow(color: Color.purple.opacity(0.35), radius: 4, x: 0, y: 2)
                             }
                         }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(index == huidigeStarterIndex ? Color.purple.opacity(0.4) : Color.clear, lineWidth: 2)
+                        )
                     }
                 }
                 .padding(.horizontal)
 
                 Spacer(minLength: 20)
 
-                // Knoppen onderin: Volgende ronde & Afronden
+                // Knoppen onderin: Volgende beurt & Afronden
                 VStack(spacing: 10) {
                     Button(action: {
-                        volgendeRonde()
+                        withAnimation {
+                            huidigeRonde += 1
+                        }
                     }) {
-                        Label("Volgende Ronde", systemImage: "arrow.right.circle.fill")
+                        Label("Volgende Beurt", systemImage: "arrow.right.circle.fill")
                             .font(.headline)
                             .foregroundColor(.white)
                             .padding()
                             .frame(maxWidth: .infinity)
                             .background(Color.purple)
                             .cornerRadius(12)
+                            .shadow(color: Color.purple.opacity(0.3), radius: 4, x: 0, y: 2)
                     }
 
                     Button(action: {
-                        sluitSpelHandmatigAf()
+                        showHandmatigAfrondenSheet = true
                     }) {
                         Text("Spel Afronden")
                             .font(.subheadline)
@@ -244,13 +185,6 @@ struct JattenGameView: View {
                 .padding(.horizontal)
             }
             .padding(.vertical)
-        }
-        .onAppear {
-            if rondeScores.isEmpty {
-                rondeScores = Array(repeating: 0, count: spelers.count)
-                totaleScores = Array(repeating: 0, count: spelers.count)
-                isExpanded = Array(repeating: false, count: spelers.count)
-            }
         }
         .alert("6 dezelfde!", isPresented: $showZesDezelfdeAlert) {
             Button("Ja, winnaar!") {
@@ -266,13 +200,23 @@ struct JattenGameView: View {
                 Text("Heeft deze speler 6 dezelfde?")
             }
         }
+        .confirmationDialog("Kies de winnaar", isPresented: $showHandmatigAfrondenSheet, titleVisibility: .visible) {
+            ForEach(spelers.indices, id: \.self) { index in
+                Button("\(spelers[index].name) (Winnaar)") {
+                    spelerWintMetZesDezelfde(index: index)
+                }
+            }
+            Button("Annuleren", role: .cancel) {}
+        }
         .navigationDestination(isPresented: $showWinnaarView) {
             if let winnaar = winnaar {
+                let winIndex = spelers.firstIndex(where: { $0.id == winnaar.id }) ?? 0
+                let scores = spelers.indices.map { $0 == winIndex ? 6 : 0 }
                 WinnaarView(
                     gameName: "Jatten",
                     winnaar: winnaar,
                     sortedSpelers: spelers,
-                    sortedScores: totaleScores,
+                    sortedScores: scores,
                     isLowestScoreWins: false
                 )
             }
@@ -280,48 +224,8 @@ struct JattenGameView: View {
     }
 
     private func spelerWintMetZesDezelfde(index: Int) {
-        // Totaal bijwerken
-        for i in spelers.indices {
-            if i < rondeScores.count && i < totaleScores.count {
-                totaleScores[i] += rondeScores[i]
-            }
-        }
         winnaar = spelers[index]
         showWinnaarView = true
-    }
-
-    private func volgendeRonde() {
-        // Totaal bijwerken
-        for i in spelers.indices {
-            if i < rondeScores.count && i < totaleScores.count {
-                totaleScores[i] += rondeScores[i]
-            }
-        }
-
-        huidigeRonde += 1
-        rondeScores = Array(repeating: 0, count: spelers.count)
-        withAnimation {
-            isExpanded = Array(repeating: false, count: spelers.count)
-        }
-    }
-
-    private func sluitSpelHandmatigAf() {
-        for i in spelers.indices {
-            if i < rondeScores.count && i < totaleScores.count {
-                totaleScores[i] += rondeScores[i]
-            }
-        }
-        bepaalWinnaar()
-        showWinnaarView = true
-    }
-
-    private func bepaalWinnaar() {
-        if let maxScore = totaleScores.max(),
-           let winnaarIndex = totaleScores.firstIndex(of: maxScore) {
-            winnaar = spelers[winnaarIndex]
-        } else {
-            winnaar = spelers.first
-        }
     }
 }
 

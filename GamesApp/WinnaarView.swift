@@ -179,8 +179,21 @@ struct WinnaarView: View {
                                 }
                             }
                             Spacer()
-                            Text("\(sortedScores[safe: index] ?? 0) punten")
-                                .fontWeight(.semibold)
+                            if gameName == "Jatten" {
+                                if sortedSpelers[index].name == winnaar.name {
+                                    Text("🏆 6 dezelfde!")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.purple)
+                                } else {
+                                    Text("Meegespeeld")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } else {
+                                Text("\(sortedScores[safe: index] ?? 0) punten")
+                                    .fontWeight(.semibold)
+                            }
                         }
                     }
                 }
