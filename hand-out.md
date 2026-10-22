@@ -40,12 +40,12 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   - **Alfabetisch**: Sorteert de spellen op alfabetische volgorde (A-Z).
   - De geselecteerde sorteervoorkeur wordt bewaard via `@AppStorage`.
 * [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers`, winnaars, H2H-statistieken, 2v2 Duo-statistieken en Balzakken leaderboards.
-* [`StatisticsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/StatisticsView.swift): Gloednieuw statistiekenscherm met:
+* [`StatisticsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/StatisticsView.swift): Gloednieuw statistiekenscherm met een moderne horizontaal scrollende pill-navigatiebalk (voorzien van SF Symbols, themakleuren, vloeiende capsule-animaties en haptic feedback):
   1. *Overzicht:* KPI-tegels (totale potjes, actieve spelers, records) & populariteitsgrafieken.
   2. *Spelers & Rangen:* Podium (🥇, 🥈, 🥉), winpercentages en ranglijsten.
-  3. *Wie wint van wie?:* Head-to-head rivaliteiten met filter per spel.
-  4. *Duo's 🤝:* Partner-chemie en droomteams ranking voor Crokinole 2v2.
-  5. *Balzakken 🎯:* Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, ranglijst juiste vs foute balzakken).
+  3. *Duo's:* Partner-chemie en droomteams ranking voor Crokinole 2v2.
+  4. *Wie wint?:* Head-to-head rivaliteiten met filter per spel.
+  5. *Balzakken:* Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, ranglijst juiste vs foute balzakken).
 * [`SettingsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SettingsView.swift): Volledig gerenoveerd:
   - *Spelersbeheer:* Namen toevoegen, lijst bekijken, swipe-to-delete.
   - *Geschiedenis van Potjes:* Chronologische lijst met scores en swipe-to-delete.

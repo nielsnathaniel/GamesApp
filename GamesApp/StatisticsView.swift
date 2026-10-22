@@ -5,15 +5,36 @@ struct StatisticsView: View {
     @State private var selectedSegment: StatSegment = .overzicht
     @State private var selectedGameFilter: String = "Alle Spellen"
     @State private var selectedPartnerPlayer: String = ""
+    @Namespace private var categoryAnimation
 
     enum StatSegment: String, CaseIterable, Identifiable {
         case overzicht = "Overzicht"
         case spelers = "Spelers"
-        case teams = "Duo's 🤝"
+        case teams = "Duo's"
         case rivaliteiten = "Wie wint?"
-        case balzakken = "Balzakken 🎯"
+        case balzakken = "Balzakken"
 
-        var id: String { self.rawValue }
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .overzicht: return "chart.pie.fill"
+            case .spelers: return "crown.fill"
+            case .teams: return "person.2.fill"
+            case .rivaliteiten: return "bolt.fill"
+            case .balzakken: return "flame.fill"
+            }
+        }
+
+        var themeColor: Color {
+            switch self {
+            case .overzicht: return .blue
+            case .spelers: return .purple
+            case .teams: return .indigo
+            case .rivaliteiten: return .orange
+            case .balzakken: return .red
+            }
+        }
     }
 
     var availableGames: [String] {
@@ -26,15 +47,8 @@ struct StatisticsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Moderne segmented control
-                Picker("Statistieken categorie", selection: $selectedSegment) {
-                    ForEach(StatSegment.allCases) { segment in
-                        Text(segment.rawValue).tag(segment)
-                    }
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                // Moderne interactieve categorie-balk
+                categoryNavBar
 
                 ScrollView {
                     VStack(spacing: 18) {
@@ -52,12 +66,72 @@ struct StatisticsView: View {
                         }
                     }
                     .padding()
+                    .animation(.easeInOut(duration: 0.2), value: selectedSegment)
                 }
             }
             .navigationTitle("Statistieken")
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .onAppear {
                 scoreManager.refresh()
+            }
+        }
+    }
+
+    // MARK: - Moderne Categorie Balk
+
+    private var categoryNavBar: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(StatSegment.allCases) { segment in
+                        let isSelected = selectedSegment == segment
+
+                        Button(action: {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                selectedSegment = segment
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: segment.icon)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(isSelected ? .white : segment.themeColor)
+
+                                Text(segment.rawValue)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(isSelected ? .white : .primary)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background {
+                                ZStack {
+                                    if isSelected {
+                                        segment.themeColor
+                                            .clipShape(Capsule())
+                                            .matchedGeometryEffect(id: "activeStatPill", in: categoryAnimation)
+                                            .shadow(color: segment.themeColor.opacity(0.35), radius: 5, x: 0, y: 2)
+                                    } else {
+                                        Color(UIColor.secondarySystemGroupedBackground)
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(Color.gray.opacity(0.18), lineWidth: 1)
+                                            )
+                                    }
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .id(segment)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .onChange(of: selectedSegment) { _, newSegment in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    proxy.scrollTo(newSegment, anchor: .center)
+                }
             }
         }
     }
