@@ -445,22 +445,10 @@ struct StatisticsView: View {
     // MARK: - 3. WIE WINT VAN WIE? (Rivaliteiten)
 
     private var rivalriesSection: some View {
-        VStack(spacing: 14) {
-            // Filter dropdown
+        VStack(spacing: 16) {
+            // Moderne Filter balk
             if availableGames.count > 1 {
-                HStack {
-                    Text("Spel:")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Picker("Filter spel", selection: $selectedGameFilter) {
-                        ForEach(availableGames, id: \.self) { g in
-                            Text(g).tag(g)
-                        }
-                    }
-                    .pickerStyle(MenuPickerStyle())
-                    Spacer()
-                }
-                .padding(.horizontal, 4)
+                gameFilterBar
             }
 
             let rivalries = scoreManager.allRivalries(gameFilter: selectedGameFilter)
@@ -988,6 +976,105 @@ struct StatisticsView: View {
         .frame(maxWidth: .infinity)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
+    }
+
+    // MARK: - Moderne Spel Filter Balk (Rivaliteiten)
+
+    private var gameFilterBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                    .foregroundColor(.orange)
+                    .font(.subheadline)
+
+                Text("Filter op Spel")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+
+                Spacer()
+
+                if selectedGameFilter != "Alle Spellen" {
+                    Button(action: {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                            selectedGameFilter = "Alle Spellen"
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle.fill")
+                            Text("Wis filter")
+                        }
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(availableGames, id: \.self) { g in
+                        let isSelected = selectedGameFilter == g
+                        let color = g == "Alle Spellen" ? Color.orange : gameColor(for: g)
+
+                        Button(action: {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                selectedGameFilter = g
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: gameIcon(for: g))
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(isSelected ? .white : color)
+
+                                Text(g)
+                                    .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background {
+                                ZStack {
+                                    if isSelected {
+                                        color
+                                            .clipShape(Capsule())
+                                            .shadow(color: color.opacity(0.35), radius: 5, x: 0, y: 2)
+                                    } else {
+                                        Color(UIColor.secondarySystemGroupedBackground)
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(Color.gray.opacity(0.18), lineWidth: 1)
+                                            )
+                                    }
+                                }
+                            }
+                            .foregroundColor(isSelected ? .white : .primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+                .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    private func gameIcon(for game: String) -> String {
+        switch game {
+        case "Alle Spellen": return "line.3.horizontal.decrease.circle.fill"
+        case "Crockinole": return "circle.circle.fill"
+        case "Regenwormen": return "circle.hexagongrid.fill"
+        case "Jatten": return "hand.raised.fill"
+        case "Balzakken": return "flame.fill"
+        case "Beverbende": return "pawprint.fill"
+        case "Nmbr9": return "number.square.fill"
+        case "Duizenden": return "suit.spade.fill"
+        default: return "gamecontroller.fill"
+        }
     }
 
     private func gameColor(for game: String) -> Color {

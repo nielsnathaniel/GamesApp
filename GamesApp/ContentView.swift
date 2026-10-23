@@ -6,12 +6,29 @@ enum GameSortOption: String, CaseIterable, Identifiable {
     case alfabetisch = "Alfabetisch"
 
     var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .populair: return "flame.fill"
+        case .toegevoegd: return "clock.arrow.circlepath"
+        case .alfabetisch: return "textformat.abc"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .populair: return .orange
+        case .toegevoegd: return .blue
+        case .alfabetisch: return .purple
+        }
+    }
 }
 
 struct ContentView: View {
     @State private var selectedTab: Int = 0
     @AppStorage("game_sort_option") private var sortOption: GameSortOption = .toegevoegd
     @ObservedObject private var scoreManager = ScoreManager.shared
+    @Namespace private var sortNamespace
 
     let games = [
         ("Nmbr9", "Nmbr9"),
@@ -80,16 +97,8 @@ struct ContentView: View {
     private var gameSelectionView: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Sorteeropties: Populair, Toegevoegd, Alfabetisch
-                Picker("Sorteren", selection: $sortOption) {
-                    ForEach(GameSortOption.allCases) { option in
-                        Text(option.rawValue).tag(option)
-                    }
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal)
-                .padding(.top, 6)
-                .padding(.bottom, 6)
+                // Moderne Sorteer / Filter balk
+                sortFilterBar
 
                 ScrollView {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 20) {
@@ -146,6 +155,50 @@ struct ContentView: View {
                 scoreManager.refresh()
             }
         }
+    }
+
+    // MARK: - Moderne Sorteer / Filter Balk
+
+    private var sortFilterBar: some View {
+        HStack(spacing: 4) {
+            ForEach(GameSortOption.allCases) { option in
+                let isSelected = sortOption == option
+
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        sortOption = option
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: option.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(isSelected ? option.iconColor : .secondary)
+
+                        Text(option.rawValue)
+                            .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                            .foregroundColor(isSelected ? .primary : .secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(UIColor.systemBackground))
+                                .matchedGeometryEffect(id: "activeSortPill", in: sortNamespace)
+                                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 1.5)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .background(Color(UIColor.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal)
+        .padding(.top, 6)
+        .padding(.bottom, 6)
     }
 
     @ViewBuilder
