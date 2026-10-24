@@ -25,7 +25,7 @@ struct JattenGameView: View {
                         if UIImage(named: "Jatten") != nil {
                             Image("Jatten")
                                 .resizable()
-                                .scaledToFill()
+                                .scaledToFit()
                                 .frame(width: 38, height: 38)
                                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                                 .shadow(color: .purple.opacity(0.3), radius: 3, x: 0, y: 1)

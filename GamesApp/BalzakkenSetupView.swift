@@ -14,7 +14,7 @@ struct BalzakkenSetupView: View {
                     if UIImage(named: "Balzakken") != nil {
                         Image("Balzakken")
                             .resizable()
-                            .scaledToFill()
+                            .scaledToFit()
                             .frame(width: 44, height: 44)
                             .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                             .shadow(color: .red.opacity(0.3), radius: 4, x: 0, y: 2)

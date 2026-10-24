@@ -204,16 +204,23 @@ struct ContentView: View {
     @ViewBuilder
     private func gameIcon(for gameName: String, assetName: String) -> some View {
         if UIImage(named: assetName) != nil {
-            Image(assetName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemGroupedBackground))
+                    .frame(width: 80, height: 80)
+
+                Image(assetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 76, height: 76)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .frame(width: 80, height: 80)
+            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
         } else {
             // Aantrekkelijke SF Symbol fallback voor games zonder asset image
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(gameIconColor(for: gameName).opacity(0.15))
                     .frame(width: 80, height: 80)
 

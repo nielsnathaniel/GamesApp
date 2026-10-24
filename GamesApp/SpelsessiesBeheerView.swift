@@ -339,7 +339,7 @@ struct SpelsessiesBeheerView: View {
                 if UIImage(named: game.gameName) != nil {
                     Image(game.gameName)
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                         .frame(width: 40, height: 40)
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 } else {

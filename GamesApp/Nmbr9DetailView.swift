@@ -30,7 +30,7 @@ struct Nmbr9DetailView: View {
                 HStack(spacing: 12) {
                     Image("Nmbr9")
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                         .frame(width: 44, height: 44)
                         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                         .shadow(color: .indigo.opacity(0.3), radius: 4, x: 0, y: 2)

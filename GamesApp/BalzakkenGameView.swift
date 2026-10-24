@@ -50,7 +50,7 @@ struct BalzakkenGameView: View {
                         if UIImage(named: "Balzakken") != nil {
                             Image("Balzakken")
                                 .resizable()
-                                .scaledToFill()
+                                .scaledToFit()
                                 .frame(width: 38, height: 38)
                                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                                 .shadow(color: .red.opacity(0.3), radius: 3, x: 0, y: 1)
