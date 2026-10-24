@@ -207,15 +207,14 @@ struct ContentView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color(UIColor.secondarySystemGroupedBackground))
-                    .frame(width: 80, height: 80)
 
                 Image(assetName)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 76, height: 76)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(maxWidth: 80, maxHeight: 80)
             }
             .frame(width: 80, height: 80)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
         } else {
             // Aantrekkelijke SF Symbol fallback voor games zonder asset image
