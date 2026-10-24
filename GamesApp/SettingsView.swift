@@ -126,6 +126,36 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.vertical, 4)
                     }
+
+                    DisclosureGroup("30 Seconds Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Teamspel: 2, 3 of 4 teams met minimaal 2 spelers per team")
+                            Text("• Beurt: 1 speler omschrijft 5 begrippen in 30 seconden, teamgenoten raden")
+                            Text("• Omschrijver rouleert automatisch elke beurt binnen het team")
+                            Text("• Dobbelsteen (0, 1 of 2): Deze worp wordt afgetrokken van je aantal goed geraden namen")
+                            Text("• Stappen: max(0, geraden - dobbelsteen)")
+                            Text("• Winnaar: Het eerste team dat de finish (bijv. 35 punten) bereikt!")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+
+                    DisclosureGroup("Cranium Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Teamspel: 2 tot 4 teams strijden op 4 verschillende breingebieden")
+                            Text("• 🟡 Data Head: Trivia, weetjes, feiten & wetenschap")
+                            Text("• 🔵 Creative Cat: Tekenen, kleien & sculpturen boetseren")
+                            Text("• 🔴 Word Worm: Woordpuzzels, anagrammen & achterstevoren spellen")
+                            Text("• 🟢 Star Performer: Uitbeelden, zingen, neuriën & typetjes nadoen")
+                            Text("• 🟣 Club Cranium: Alle teams strijden tegelijk; winnaar pakt een bonuspunt!")
+                            Text("• Timer: 60 seconden per opdracht")
+                            Text("• Winnaar: Eerste team in Cranium Centrale dat alle 4 de categorieën heeft voltooid!")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 // 3. Over GamesApp
@@ -139,7 +169,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Ondersteunde Spellen")
                         Spacer()
-                        Text("8 spellen")
+                        Text("10 spellen")
                             .foregroundColor(.secondary)
                     }
                 }

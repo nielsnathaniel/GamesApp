@@ -20,7 +20,9 @@ Dit document dient als overdracht en briefing voor **Antigravity** (en ontwikkel
 5. **Nmbr9:** Puzzel- en cijferspel met lagenvermenigvuldigers. Vernieuwd modern 3D polyomino-logo (`Nmbr9.imageset`).
 6. **Regenwormen:** Dobbelspel rondom stenen en wormen. Nieuw vrolijk 3D cartoonlogo met regenworm en dobbelstenen (`Regenwormen.imageset`).
 7. **Jatten:** Kaartspel met push-your-luck elementen. Nieuw speels 3D logo met gemaskerde wasbeer-dief en speelkaarten (`Jatten.imageset`).
-8. **Love Letter:** Populair deductie- en kaartspel (2-6 spelers). Houdt per ronde bij wie er wint, waarom (enige overgebleven of handen vergelijken) en met welke handkaart de winnaar eindigt (`LoveLetter.imageset`).
+8. **Love Letter:** Populair deductie- en kaartspel (2-6 spelers). Houdt per ronde bij wie er wint, waarom (enige overgebleven of handen vergelijken), wie de startspeler was en met welke handkaart de winnaar eindigt (`LoveLetter.imageset`).
+9. **30 Seconds:** Razendsnel partyspel met 2 tot 4 teams (`ThirtySecondsSetupView.swift`, `ThirtySecondsGameView.swift`). Bevat een live 30-seconden timer met haptische waarschuwingen, dobbelsteenworp (0, 1 of 2), live berekening van verdiende stappen, automatische rotatie van de omschrijver en een beurtenlogboek.
+10. **Cranium:** Uitgebreid teamspel voor 2 tot 4 teams (`CraniumSetupView.swift`, `CraniumGameView.swift`). Ondersteunt de 4 iconische categorieën (Data Head, Creative Cat, Word Worm, Star Performer) én Club Cranium, inclusief 60-seconden timer, categorieplaneet-badges en Cranium Centrale finish.
 
 ---
 

@@ -38,7 +38,9 @@ struct ContentView: View {
         ("Regenwormen", "Regenwormen"),
         ("Jatten", "Jatten"),
         ("Balzakken", "Balzakken"),
-        ("Love Letter", "LoveLetter")
+        ("Love Letter", "LoveLetter"),
+        ("30 Seconds", "ThirtySeconds"),
+        ("Cranium", "Cranium")
     ]
 
     private func playCount(for gameName: String) -> Int {
@@ -250,6 +252,8 @@ struct ContentView: View {
         case "Jatten": return "hand.raised.fill"
         case "Balzakken": return "flame.fill"
         case "Love Letter": return "heart.fill"
+        case "30 Seconds": return "timer"
+        case "Cranium": return "brain.head.profile"
         default: return "gamecontroller.fill"
         }
     }
@@ -261,6 +265,8 @@ struct ContentView: View {
         case "Jatten": return .purple
         case "Balzakken": return .red
         case "Love Letter": return .pink
+        case "30 Seconds": return .orange
+        case "Cranium": return .purple
         default: return .green
         }
     }
@@ -284,6 +290,10 @@ struct ContentView: View {
             BalzakkenSetupView()
         case "Love Letter":
             LoveLetterSetupView()
+        case "30 Seconds":
+            ThirtySecondsSetupView()
+        case "Cranium":
+            CraniumSetupView()
         default:
             Text("Onbekend Spel")
         }

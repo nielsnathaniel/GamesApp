@@ -502,6 +502,8 @@ struct SpelsessiesBeheerView: View {
         case "Nmbr9": return "number.square.fill"
         case "Duizenden": return "suit.spade.fill"
         case "Love Letter": return "heart.fill"
+        case "30 Seconds": return "timer"
+        case "Cranium": return "brain.head.profile"
         default: return "gamecontroller.fill"
         }
     }
@@ -515,6 +517,8 @@ struct SpelsessiesBeheerView: View {
         case "Beverbende": return .green
         case "Nmbr9": return .indigo
         case "Love Letter": return .pink
+        case "30 Seconds": return .orange
+        case "Cranium": return .purple
         default: return .teal
         }
     }

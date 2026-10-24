@@ -46,11 +46,48 @@ enum LoveLetterWinReason: String, CaseIterable, Identifiable {
 struct LoveLetterRoundRecord: Identifiable, Codable {
     var id: UUID = UUID()
     let roundNumber: Int
+    var starterName: String = ""
     let winnerName: String
     let reason: String
     let cardValue: Int
     let cardName: String
     let spyBonusPlayer: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, roundNumber, starterName, winnerName, reason, cardValue, cardName, spyBonusPlayer
+    }
+
+    init(
+        id: UUID = UUID(),
+        roundNumber: Int,
+        starterName: String = "",
+        winnerName: String,
+        reason: String,
+        cardValue: Int,
+        cardName: String,
+        spyBonusPlayer: String?
+    ) {
+        self.id = id
+        self.roundNumber = roundNumber
+        self.starterName = starterName
+        self.winnerName = winnerName
+        self.reason = reason
+        self.cardValue = cardValue
+        self.cardName = cardName
+        self.spyBonusPlayer = spyBonusPlayer
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        self.roundNumber = try container.decode(Int.self, forKey: .roundNumber)
+        self.starterName = try container.decodeIfPresent(String.self, forKey: .starterName) ?? ""
+        self.winnerName = try container.decode(String.self, forKey: .winnerName)
+        self.reason = try container.decode(String.self, forKey: .reason)
+        self.cardValue = try container.decode(Int.self, forKey: .cardValue)
+        self.cardName = try container.decode(String.self, forKey: .cardName)
+        self.spyBonusPlayer = try container.decodeIfPresent(String.self, forKey: .spyBonusPlayer)
+    }
 }
 
 struct LoveLetterGameView: View {
@@ -111,6 +148,7 @@ struct LoveLetterGameView: View {
             LoveLetterRoundInputSheet(
                 spelers: spelers,
                 roundNumber: huidigeRonde,
+                starterName: spelers[safe: huidigeStarterIndex] ?? "",
                 onSave: { winnerName, reason, card, spyBonus in
                     applyRoundResult(winnerName: winnerName, reason: reason, card: card, spyBonus: spyBonus)
                 }
@@ -348,8 +386,20 @@ struct LoveLetterGameView: View {
                     ForEach(rondeGeschiedenis.reversed()) { round in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text("Ronde \(round.roundNumber)")
-                                    .font(.headline)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Ronde \(round.roundNumber)")
+                                        .font(.headline)
+                                    if !round.starterName.isEmpty {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "dice.fill")
+                                                .foregroundColor(.pink)
+                                                .font(.caption2)
+                                            Text("Begonnen door \(round.starterName)")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
 
                                 Spacer()
 
@@ -438,6 +488,9 @@ struct LoveLetterGameView: View {
             return
         }
 
+        // Startspeler van deze afgeronde ronde
+        let currentStarter = spelers[safe: huidigeStarterIndex] ?? winnerName
+
         // Winnaar krijgt +1 fiche
         fichesPerSpeler[winnerIdx] += 1
 
@@ -450,6 +503,7 @@ struct LoveLetterGameView: View {
         // Bewaar in rondelog
         let record = LoveLetterRoundRecord(
             roundNumber: huidigeRonde,
+            starterName: currentStarter,
             winnerName: winnerName,
             reason: reason.rawValue,
             cardValue: card.value,
@@ -487,6 +541,10 @@ struct LoveLetterGameView: View {
             }
         }
         huidigeRonde = max(1, rondeGeschiedenis.count + 1)
+        if let last = rondeGeschiedenis.last,
+           let wIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(last.winnerName) == .orderedSame }) {
+            huidigeStarterIndex = wIdx
+        }
     }
 
     private func finalizeGame(winnerName: String) {
@@ -532,6 +590,7 @@ struct LoveLetterGameView: View {
 struct LoveLetterRoundInputSheet: View {
     let spelers: [String]
     let roundNumber: Int
+    var starterName: String = ""
     let onSave: (String, LoveLetterWinReason, LoveLetterCardInfo, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -545,6 +604,21 @@ struct LoveLetterRoundInputSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if !starterName.isEmpty {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "dice.fill")
+                                .foregroundColor(.pink)
+                            Text("Startspeler deze ronde:")
+                                .foregroundColor(.secondary)
+                            Text(starterName)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                        }
+                        .font(.subheadline)
+                    }
+                }
+
                 // 1. Wie heeft gewonnen?
                 Section(header: Text("1. Wie heeft de ronde gewonnen?")) {
                     ScrollView(.horizontal, showsIndicators: false) {
