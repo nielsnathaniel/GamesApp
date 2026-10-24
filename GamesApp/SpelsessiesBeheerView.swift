@@ -95,7 +95,7 @@ struct SpelsessiesBeheerView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Spelsessies")
+        .navigationTitle("Opgeslagen Spelsessies")
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .onAppear {

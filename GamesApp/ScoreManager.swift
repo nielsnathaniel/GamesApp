@@ -226,19 +226,12 @@ class ScoreManager: ObservableObject {
     // MARK: - Spelersbeheer (Automatisch opslaan & Hergebruiken)
 
     func fetchPlayerNames() -> [String] {
-        var namesSet = Set<String>()
-
-        // 1. Opgeslagen namen uit UserDefaults
         if let data = UserDefaults.standard.stringArray(forKey: playersKey) {
-            for name in data {
-                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    namesSet.insert(trimmed)
-                }
-            }
+            return data.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
         }
 
-        // 2. Namen uit reeds gespeelde potjes en scores
+        // Alleen bij allereerste keer (geen UserDefaults key): migreer vanuit bestaande potjes & scores
+        var namesSet = Set<String>()
         for game in playedGames {
             for s in game.scores {
                 let trimmed = s.playerName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -255,7 +248,9 @@ class ScoreManager: ObservableObject {
             }
         }
 
-        return namesSet.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        let sorted = namesSet.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        UserDefaults.standard.set(sorted, forKey: playersKey)
+        return sorted
     }
 
     func savePlayerName(_ name: String) {
@@ -547,7 +542,7 @@ class ScoreManager: ObservableObject {
     }
 
     func clearAllPlayers() {
-        UserDefaults.standard.removeObject(forKey: playersKey)
+        UserDefaults.standard.set([String](), forKey: playersKey)
         self.savedPlayerNames = []
     }
 

@@ -2,150 +2,44 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
-    @State private var showClearHistoryAlert: Bool = false
-    @State private var showClearPlayersAlert: Bool = false
-    @State private var showAddPlayerAlert: Bool = false
-    @State private var newPlayerName: String = ""
 
     var body: some View {
         NavigationStack {
             List {
-                // 1. Spelersbeheer
-                Section(header: Label("Opgeslagen Spelers", systemImage: "person.2.fill")) {
-                    let players = scoreManager.fetchPlayerNames()
-                    if players.isEmpty {
-                        Text("Geen opgeslagen spelers.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(players, id: \.self) { player in
-                            HStack {
-                                Image(systemName: "person.circle.fill")
-                                    .foregroundColor(.blue)
-                                Text(player)
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        .onDelete { indexSet in
-                            for idx in indexSet {
-                                if idx < players.count {
-                                    scoreManager.deletePlayer(name: players[idx])
-                                }
-                            }
-                        }
-                    }
-
-                    Button(action: {
-                        newPlayerName = ""
-                        showAddPlayerAlert = true
-                    }) {
-                        Label("Speler handmatig toevoegen", systemImage: "plus.circle.fill")
-                            .foregroundColor(.blue)
-                    }
-                }
-
-                // 2. Spelgeschiedenis & Spelsessies
-                Section(header: Label("Geschiedenis & Spelsessies", systemImage: "clock.arrow.circlepath")) {
-                    NavigationLink(destination: SpelsessiesBeheerView()) {
-                        HStack(spacing: 12) {
+                // 1. Gegevensbeheer (Navigeer naar dedicated GegevensbeheerView)
+                Section(header: Label("Gegevensbeheer", systemImage: "cylinder.split.1x2.fill")) {
+                    NavigationLink(destination: GegevensbeheerView()) {
+                        HStack(spacing: 14) {
                             ZStack {
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: 10)
                                     .fill(Color.blue.opacity(0.12))
-                                    .frame(width: 36, height: 36)
-                                Image(systemName: "calendar.badge.clock")
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "externaldrive.fill.badge.person.crop")
                                     .foregroundColor(.blue)
-                                    .font(.system(size: 18))
+                                    .font(.system(size: 20))
                             }
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Spelsessies Beheren")
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Gegevensbeheer")
                                     .font(.headline)
-                                Text("Verwijder per dag, per spel of per sessie")
-                                    .font(.caption2)
+                                    .foregroundColor(.primary)
+
+                                Text("Opgeslagen spelers & spelsessies beheren")
+                                    .font(.caption)
                                     .foregroundColor(.secondary)
                             }
 
                             Spacer()
 
-                            Text("\(scoreManager.playedGames.count)")
-                                .font(.subheadline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Color.blue.opacity(0.1))
-                                .clipShape(Capsule())
+                            Text("\(scoreManager.fetchPlayerNames().count) spelers")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 4)
                     }
-
-                    let games = scoreManager.playedGames
-                    if games.isEmpty {
-                        Text("Nog geen gespeelde potjes opgeslagen.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(games.reversed()) { game in
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text(game.sessionTitle)
-                                        .font(.headline)
-                                    Spacer()
-                                    Text(game.date, style: .date)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-
-                                if !game.winner.isEmpty {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "crown.fill")
-                                            .foregroundColor(.yellow)
-                                        Text("Winnaar: \(game.winner)")
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.primary)
-                                    }
-                                }
-
-                                // Scores
-                                HStack {
-                                    ForEach(game.scores) { sc in
-                                        Text("\(sc.playerName): \(sc.score)")
-                                            .font(.caption2)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color(UIColor.tertiarySystemGroupedBackground))
-                                            .cornerRadius(6)
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .onDelete { indexSet in
-                            let reversedGames = Array(games.reversed())
-                            for idx in indexSet {
-                                if idx < reversedGames.count {
-                                    scoreManager.deleteGame(id: reversedGames[idx].id)
-                                }
-                            }
-                        }
-                    }
                 }
 
-                // 3. Gegevensbeheer & Reset acties
-                Section(header: Label("Gegevensbeheer", systemImage: "trash.fill")) {
-                    Button(role: .destructive, action: {
-                        showClearHistoryAlert = true
-                    }) {
-                        Label("Spelgeschiedenis & scores wissen", systemImage: "arrow.counterclockwise")
-                    }
-
-                    Button(role: .destructive, action: {
-                        showClearPlayersAlert = true
-                    }) {
-                        Label("Alle opgeslagen spelers wissen", systemImage: "person.crop.circle.badge.minus")
-                    }
-                }
-
-                // 4. Speluitleg & Regels
+                // 2. Speluitleg & Regels
                 Section(header: Label("Spelregels Quick Reference", systemImage: "book.closed.fill")) {
                     DisclosureGroup("Balzakken Regels") {
                         VStack(alignment: .leading, spacing: 6) {
@@ -213,7 +107,7 @@ struct SettingsView: View {
                     }
                 }
 
-                // 5. Over GamesApp
+                // 3. Over GamesApp
                 Section(header: Label("Over GamesApp", systemImage: "info.circle.fill")) {
                     HStack {
                         Text("Versie")
@@ -232,36 +126,6 @@ struct SettingsView: View {
             .navigationTitle("Instellingen")
             .onAppear {
                 scoreManager.refresh()
-            }
-            .alert("Nieuwe Speler Toevoegen", isPresented: $showAddPlayerAlert) {
-                TextField("Spelersnaam", text: $newPlayerName)
-                Button("Opslaan") {
-                    let trimmed = newPlayerName.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        scoreManager.savePlayerName(trimmed)
-                    }
-                }
-                Button("Annuleer", role: .cancel) {}
-            }
-            .confirmationDialog(
-                "Weet je zeker dat je alle spelgeschiedenis wilt wissen?",
-                isPresented: $showClearHistoryAlert,
-                titleVisibility: .visible
-            ) {
-                Button("Geschiedenis wissen", role: .destructive) {
-                    scoreManager.clearHistory()
-                }
-                Button("Annuleer", role: .cancel) {}
-            }
-            .confirmationDialog(
-                "Weet je zeker dat je alle opgeslagen spelers wilt wissen?",
-                isPresented: $showClearPlayersAlert,
-                titleVisibility: .visible
-            ) {
-                Button("Spelers wissen", role: .destructive) {
-                    scoreManager.clearAllPlayers()
-                }
-                Button("Annuleer", role: .cancel) {}
             }
         }
     }

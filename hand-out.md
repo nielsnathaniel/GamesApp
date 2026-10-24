@@ -47,16 +47,23 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   3. *Duo's:* Partner-chemie en droomteams ranking voor Crokinole 2v2.
   4. *Wie wint?:* Head-to-head rivaliteiten met een moderne interactieve filterbalk (gekleurde chips per spel, game-iconen en 'Wis filter'-knop ter vervanging van de oude dropdown picker).
   5. *Balzakken:* Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, ranglijst juiste vs foute balzakken).
-* [`SettingsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SettingsView.swift) & [`SpelsessiesBeheerView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SpelsessiesBeheerView.swift):
-  - *Spelersbeheer:* Namen toevoegen, lijst bekijken, swipe-to-delete.
-  - *Spelsessies & Geschiedenis Beheer:* Volledig handmatig sessies verwijderen zonder echte data kwijt te raken:
-    - Elke potje wordt gepresenteerd als **`Spelsessie [Spelnaam] met [Spelers]`** (bijv. *"Spelsessie Balzakken met Niels & Lisa"*).
-    - **Per dag gegroepeerd:** Duidelijke overzichten (*Vandaag*, *Gisteren*, specifieke datum) met een knop *"Wis deze dag"*.
-    - **Filter per spel:** Snel alle potjes van een specifiek spel isoleren of in bulk wissen.
-    - **Snelle testdata opruimactie:** *"Wis testdata vóór gisteren"* verwijdert in 1 tik alle oude testdata, terwijl de potjes van gisteren en vandaag veilig bewaard blijven.
-    - Direct bereikbaar via zowel Instellingen als via de knop **"Sessies"** in de navigatiebalk van Statistieken.
-  - *Gegevensbeheer:* Bevestigingsdialoog voor het wissen van geschiedenis of spelers.
-  - *Spelregels Quick Reference:* Inklapbare handleidingen voor de spellen.
+* [`SettingsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SettingsView.swift), [`GegevensbeheerView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/GegevensbeheerView.swift), [`OpgeslagenSpelersView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/OpgeslagenSpelersView.swift) & [`SpelsessiesBeheerView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SpelsessiesBeheerView.swift):
+  - *Gegevensbeheer Hub:* Onder Instellingen staat nu een overzichtelijke knop **Gegevensbeheer** die leidt naar een centrale beheermodule met samenvattende KPI-tegels (aantal spelers, aantal sessies) en twee hoofdknoppen:
+    1. **Opgeslagen Spelers (`OpgeslagenSpelersView.swift`):** Nieuw eigen scherm voor spelersbeheer:
+       - Zoekbalk om snel spelers te vinden (`.searchable`).
+       - Lijst met initiaal-avatars en namen.
+       - Direct nieuwe spelers handmatig toevoegen via de `+`-knop of actierij.
+       - Swipe-to-delete of prullenbakknoppen om spelers definitief te verwijderen.
+       - Veilige resetknop om alle spelers in één keer te wissen.
+    2. **Opgeslagen Spelsessies (`SpelsessiesBeheerView.swift`):** Nieuw eigen scherm voor geschiedenis en spelsessies:
+       - Elke potje gepresenteerd als **`Spelsessie [Spelnaam] met [Spelers]`** (bijv. *"Spelsessie Balzakken met Niels & Lisa"*).
+       - **Per dag gegroepeerd:** Duidelijke overzichten (*Vandaag*, *Gisteren*, specifieke datum) met een knop *"Wis deze dag"*.
+       - **Filter per spel:** Snel alle potjes van een specifiek spel isoleren via filterchips of in bulk wissen.
+       - **Snelle testdata opruimactie:** *"Wis testdata vóór gisteren"* verwijdert in 1 tik alle oude testdata, terwijl de potjes van gisteren en vandaag veilig bewaard blijven.
+       - Direct bereikbaar via Instellingen (Gegevensbeheer) en via de knop **"Sessies"** in de Statistieken navigatiebalk.
+    - *Volledige Reset:* Veilige bevestigingsdialogen onder Gegevensbeheer voor het eventueel volledig resetten van scores en geschiedenis.
+  - *Spelregels Quick Reference:* Inklapbare handleidingen voor alle ondersteunde spellen direct op het hoofdscherm van Instellingen.
+  - *Over GamesApp:* Versie-informatie en appdetails.
 * [`BalzakkenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/BalzakkenGameView.swift):
   - Knoppen zijn vereenvoudigd naar puur de getallen: `-1`, `+1`, `+5`, `+11`.
   - Registratie van Juiste Balzakken (`BALZAK! (0)`) en Foute Balzakken (`Valse Balzak (+25)`). Balzakstatistieken worden per ronde geregistreerd zodat herhaaldelijk klikken niet tot dubbeltelling leidt.
