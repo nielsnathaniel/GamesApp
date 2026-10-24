@@ -37,7 +37,8 @@ struct ContentView: View {
         ("Crockinole", "Crockinole"),
         ("Regenwormen", "Regenwormen"),
         ("Jatten", "Jatten"),
-        ("Balzakken", "Balzakken")
+        ("Balzakken", "Balzakken"),
+        ("Love Letter", "LoveLetter")
     ]
 
     private func playCount(for gameName: String) -> Int {
@@ -201,14 +202,26 @@ struct ContentView: View {
         .padding(.bottom, 6)
     }
 
+    private func resolveImageName(for assetName: String) -> String? {
+        if UIImage(named: assetName) != nil { return assetName }
+        if assetName.caseInsensitiveCompare("nmbr9") == .orderedSame {
+            if UIImage(named: "Nmbr9") != nil { return "Nmbr9" }
+            if UIImage(named: "NMbr9") != nil { return "NMbr9" }
+        }
+        if assetName.caseInsensitiveCompare("loveletter") == .orderedSame || assetName.caseInsensitiveCompare("love letter") == .orderedSame {
+            if UIImage(named: "LoveLetter") != nil { return "LoveLetter" }
+        }
+        return nil
+    }
+
     @ViewBuilder
     private func gameIcon(for gameName: String, assetName: String) -> some View {
-        if UIImage(named: assetName) != nil {
+        if let actualName = resolveImageName(for: assetName) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color(UIColor.secondarySystemGroupedBackground))
 
-                Image(assetName)
+                Image(actualName)
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: 80, maxHeight: 80)
@@ -236,6 +249,7 @@ struct ContentView: View {
         case "Regenwormen": return "circle.hexagongrid.fill"
         case "Jatten": return "hand.raised.fill"
         case "Balzakken": return "flame.fill"
+        case "Love Letter": return "heart.fill"
         default: return "gamecontroller.fill"
         }
     }
@@ -246,6 +260,7 @@ struct ContentView: View {
         case "Regenwormen": return .orange
         case "Jatten": return .purple
         case "Balzakken": return .red
+        case "Love Letter": return .pink
         default: return .green
         }
     }
@@ -267,6 +282,8 @@ struct ContentView: View {
             JattenSetupView()
         case "Balzakken":
             BalzakkenSetupView()
+        case "Love Letter":
+            LoveLetterSetupView()
         default:
             Text("Onbekend Spel")
         }

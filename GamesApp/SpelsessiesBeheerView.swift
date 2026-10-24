@@ -336,8 +336,9 @@ struct SpelsessiesBeheerView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
                 // Spel icoontje
-                if UIImage(named: game.gameName) != nil {
-                    Image(game.gameName)
+                let assetKey = game.gameName.replacingOccurrences(of: " ", with: "")
+                if let uiImg = UIImage(named: game.gameName) ?? UIImage(named: assetKey) ?? (game.gameName.caseInsensitiveCompare("Nmbr9") == .orderedSame ? (UIImage(named: "Nmbr9") ?? UIImage(named: "NMbr9")) : nil) {
+                    Image(uiImage: uiImg)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 40, height: 40)
@@ -500,6 +501,7 @@ struct SpelsessiesBeheerView: View {
         case "Beverbende": return "pawprint.fill"
         case "Nmbr9": return "number.square.fill"
         case "Duizenden": return "suit.spade.fill"
+        case "Love Letter": return "heart.fill"
         default: return "gamecontroller.fill"
         }
     }
@@ -512,6 +514,7 @@ struct SpelsessiesBeheerView: View {
         case "Balzakken": return .red
         case "Beverbende": return .green
         case "Nmbr9": return .indigo
+        case "Love Letter": return .pink
         default: return .teal
         }
     }

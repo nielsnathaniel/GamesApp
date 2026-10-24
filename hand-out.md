@@ -20,6 +20,7 @@ Dit document dient als overdracht en briefing voor **Antigravity** (en ontwikkel
 5. **Nmbr9:** Puzzel- en cijferspel met lagenvermenigvuldigers. Vernieuwd modern 3D polyomino-logo (`Nmbr9.imageset`).
 6. **Regenwormen:** Dobbelspel rondom stenen en wormen. Nieuw vrolijk 3D cartoonlogo met regenworm en dobbelstenen (`Regenwormen.imageset`).
 7. **Jatten:** Kaartspel met push-your-luck elementen. Nieuw speels 3D logo met gemaskerde wasbeer-dief en speelkaarten (`Jatten.imageset`).
+8. **Love Letter:** Populair deductie- en kaartspel (2-6 spelers). Houdt per ronde bij wie er wint, waarom (enige overgebleven of handen vergelijken) en met welke handkaart de winnaar eindigt (`LoveLetter.imageset`).
 
 ---
 

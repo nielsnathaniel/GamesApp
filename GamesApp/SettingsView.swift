@@ -105,6 +105,27 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.vertical, 4)
                     }
+
+                    DisclosureGroup("Love Letter Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Doel: Zorg dat jouw liefdesbrief de Prinses bereikt!")
+                            Text("• Beurt: Trek 1 kaart en speel 1 van je 2 kaarten uit")
+                            Text("• Ronde winnen: Enige overgebleven speler OF hoogste handkaart als de trekstapel leeg is")
+                            Text("• 9: Prinses (9 pt) - Verlies direct als je haar moet afleggen")
+                            Text("• 8: Gravin (8 pt) - Moet afgelegd worden als je ook Koning of Prins hebt")
+                            Text("• 7: Koning (7 pt) - Ruil je handkaart met een andere speler")
+                            Text("• 6: Kanselier (6 pt) - Trek 2 kaarten, leg 2 kaarten onderop de trekstapel")
+                            Text("• 5: Prins (5 pt) - Dwing een speler om zijn/haar handkaart af te leggen")
+                            Text("• 4: Dienstmeid (4 pt) - Beschermd tegen alle kaarten tot je volgende beurt")
+                            Text("• 3: Baron (3 pt) - Vergelijk handkaarten in het geheim; laagste ligt eruit")
+                            Text("• 2: Priester (2 pt) - Bekijk stiekem de handkaart van een medespeler")
+                            Text("• 1: Wacht (1 pt) - Noem een kaartwaarde (niet Wacht); raad je goed, dan ligt die speler eruit")
+                            Text("• 0: Spion (0 pt) - +1 bonusfiche als je overleeft en als enige een spion speelde")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 // 3. Over GamesApp
@@ -118,7 +139,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Ondersteunde Spellen")
                         Spacer()
-                        Text("7 spellen")
+                        Text("8 spellen")
                             .foregroundColor(.secondary)
                     }
                 }

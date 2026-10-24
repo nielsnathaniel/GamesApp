@@ -28,12 +28,18 @@ struct Nmbr9DetailView: View {
         ScrollView {
             VStack {
                 HStack(spacing: 12) {
-                    Image("Nmbr9")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                        .shadow(color: .indigo.opacity(0.3), radius: 4, x: 0, y: 2)
+                    if let uiImg = UIImage(named: "Nmbr9") ?? UIImage(named: "NMbr9") {
+                        Image(uiImage: uiImg)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                            .shadow(color: .indigo.opacity(0.3), radius: 4, x: 0, y: 2)
+                    } else {
+                        Image(systemName: "number.square.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(.indigo)
+                    }
                     
                     Text("Nmbr9")
                         .font(.largeTitle)

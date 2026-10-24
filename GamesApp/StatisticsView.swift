@@ -1086,6 +1086,7 @@ struct StatisticsView: View {
         case "Beverbende": return "pawprint.fill"
         case "Nmbr9": return "number.square.fill"
         case "Duizenden": return "suit.spade.fill"
+        case "Love Letter": return "heart.fill"
         default: return "gamecontroller.fill"
         }
     }
@@ -1098,6 +1099,7 @@ struct StatisticsView: View {
         case "Balzakken": return .red
         case "Beverbende": return .green
         case "Nmbr9": return .indigo
+        case "Love Letter": return .pink
         default: return .teal
         }
     }
