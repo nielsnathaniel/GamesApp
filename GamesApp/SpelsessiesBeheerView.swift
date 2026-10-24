@@ -336,13 +336,21 @@ struct SpelsessiesBeheerView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
                 // Spel icoontje
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(gameColor(for: game.gameName).opacity(0.15))
+                if UIImage(named: game.gameName) != nil {
+                    Image(game.gameName)
+                        .resizable()
+                        .scaledToFill()
                         .frame(width: 40, height: 40)
-                    Image(systemName: gameIcon(for: game.gameName))
-                        .foregroundColor(gameColor(for: game.gameName))
-                        .font(.system(size: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(gameColor(for: game.gameName).opacity(0.15))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: gameIcon(for: game.gameName))
+                            .foregroundColor(gameColor(for: game.gameName))
+                            .font(.system(size: 20))
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 3) {

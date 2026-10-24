@@ -10,11 +10,19 @@ struct JattenSetupView: View {
     var body: some View {
         ScrollView {
             VStack {
-                HStack {
-                    Image(systemName: "hand.raised.fill")
-                        .font(.system(size: 36))
-                        .foregroundColor(.purple)
-                        .padding(.trailing, 10)
+                HStack(spacing: 12) {
+                    if UIImage(named: "Jatten") != nil {
+                        Image("Jatten")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                            .shadow(color: .purple.opacity(0.3), radius: 4, x: 0, y: 2)
+                    } else {
+                        Image(systemName: "hand.raised.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(.purple)
+                    }
                     
                     Text("Jatten")
                         .font(.largeTitle)

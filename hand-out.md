@@ -12,14 +12,14 @@ Dit document dient als overdracht en briefing voor **Antigravity** (en ontwikkel
 * **Taal van de UI:** Nederlands
 * **Doel:** Een moderne, intuïtieve score-tracking app voor diverse bord- en kaartspellen met vrienden en familie, inclusief diepgaande statistieken, rondegeschiedenis en spelersbeheer.
 
-### Ondersteunde Spellen:
-1. **Balzakken:** Populair dobbel/kaartspel met speciale regels (69 en 99 straffen, Valse Balzak, Balzak!).
-2. **Duizenden:** Klassiek kaartspel met melds, slagen en minpunten.
-3. **Beverbende:** Tactisch kaartspel waarbij de laagste score wint.
+### Ondersteunde Spellen & Logo's:
+1. **Balzakken:** Populair dobbel/kaartspel met speciale regels (69 en 99 straffen, Valse Balzak, Balzak!). Heeft nu een opvallend 3D app-logo (`Balzakken.imageset`) met biljartballen en partyeffecten.
+2. **Duizenden:** Klassiek kaartspel met melds, slagen en minpunten (`Duizenden.imageset`).
+3. **Beverbende:** Tactisch kaartspel waarbij de laagste score wint (`Beverbende.imageset`).
 4. **Crokinole (Crockinole):** Schijvenspel met 20-gaten en differentieel scoreverloop.
-5. **Nmbr9:** Puzzel- en cijferspel met lagenvermenigvuldigers.
-6. **Regenwormen:** Dobbelspel rondom stenen en wormen.
-7. **Jatten:** Kaartspel met push-your-luck elementen.
+5. **Nmbr9:** Puzzel- en cijferspel met lagenvermenigvuldigers. Vernieuwd modern 3D polyomino-logo (`Nmbr9.imageset`).
+6. **Regenwormen:** Dobbelspel rondom stenen en wormen. Nieuw vrolijk 3D cartoonlogo met regenworm en dobbelstenen (`Regenwormen.imageset`).
+7. **Jatten:** Kaartspel met push-your-luck elementen. Nieuw speels 3D logo met gemaskerde wasbeer-dief en speelkaarten (`Jatten.imageset`).
 
 ---
 

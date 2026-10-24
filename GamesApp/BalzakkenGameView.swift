@@ -46,9 +46,18 @@ struct BalzakkenGameView: View {
             VStack(spacing: 16) {
                 // Header
                 VStack(spacing: 4) {
-                    HStack {
-                        Image(systemName: "flame.fill")
-                            .foregroundColor(.red)
+                    HStack(spacing: 10) {
+                        if UIImage(named: "Balzakken") != nil {
+                            Image("Balzakken")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 38, height: 38)
+                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                .shadow(color: .red.opacity(0.3), radius: 3, x: 0, y: 1)
+                        } else {
+                            Image(systemName: "flame.fill")
+                                .foregroundColor(.red)
+                        }
                         Text("Balzakken")
                             .font(.largeTitle)
                             .fontWeight(.bold)

@@ -27,12 +27,13 @@ struct Nmbr9DetailView: View {
     var body: some View {
         ScrollView {
             VStack {
-                HStack {
+                HStack(spacing: 12) {
                     Image("Nmbr9")
                         .resizable()
-                        .scaledToFit()
-                        .frame(width: 40, height: 40)
-                        .padding(.trailing, 10)
+                        .scaledToFill()
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .shadow(color: .indigo.opacity(0.3), radius: 4, x: 0, y: 2)
                     
                     Text("Nmbr9")
                         .font(.largeTitle)

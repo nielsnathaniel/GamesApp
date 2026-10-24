@@ -10,11 +10,19 @@ struct RegenwormenSetupView: View {
     var body: some View {
         ScrollView {
             VStack {
-                HStack {
-                    Image(systemName: "circle.hexagongrid.fill")
-                        .font(.system(size: 36))
-                        .foregroundColor(.orange)
-                        .padding(.trailing, 10)
+                HStack(spacing: 12) {
+                    if UIImage(named: "Regenwormen") != nil {
+                        Image("Regenwormen")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                            .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
+                    } else {
+                        Image(systemName: "circle.hexagongrid.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(.orange)
+                    }
                     
                     Text("Regenwormen")
                         .font(.largeTitle)

@@ -24,9 +24,18 @@ struct RegenwormenGameView: View {
         ScrollView {
             VStack(spacing: 16) {
                 // Header
-                HStack {
-                    Image(systemName: "circle.hexagongrid.fill")
-                        .foregroundColor(.orange)
+                HStack(spacing: 10) {
+                    if UIImage(named: "Regenwormen") != nil {
+                        Image("Regenwormen")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 38, height: 38)
+                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .shadow(color: .orange.opacity(0.3), radius: 3, x: 0, y: 1)
+                    } else {
+                        Image(systemName: "circle.hexagongrid.fill")
+                            .foregroundColor(.orange)
+                    }
                     Text("Regenwormen")
                         .font(.largeTitle)
                         .fontWeight(.bold)

@@ -21,9 +21,18 @@ struct JattenGameView: View {
             VStack(spacing: 16) {
                 // Header
                 VStack(spacing: 4) {
-                    HStack {
-                        Image(systemName: "hand.raised.fill")
-                            .foregroundColor(.purple)
+                    HStack(spacing: 10) {
+                        if UIImage(named: "Jatten") != nil {
+                            Image("Jatten")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 38, height: 38)
+                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                .shadow(color: .purple.opacity(0.3), radius: 3, x: 0, y: 1)
+                        } else {
+                            Image(systemName: "hand.raised.fill")
+                                .foregroundColor(.purple)
+                        }
                         Text("Jatten")
                             .font(.largeTitle)
                             .fontWeight(.bold)

@@ -206,19 +206,19 @@ struct ContentView: View {
         if UIImage(named: assetName) != nil {
             Image(assetName)
                 .resizable()
-                .scaledToFit()
+                .scaledToFill()
                 .frame(width: 80, height: 80)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
         } else {
             // Aantrekkelijke SF Symbol fallback voor games zonder asset image
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(gameIconColor(for: gameName).opacity(0.15))
                     .frame(width: 80, height: 80)
 
                 Image(systemName: gameIconSymbol(for: gameName))
-                    .font(.system(size: 40))
+                    .font(.system(size: 38))
                     .foregroundColor(gameIconColor(for: gameName))
             }
         }

@@ -21,12 +21,13 @@ struct BeverbendeSetupView: View {
     var body: some View {
         ScrollView {
             VStack {
-                HStack {
+                HStack(spacing: 12) {
                     Image("Beverbende")
                         .resizable()
-                        .scaledToFit()
-                        .frame(width: 40, height: 40)
-                        .padding(.trailing, 10)
+                        .scaledToFill()
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .shadow(color: .green.opacity(0.3), radius: 4, x: 0, y: 2)
                     
                     Text("Beverbende")
                         .font(.largeTitle)

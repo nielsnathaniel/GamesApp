@@ -10,11 +10,19 @@ struct BalzakkenSetupView: View {
     var body: some View {
         ScrollView {
             VStack {
-                HStack {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 36))
-                        .foregroundColor(.red)
-                        .padding(.trailing, 10)
+                HStack(spacing: 12) {
+                    if UIImage(named: "Balzakken") != nil {
+                        Image("Balzakken")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                            .shadow(color: .red.opacity(0.3), radius: 4, x: 0, y: 2)
+                    } else {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(.red)
+                    }
                     
                     Text("Balzakken")
                         .font(.largeTitle)

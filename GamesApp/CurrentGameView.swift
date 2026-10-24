@@ -38,8 +38,9 @@ struct CurrentGameView: View {
             HStack {
                 Image(imageName)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill()
                     .frame(width: 40, height: 40)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .padding(.trailing, 10)
                 
                 Text(gameName)
