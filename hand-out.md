@@ -47,9 +47,14 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   3. *Duo's:* Partner-chemie en droomteams ranking voor Crokinole 2v2.
   4. *Wie wint?:* Head-to-head rivaliteiten met een moderne interactieve filterbalk (gekleurde chips per spel, game-iconen en 'Wis filter'-knop ter vervanging van de oude dropdown picker).
   5. *Balzakken:* Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, ranglijst juiste vs foute balzakken).
-* [`SettingsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SettingsView.swift): Volledig gerenoveerd:
+* [`SettingsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SettingsView.swift) & [`SpelsessiesBeheerView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SpelsessiesBeheerView.swift):
   - *Spelersbeheer:* Namen toevoegen, lijst bekijken, swipe-to-delete.
-  - *Geschiedenis van Potjes:* Chronologische lijst met scores en swipe-to-delete.
+  - *Spelsessies & Geschiedenis Beheer:* Volledig handmatig sessies verwijderen zonder echte data kwijt te raken:
+    - Elke potje wordt gepresenteerd als **`Spelsessie [Spelnaam] met [Spelers]`** (bijv. *"Spelsessie Balzakken met Niels & Lisa"*).
+    - **Per dag gegroepeerd:** Duidelijke overzichten (*Vandaag*, *Gisteren*, specifieke datum) met een knop *"Wis deze dag"*.
+    - **Filter per spel:** Snel alle potjes van een specifiek spel isoleren of in bulk wissen.
+    - **Snelle testdata opruimactie:** *"Wis testdata vóór gisteren"* verwijdert in 1 tik alle oude testdata, terwijl de potjes van gisteren en vandaag veilig bewaard blijven.
+    - Direct bereikbaar via zowel Instellingen als via de knop **"Sessies"** in de navigatiebalk van Statistieken.
   - *Gegevensbeheer:* Bevestigingsdialoog voor het wissen van geschiedenis of spelers.
   - *Spelregels Quick Reference:* Inklapbare handleidingen voor de spellen.
 * [`BalzakkenGameView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/BalzakkenGameView.swift):

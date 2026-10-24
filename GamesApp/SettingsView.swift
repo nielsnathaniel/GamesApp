@@ -43,8 +43,41 @@ struct SettingsView: View {
                     }
                 }
 
-                // 2. Spelgeschiedenis overzicht
-                Section(header: Label("Geschiedenis van Potjes", systemImage: "clock.arrow.circlepath")) {
+                // 2. Spelgeschiedenis & Spelsessies
+                Section(header: Label("Geschiedenis & Spelsessies", systemImage: "clock.arrow.circlepath")) {
+                    NavigationLink(destination: SpelsessiesBeheerView()) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.blue.opacity(0.12))
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "calendar.badge.clock")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 18))
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Spelsessies Beheren")
+                                    .font(.headline)
+                                Text("Verwijder per dag, per spel of per sessie")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            Text("\(scoreManager.playedGames.count)")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(Capsule())
+                        }
+                        .padding(.vertical, 4)
+                    }
+
                     let games = scoreManager.playedGames
                     if games.isEmpty {
                         Text("Nog geen gespeelde potjes opgeslagen.")
@@ -53,7 +86,7 @@ struct SettingsView: View {
                         ForEach(games.reversed()) { game in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
-                                    Text(game.gameName)
+                                    Text(game.sessionTitle)
                                         .font(.headline)
                                     Spacer()
                                     Text(game.date, style: .date)

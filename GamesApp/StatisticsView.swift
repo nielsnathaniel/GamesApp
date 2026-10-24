@@ -70,6 +70,19 @@ struct StatisticsView: View {
                 }
             }
             .navigationTitle("Statistieken")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: SpelsessiesBeheerView()) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar.badge.clock")
+                            Text("Sessies")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.blue)
+                    }
+                }
+            }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .onAppear {
                 scoreManager.refresh()

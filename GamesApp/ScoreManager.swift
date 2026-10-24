@@ -93,6 +93,32 @@ struct PlayedGame: Identifiable, Codable {
     }
 }
 
+extension PlayedGame {
+    var playerNamesList: [String] {
+        if let teams = teams, !teams.isEmpty {
+            return teams.flatMap { $0.playerNames }
+        }
+        return scores.map { $0.playerName }
+    }
+
+    var playersDescription: String {
+        let names = playerNamesList
+        if names.isEmpty { return "" }
+        if names.count == 1 { return names[0] }
+        if names.count == 2 { return "\(names[0]) & \(names[1])" }
+        let head = names.dropLast().joined(separator: ", ")
+        return "\(head) & \(names.last!)"
+    }
+
+    var sessionTitle: String {
+        let players = playersDescription
+        if players.isEmpty {
+            return "Spelsessie \(gameName)"
+        }
+        return "Spelsessie \(gameName) met \(players)"
+    }
+}
+
 struct TeamStat: Identifiable {
     var id: String { teamKey }
     let teamKey: String
@@ -451,8 +477,67 @@ class ScoreManager: ObservableObject {
 
     func deleteGame(id: UUID) {
         var games = fetchGames()
+        if let toDelete = games.first(where: { $0.id == id }) {
+            deleteScoresForGame(toDelete)
+        }
         games.removeAll { $0.id == id }
         persistGames(games)
+        refresh()
+    }
+
+    private func deleteScoresForGame(_ game: PlayedGame) {
+        var existingScores = fetchScores()
+        let gameDate = game.date
+        let gameName = game.gameName
+        let pNames = Set(game.scores.map { $0.playerName.lowercased() })
+
+        existingScores.removeAll { sc in
+            sc.gameName.caseInsensitiveCompare(gameName) == .orderedSame &&
+            abs(sc.date.timeIntervalSince(gameDate)) < 5.0 &&
+            pNames.contains(sc.playerName.lowercased())
+        }
+        persistScores(existingScores)
+    }
+
+    func deleteGames(ids: Set<UUID>) {
+        var games = fetchGames()
+        var existingScores = fetchScores()
+
+        for game in games where ids.contains(game.id) {
+            let gameDate = game.date
+            let gameName = game.gameName
+            let pNames = Set(game.scores.map { $0.playerName.lowercased() })
+
+            existingScores.removeAll { sc in
+                sc.gameName.caseInsensitiveCompare(gameName) == .orderedSame &&
+                abs(sc.date.timeIntervalSince(gameDate)) < 5.0 &&
+                pNames.contains(sc.playerName.lowercased())
+            }
+        }
+
+        games.removeAll { ids.contains($0.id) }
+        persistGames(games)
+        persistScores(existingScores)
+        refresh()
+    }
+
+    func deleteGames(on day: Date) {
+        let calendar = Calendar.current
+        let idsToDelete = Set(playedGames.filter { calendar.isDate($0.date, inSameDayAs: day) }.map { $0.id })
+        deleteGames(ids: idsToDelete)
+    }
+
+    func deleteGames(forGame gameName: String) {
+        let idsToDelete = Set(playedGames.filter { $0.gameName.caseInsensitiveCompare(gameName) == .orderedSame }.map { $0.id })
+        deleteGames(ids: idsToDelete)
+    }
+
+    func deleteGamesBeforeYesterday() {
+        let calendar = Calendar.current
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) else { return }
+        let startOfYesterday = calendar.startOfDay(for: yesterday)
+        let idsToDelete = Set(playedGames.filter { $0.date < startOfYesterday }.map { $0.id })
+        deleteGames(ids: idsToDelete)
     }
 
     func deletePlayer(name: String) {
