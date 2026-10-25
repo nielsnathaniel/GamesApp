@@ -365,42 +365,53 @@ struct QwixxGameView: View {
 
     private var directModeView: some View {
         VStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .foregroundColor(.orange)
+                Text("Tik op een score om direct een getal in te typen met het cijfertoetsenbord.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.top, 2)
+
             ForEach(spelers.indices, id: \.self) { idx in
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     Text(spelers[idx])
                         .font(.headline)
 
                     Spacer()
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Button(action: {
-                            if playerScores[idx].directScore >= 5 {
-                                playerScores[idx].directScore -= 5
-                            }
+                            playerScores[idx].directScore -= 5
                         }) {
                             Text("-5")
-                                .font(.caption)
+                                .font(.caption2)
                                 .fontWeight(.bold)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 6)
                                 .background(Color.secondary.opacity(0.12))
                                 .cornerRadius(6)
                         }
 
                         Button(action: {
-                            if playerScores[idx].directScore > 0 {
-                                playerScores[idx].directScore -= 1
-                            }
+                            playerScores[idx].directScore -= 1
                         }) {
                             Image(systemName: "minus.circle.fill")
                                 .font(.title3)
                                 .foregroundColor(.red)
                         }
 
-                        Text("\(playerScores[idx].directScore)")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .frame(minWidth: 40)
+                        NumericScoreInputView(
+                            score: $playerScores[idx].directScore,
+                            allowNegative: true,
+                            range: -100...200,
+                            tintColor: .orange,
+                            minWidth: 54,
+                            height: 36
+                        )
 
                         Button(action: {
                             playerScores[idx].directScore += 1
@@ -414,9 +425,9 @@ struct QwixxGameView: View {
                             playerScores[idx].directScore += 5
                         }) {
                             Text("+5")
-                                .font(.caption)
+                                .font(.caption2)
                                 .fontWeight(.bold)
-                                .padding(.horizontal, 8)
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 6)
                                 .background(Color.secondary.opacity(0.12))
                                 .cornerRadius(6)

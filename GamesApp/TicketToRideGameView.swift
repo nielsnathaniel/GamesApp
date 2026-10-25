@@ -272,6 +272,16 @@ struct TicketToRideGameView: View {
                             .foregroundColor(.red)
                     }
 
+                    NumericScoreInputView(
+                        score: $playerScores[selectedPlayerIndex].routePoints,
+                        allowNegative: false,
+                        range: 0...400,
+                        tintColor: .blue,
+                        minWidth: 44,
+                        height: 28,
+                        font: .subheadline
+                    )
+
                     Button(action: {
                         playerScores[selectedPlayerIndex].routePoints += 1
                     }) {
@@ -367,11 +377,15 @@ struct TicketToRideGameView: View {
                         Image(systemName: "minus.circle.fill").foregroundColor(.red)
                     }
 
-                    Text("+\(playerScores[selectedPlayerIndex].completedTickets)")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
-                        .frame(minWidth: 40)
+                    NumericScoreInputView(
+                        score: $playerScores[selectedPlayerIndex].completedTickets,
+                        allowNegative: false,
+                        range: 0...400,
+                        tintColor: .green,
+                        minWidth: 44,
+                        height: 28,
+                        font: .subheadline
+                    )
 
                     Button(action: {
                         playerScores[selectedPlayerIndex].completedTickets += 1
@@ -429,11 +443,15 @@ struct TicketToRideGameView: View {
                         Image(systemName: "minus.circle.fill").foregroundColor(.secondary)
                     }
 
-                    Text("-\(playerScores[selectedPlayerIndex].failedTickets)")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.red)
-                        .frame(minWidth: 40)
+                    NumericScoreInputView(
+                        score: $playerScores[selectedPlayerIndex].failedTickets,
+                        allowNegative: false,
+                        range: 0...400,
+                        tintColor: .red,
+                        minWidth: 44,
+                        height: 28,
+                        font: .subheadline
+                    )
 
                     Button(action: {
                         playerScores[selectedPlayerIndex].failedTickets += 1
@@ -562,18 +580,27 @@ struct TicketToRideGameView: View {
 
     private var directModeView: some View {
         VStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .foregroundColor(.blue)
+                Text("Tik op een score om direct een getal in te typen met het cijfertoetsenbord.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal)
+            .padding(.top, 2)
+
             ForEach(spelers.indices, id: \.self) { idx in
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     Text(spelers[idx])
                         .font(.headline)
 
                     Spacer()
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Button(action: {
-                            if playerScores[idx].directScore >= 10 {
-                                playerScores[idx].directScore -= 10
-                            }
+                            playerScores[idx].directScore -= 10
                         }) {
                             Text("-10")
                                 .font(.caption2)
@@ -585,19 +612,21 @@ struct TicketToRideGameView: View {
                         }
 
                         Button(action: {
-                            if playerScores[idx].directScore > 0 {
-                                playerScores[idx].directScore -= 1
-                            }
+                            playerScores[idx].directScore -= 1
                         }) {
                             Image(systemName: "minus.circle.fill")
                                 .font(.title3)
                                 .foregroundColor(.red)
                         }
 
-                        Text("\(playerScores[idx].directScore)")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .frame(minWidth: 44)
+                        NumericScoreInputView(
+                            score: $playerScores[idx].directScore,
+                            allowNegative: true,
+                            range: -100...400,
+                            tintColor: .blue,
+                            minWidth: 54,
+                            height: 36
+                        )
 
                         Button(action: {
                             playerScores[idx].directScore += 1

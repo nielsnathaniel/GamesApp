@@ -173,6 +173,7 @@ struct SettingsView: View {
 
                     DisclosureGroup("Pig Hole Regels") {
                         VStack(alignment: .leading, spacing: 6) {
+                            Text("• Start: Totaal 60 varkentjes verdeeld over het aantal spelers (bijv. 4 spelers = 15 elk, 3 = 20 elk)")
                             Text("• Doel: Als eerste al je varkentjes kwijtraken!")
                             Text("• Ronde 1: Iedereen gooit maximaal 1x met de dobbelsteen")
                             Text("• Ronde 2: Iedereen gooit maximaal 2x met de dobbelsteen")

@@ -8,13 +8,7 @@ struct PigHoleSetupView: View {
     @State private var spelers: [String] = Array(repeating: "", count: 6)
 
     private func defaultPigs(for playerCnt: Int) -> Int {
-        switch playerCnt {
-        case 2: return 20
-        case 3: return 18
-        case 4: return 15
-        case 5: return 13
-        default: return 11
-        }
+        return 60 / max(1, playerCnt)
     }
 
     var body: some View {
@@ -83,44 +77,67 @@ struct PigHoleSetupView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Startvoorraad Varkentjes")
                                 .font(.headline)
-                            Text("Aantal varkentjes per speler bij aanvang")
+                            Text("Totaal 60 varkentjes verdeeld over \(aantalSpelers) spelers (\(defaultPigs(for: aantalSpelers)) elk)")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
 
                         Spacer()
 
-                        HStack(spacing: 12) {
+                        HStack(spacing: 8) {
                             Button(action: {
-                                if startVarkens > 5 { startVarkens -= 1 }
+                                if startVarkens > 1 { startVarkens -= 1 }
                             }) {
                                 Image(systemName: "minus.circle.fill")
                                     .font(.title2)
-                                    .foregroundColor(startVarkens > 5 ? .pink : .secondary.opacity(0.3))
+                                    .foregroundColor(startVarkens > 1 ? .pink : .secondary.opacity(0.3))
                             }
-                            .disabled(startVarkens <= 5)
+                            .disabled(startVarkens <= 1)
 
-                            HStack(spacing: 4) {
-                                Text("\(startVarkens)")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                Text("🐷")
-                            }
-                            .frame(minWidth: 50)
+                            NumericScoreInputView(
+                                score: $startVarkens,
+                                allowNegative: false,
+                                range: 1...60,
+                                tintColor: .pink,
+                                minWidth: 46,
+                                height: 32
+                            )
 
                             Button(action: {
-                                if startVarkens < 30 { startVarkens += 1 }
+                                if startVarkens < 60 { startVarkens += 1 }
                             }) {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.title2)
-                                    .foregroundColor(startVarkens < 30 ? .pink : .secondary.opacity(0.3))
+                                    .foregroundColor(startVarkens < 60 ? .pink : .secondary.opacity(0.3))
                             }
-                            .disabled(startVarkens >= 30)
+                            .disabled(startVarkens >= 60)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(Color(UIColor.secondarySystemGroupedBackground))
                         .cornerRadius(10)
+                    }
+                    .padding(.horizontal)
+
+                    HStack {
+                        Text("💡 Tik op het getal om direct te typen, of gebruik de knoppen.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        if startVarkens != defaultPigs(for: aantalSpelers) {
+                            Button(action: {
+                                startVarkens = defaultPigs(for: aantalSpelers)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.counterclockwise")
+                                    Text("Herstel (\(defaultPigs(for: aantalSpelers)))")
+                                }
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.pink)
+                            }
+                        }
                     }
                     .padding(.horizontal)
                 }
