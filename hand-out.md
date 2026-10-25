@@ -40,12 +40,12 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
 ```
 
 ### Belangrijke Bestanden:
-* [`ContentView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ContentView.swift): TabView configuratie (Spellen, Statistieken, Instellingen) inclusief een moderne interactieve iOS segmented pill-bar voor het sorteren en filteren van het spellenaanbod:
-  - **Populair**: Sorteert spellen op basis van het aantal gespeelde potjes (meest gespeeld bovenaan) met een subtiele vlam-badge (`🔥 Xx`) en speelfrequentie.
-  - **Toegevoegd**: Behoudt de standaard/oorspronkelijke volgorde van de spellen.
-  - **Alfabetisch**: Sorteert de spellen op alfabetische volgorde (A-Z).
-  - Vloeiende capsule-animatie (`matchedGeometryEffect`), themakleuren en haptische feedback.
-  - De geselecteerde sorteervoorkeur wordt bewaard via `@AppStorage`.
+* [`ContentView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ContentView.swift): TabView configuratie (Spellen, Statistieken, Instellingen) inclusief een subtiele filter/sorteer knop rechtsboven in de navigatiebalk:
+  - **Rechtsboven Filter Menu (`filterSortMenu`):** Compacte navigatieknop met `line.3.horizontal.decrease.circle` die direct een menu opent om te sorteren:
+    - **Toegevoegd**: Behoudt de standaard/oorspronkelijke volgorde van de spellen.
+    - **Populair**: Sorteert spellen op basis van het aantal gespeelde potjes (meest gespeeld bovenaan) met een subtiele vlam-badge (`🔥 Xx`) en speelfrequentie.
+    - **Alfabetisch**: Sorteert de spellen op alfabetische volgorde (A-Z).
+  - De geselecteerde sorteervoorkeur wordt bewaard via `@AppStorage` en toont een actieve vulling wanneer er een niet-standaard sortering actief is.
 * [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers`, winnaars, H2H-statistieken, 2v2 Duo-statistieken en Balzakken leaderboards.
 * [`StatisticsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/StatisticsView.swift): Gloednieuw statistiekenscherm met een moderne horizontaal scrollende pill-navigatiebalk en interactieve filterbalk:
   1. *Overzicht:* KPI-tegels (totale potjes, actieve spelers, records) & populariteitsgrafieken.

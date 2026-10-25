@@ -28,7 +28,6 @@ struct ContentView: View {
     @State private var selectedTab: Int = 0
     @AppStorage("game_sort_option") private var sortOption: GameSortOption = .toegevoegd
     @ObservedObject private var scoreManager = ScoreManager.shared
-    @Namespace private var sortNamespace
 
     let games = [
         ("Nmbr9", "Nmbr9"),
@@ -102,109 +101,87 @@ struct ContentView: View {
 
     private var gameSelectionView: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Moderne Sorteer / Filter balk
-                sortFilterBar
+            ScrollView {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 20) {
+                    ForEach(sortedGames, id: \.0) { game in
+                        NavigationLink(destination: destinationView(for: game.0)) {
+                            VStack(spacing: 8) {
+                                ZStack(alignment: .topTrailing) {
+                                    gameIcon(for: game.0, assetName: game.1)
 
-                ScrollView {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 20) {
-                        ForEach(sortedGames, id: \.0) { game in
-                            NavigationLink(destination: destinationView(for: game.0)) {
-                                VStack(spacing: 8) {
-                                    ZStack(alignment: .topTrailing) {
-                                        gameIcon(for: game.0, assetName: game.1)
-
-                                        if sortOption == .populair {
-                                            let count = playCount(for: game.0)
-                                            HStack(spacing: 2) {
-                                                Image(systemName: "flame.fill")
-                                                    .font(.system(size: 8))
-                                                Text("\(count)x")
-                                                    .font(.system(size: 10, weight: .bold))
-                                            }
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 3)
-                                            .background(count > 0 ? Color.orange : Color.gray.opacity(0.5))
-                                            .foregroundColor(.white)
-                                            .clipShape(Capsule())
-                                            .offset(x: 10, y: -6)
+                                    if sortOption == .populair {
+                                        let count = playCount(for: game.0)
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "flame.fill")
+                                                .font(.system(size: 8))
+                                            Text("\(count)x")
+                                                .font(.system(size: 10, weight: .bold))
                                         }
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(count > 0 ? Color.orange : Color.gray.opacity(0.5))
+                                        .foregroundColor(.white)
+                                        .clipShape(Capsule())
+                                        .offset(x: 10, y: -6)
                                     }
-
-                                    VStack(spacing: 2) {
-                                        Text(game.0)
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
-
-                                        if sortOption == .populair {
-                                            let count = playCount(for: game.0)
-                                            Text(count == 1 ? "1x gespeeld" : "\(count)x gespeeld")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    .padding(.top, 2)
                                 }
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(14)
-                                .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 4)
+
+                                VStack(spacing: 2) {
+                                    Text(game.0)
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+
+                                    if sortOption == .populair {
+                                        let count = playCount(for: game.0)
+                                        Text(count == 1 ? "1x gespeeld" : "\(count)x gespeeld")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .padding(.top, 2)
                             }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(14)
+                            .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 4)
                         }
                     }
-                    .padding()
                 }
+                .padding()
             }
             .navigationTitle("Spellen")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    filterSortMenu
+                }
+            }
             .onAppear {
                 scoreManager.refresh()
             }
         }
     }
 
-    // MARK: - Moderne Sorteer / Filter Balk
+    // MARK: - Filter / Sorteer Knop Rechtsboven
 
-    private var sortFilterBar: some View {
-        HStack(spacing: 4) {
-            ForEach(GameSortOption.allCases) { option in
-                let isSelected = sortOption == option
-
-                Button(action: {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                        sortOption = option
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: option.icon)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(isSelected ? option.iconColor : .secondary)
-
-                        Text(option.rawValue)
-                            .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-                            .foregroundColor(isSelected ? .primary : .secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(Color(UIColor.systemBackground))
-                                .matchedGeometryEffect(id: "activeSortPill", in: sortNamespace)
-                                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 1.5)
-                        }
-                    }
+    private var filterSortMenu: some View {
+        Menu {
+            Picker("Sorteer spellen", selection: $sortOption) {
+                ForEach(GameSortOption.allCases) { option in
+                    Label(option.rawValue, systemImage: option.icon)
+                        .tag(option)
                 }
-                .buttonStyle(.plain)
             }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: sortOption == .toegevoegd ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(sortOption == .toegevoegd ? .primary : .blue)
+            }
+            .frame(width: 36, height: 36)
+            .contentShape(Rectangle())
         }
-        .padding(4)
-        .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
+        .accessibilityLabel("Sorteer spellen")
     }
 
     private func resolveImageName(for assetName: String) -> String? {
