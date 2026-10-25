@@ -39,6 +39,58 @@ struct LoveLetterSetupView: View {
         actieveKaarten.reduce(0) { $0 + $1.copies }
     }
 
+    private func exclusiveHint(for cardId: String) -> String? {
+        switch cardId {
+        case "priester":
+            return "of Kardinaal"
+        case "kardinaal":
+            return "of Priester"
+        case "joker", "moordenaar":
+            return "Duo • of Spion"
+        case "spion":
+            return "of Joker & Moordenaar"
+        default:
+            return nil
+        }
+    }
+
+    private func toggleCard(_ cardId: String) {
+        withAnimation(.easeInOut(duration: 0.15)) {
+            if geselecteerdeKaartIds.contains(cardId) {
+                // Uitvinken
+                geselecteerdeKaartIds.remove(cardId)
+
+                // Als Joker of Moordenaar wordt uitgevinkt, gaat de partner ook direct uit
+                if cardId == "joker" {
+                    geselecteerdeKaartIds.remove("moordenaar")
+                } else if cardId == "moordenaar" {
+                    geselecteerdeKaartIds.remove("joker")
+                }
+            } else {
+                // Aanvinken
+                geselecteerdeKaartIds.insert(cardId)
+
+                // Regel 1: 2 priesters OF 2 kardinalen (beide kan niet, kies je er 1 dan vinkt de ander uit)
+                if cardId == "priester" {
+                    geselecteerdeKaartIds.remove("kardinaal")
+                } else if cardId == "kardinaal" {
+                    geselecteerdeKaartIds.remove("priester")
+                }
+
+                // Regel 2: Spionnen OF (Joker + Moordenaar)
+                // Vink je joker aan, dan vink je ook moordenaar aan maar gaat spion uit en andersom
+                if cardId == "joker" || cardId == "moordenaar" {
+                    geselecteerdeKaartIds.insert("joker")
+                    geselecteerdeKaartIds.insert("moordenaar")
+                    geselecteerdeKaartIds.remove("spion")
+                } else if cardId == "spion" {
+                    geselecteerdeKaartIds.remove("joker")
+                    geselecteerdeKaartIds.remove("moordenaar")
+                }
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -264,13 +316,7 @@ struct LoveLetterSetupView: View {
                         ForEach(allLoveLetterCards) { card in
                             let isIncluded = geselecteerdeKaartIds.contains(card.id)
                             Button(action: {
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    if isIncluded {
-                                        geselecteerdeKaartIds.remove(card.id)
-                                    } else {
-                                        geselecteerdeKaartIds.insert(card.id)
-                                    }
-                                }
+                                toggleCard(card.id)
                             }) {
                                 HStack(spacing: 12) {
                                     Image(systemName: isIncluded ? "checkmark.square.fill" : "square")
@@ -298,6 +344,16 @@ struct LoveLetterSetupView: View {
                                             Image(systemName: card.icon)
                                                 .font(.caption2)
                                                 .foregroundColor(isIncluded ? card.color : .secondary)
+
+                                            if let hint = exclusiveHint(for: card.id) {
+                                                Text(hint)
+                                                    .font(.system(size: 10, weight: .semibold))
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(isIncluded ? Color.pink.opacity(0.15) : Color.secondary.opacity(0.12))
+                                                    .foregroundColor(isIncluded ? .pink : .secondary)
+                                                    .clipShape(Capsule())
+                                            }
                                         }
                                         Text(card.subtitle)
                                             .font(.caption2)
