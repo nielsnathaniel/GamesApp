@@ -772,30 +772,34 @@ struct RegenwormenGameView: View {
                     Label("Stenen op tafel", systemImage: "flame.fill")
                         .font(.headline)
                         .foregroundColor(.orange)
+                        .lineLimit(1)
 
                     Spacer()
 
                     Text("\(tafelStenen.count) open stenen")
-                        .font(.caption2)
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
                 .padding(.horizontal)
 
-                // Duidelijke actieve speler instructie banner
-                HStack(spacing: 8) {
+                // Duidelijke actieve speler instructie banner (op 1 regel)
+                HStack(spacing: 6) {
                     Image(systemName: "hand.tap.fill")
                         .foregroundColor(actieveKleur)
-                        .font(.subheadline)
+                        .font(.system(size: 12, weight: .semibold))
                     Text("Tik op een steen om te pakken voor ")
                         .foregroundColor(.secondary)
                     + Text(actieveSpeler.name)
                         .bold()
                         .foregroundColor(actieveKleur)
                 }
-                .font(.subheadline)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
                 .background(actieveKleur.opacity(0.14))
                 .cornerRadius(10)
                 .overlay(
@@ -845,35 +849,40 @@ struct RegenwormenGameView: View {
                     Label("Steen afpakken", systemImage: "hand.raised.fill")
                         .font(.headline)
                         .foregroundColor(.purple)
+                        .lineLimit(1)
 
                     Spacer()
 
                     Text("Alleen bovenste steen zichtbaar")
-                        .font(.caption2)
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 .padding(.horizontal)
 
-                // Duidelijke actieve speler instructie banner voor afpakken
-                HStack(spacing: 8) {
+                // Duidelijke actieve speler instructie banner voor afpakken (op 1 regel)
+                HStack(spacing: 6) {
                     Image(systemName: "hand.raised.fill")
-                        .foregroundColor(.purple)
-                        .font(.subheadline)
+                        .foregroundColor(actieveKleur)
+                        .font(.system(size: 12, weight: .semibold))
                     Text("Tik op de bovenste steen om af te pakken voor ")
                         .foregroundColor(.secondary)
                     + Text(actieveSpeler.name)
                         .bold()
                         .foregroundColor(actieveKleur)
                 }
-                .font(.subheadline)
+                .font(.system(size: 12, weight: .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.purple.opacity(0.12))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(actieveKleur.opacity(0.14))
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                        .stroke(actieveKleur.opacity(0.35), lineWidth: 1)
                 )
                 .padding(.horizontal)
 
@@ -921,26 +930,14 @@ struct RegenwormenGameView: View {
                                     Button(action: {
                                         steelSteenVanMedespeler(van: otherIdx, steenNummer: steen)
                                     }) {
-                                        HStack(spacing: 8) {
-                                            VStack(alignment: .trailing, spacing: 1) {
-                                                Text("Pak af voor \(actieveSpeler.name)!")
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .foregroundColor(.purple)
-                                                Text("Bovenop: steen \(steen)")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                            }
-
-                                            miniSteenBadge(nummer: steen, wormenAantal: wormen(voor: steen), tint: otherKleur)
-                                        }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(Color.purple.opacity(0.12))
-                                        .cornerRadius(10)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .stroke(Color.purple.opacity(0.3), lineWidth: 1)
-                                        )
+                                        miniSteenBadge(nummer: steen, wormenAantal: wormen(voor: steen), tint: otherKleur)
+                                            .padding(4)
+                                            .background(actieveKleur.opacity(0.14))
+                                            .cornerRadius(10)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(actieveKleur.opacity(0.4), lineWidth: 1.5)
+                                            )
                                     }
                                     .buttonStyle(ScaleButtonStyle())
                                 } else {
