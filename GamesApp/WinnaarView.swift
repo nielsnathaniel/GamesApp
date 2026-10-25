@@ -293,7 +293,7 @@ struct WinnaarView: View {
             .padding(.horizontal)
 
             VStack(spacing: 0) {
-                if let teams = teamEntries {
+                if teamEntries != nil {
                     ForEach(Array(rankedTeams.enumerated()), id: \.element.id) { idx, team in
                         HStack(spacing: 12) {
                             Text(rankMedal(idx))
