@@ -1,14 +1,53 @@
 import SwiftUI
 
+enum TTRColor: String, CaseIterable, Identifiable, Codable {
+    case rood = "Rood"
+    case blauw = "Blauw"
+    case groen = "Groen"
+    case geel = "Geel"
+    case zwart = "Zwart"
+    case paars = "Paars"
+
+    var id: String { rawValue }
+
+    var color: Color {
+        switch self {
+        case .rood: return Color.red
+        case .blauw: return Color.blue
+        case .groen: return Color.green
+        case .geel: return Color(red: 0.95, green: 0.72, blue: 0.05)
+        case .zwart: return Color(white: 0.22)
+        case .paars: return Color.purple
+        }
+    }
+
+    var lightBgColor: Color {
+        switch self {
+        case .rood: return Color.red.opacity(0.12)
+        case .blauw: return Color.blue.opacity(0.12)
+        case .groen: return Color.green.opacity(0.12)
+        case .geel: return Color.yellow.opacity(0.18)
+        case .zwart: return Color.gray.opacity(0.18)
+        case .paars: return Color.purple.opacity(0.12)
+        }
+    }
+
+    var onColorTextColor: Color {
+        return self == .geel ? .black : .white
+    }
+}
+
 struct TicketToRideSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
 
     @State private var aantalSpelers: Int = 4
     @State private var spelers: [String] = Array(repeating: "", count: 5)
+    @State private var playerColors: [TTRColor] = [.rood, .blauw, .groen, .geel, .zwart]
     @State private var startModus: TTRScoreMode = .categorieen
 
     enum TTRScoreMode: String, CaseIterable, Identifiable {
-        case categorieen = "Categorieën Berekenen"
+        case categorieen = "Categorieën (Eindtelling)"
+        case liveRondes = "Ronde per Ronde (Live)"
         case direct = "Direct Totaal Invullen"
 
         var id: String { rawValue }
@@ -87,10 +126,7 @@ struct TicketToRideSetupView: View {
                     .pickerStyle(.segmented)
                     .padding(.horizontal)
 
-                    Text(startModus == .categorieen ? "Routepunten, voltooide tickets, mislukte tickets, bonussen (langste route) en stations. Je kunt tijdens het spelen wisselen." : "Direct de eindscore per speler invullen.")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
+                    modeDescriptionText
                 }
 
                 // Opgeslagen Spelers Quick Chips
@@ -100,21 +136,21 @@ struct TicketToRideSetupView: View {
                     tintColor: .blue
                 )
 
-                // Invoervelden voor spelersnamen
+                // Invoervelden voor spelersnamen & treinkleuren
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Spelers")
-                        .font(.headline)
-                        .padding(.horizontal)
+                    HStack {
+                        Text("Spelers & Treinkleuren")
+                            .font(.headline)
+                        Spacer()
+                        Text("Kies je treinkleur")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
 
                     VStack(spacing: 12) {
                         ForEach(0..<aantalSpelers, id: \.self) { index in
-                            PlayerNameInputField(
-                                placeholder: "Naam Speler \(index + 1)",
-                                text: $spelers[index],
-                                suggestions: scoreManager.savedPlayerNames,
-                                submitLabel: index < aantalSpelers - 1 ? .next : .done
-                            )
-                            .padding(.horizontal)
+                            playerRow(at: index)
                         }
                     }
                 }
@@ -125,7 +161,8 @@ struct TicketToRideSetupView: View {
                 NavigationLink(
                     destination: TicketToRideGameView(
                         spelers: Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }),
-                        initialMode: startModus
+                        initialMode: startModus,
+                        playerColors: Array(playerColors.prefix(aantalSpelers))
                     )
                 ) {
                     HStack(spacing: 8) {
@@ -153,6 +190,82 @@ struct TicketToRideSetupView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             scoreManager.refresh()
+        }
+    }
+
+    private func playerRow(at index: Int) -> some View {
+        HStack(spacing: 8) {
+            PlayerNameInputField(
+                placeholder: "Naam Speler \(index + 1)",
+                text: $spelers[index],
+                suggestions: scoreManager.savedPlayerNames,
+                submitLabel: index < aantalSpelers - 1 ? .next : .done
+            )
+
+            colorPickerMenu(for: index)
+        }
+        .padding(.horizontal)
+    }
+
+    private func colorPickerMenu(for index: Int) -> some View {
+        let currentColor = playerColors[index]
+
+        return Menu {
+            ForEach(TTRColor.allCases) { c in
+                Button {
+                    playerColors[index] = c
+                } label: {
+                    HStack {
+                        Circle().fill(c.color).frame(width: 12, height: 12)
+                        Text(c.rawValue)
+                        if currentColor == c {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(currentColor.color)
+                    .frame(width: 14, height: 14)
+                Text(currentColor.rawValue)
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(currentColor == .zwart ? .primary : currentColor.color)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 8)
+            .background(currentColor.lightBgColor)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(currentColor.color.opacity(0.35), lineWidth: 1)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var modeDescriptionText: some View {
+        switch startModus {
+        case .categorieen:
+            Text("Achteraf per speler routepunten, voltooide tickets, mislukte tickets, bonussen en stations invullen.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+        case .liveRondes:
+            Text("Tijdens het bordspel beurt voor beurt live gelegde routes invoeren in je eigen treinkleur. Na afloop vul je direct de tickets en bonussen in.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+        case .direct:
+            Text("Snel en direct de uiteindelijke totaalscores per speler intypen met het cijfertoetsenbord.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
         }
     }
 }

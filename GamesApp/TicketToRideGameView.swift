@@ -20,6 +20,7 @@ struct TTRPlayerScore {
 struct TicketToRideGameView: View {
     let spelers: [String]
     let initialMode: TicketToRideSetupView.TTRScoreMode
+    let playerColors: [TTRColor]
 
     @ObservedObject private var scoreManager = ScoreManager.shared
 
@@ -29,32 +30,63 @@ struct TicketToRideGameView: View {
     @State private var showWinnaarView: Bool = false
     @State private var winnaarPlayer: Player = Player(name: "")
 
-    init(spelers: [String], initialMode: TicketToRideSetupView.TTRScoreMode) {
+    // Live ronde-per-ronde tracking
+    @State private var currentRound: Int = 1
+    @State private var turnIndexInRound: Int = 0
+    @State private var turnHistory: [(round: Int, playerIndex: Int, points: Int, description: String)] = []
+    @State private var showCustomPointsAlert: Bool = false
+    @State private var customPointsInput: String = ""
+
+    init(
+        spelers: [String],
+        initialMode: TicketToRideSetupView.TTRScoreMode = .categorieen,
+        playerColors: [TTRColor]? = nil
+    ) {
         self.spelers = spelers
         self.initialMode = initialMode
         _currentMode = State(initialValue: initialMode)
         _playerScores = State(initialValue: Array(repeating: TTRPlayerScore(), count: spelers.count))
+
+        let defaults: [TTRColor] = [.rood, .blauw, .groen, .geel, .zwart, .paars]
+        self.playerColors = playerColors ?? Array(defaults.prefix(spelers.count))
+    }
+
+    private var activePlayerColor: TTRColor {
+        playerColors[safe: selectedPlayerIndex] ?? .blauw
+    }
+
+    private var activeColor: Color {
+        activePlayerColor.color
+    }
+
+    private var activeLightBg: Color {
+        activePlayerColor.lightBgColor
+    }
+
+    private var activePlayerName: String {
+        spelers[safe: selectedPlayerIndex] ?? ""
     }
 
     private func effectiveScore(for index: Int) -> Int {
         guard let p = playerScores[safe: index] else { return 0 }
-        return currentMode == .categorieen ? p.calculatedTotal() : p.directScore
+        return currentMode == .direct ? p.directScore : p.calculatedTotal()
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Header
+                // Header met spelicoon
                 headerView
 
-                // Modus Wisselaar
+                // Modus Wisselaar (3 opties)
                 modeSwitchBar
 
-                if currentMode == .categorieen {
-                    // Categorieën formulier
+                switch currentMode {
+                case .categorieen:
                     categoriesView
-                } else {
-                    // Directe score weergave
+                case .liveRondes:
+                    liveRondesView
+                case .direct:
                     directModeView
                 }
 
@@ -65,8 +97,35 @@ struct TicketToRideGameView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Ticket to Ride")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 1) {
+                    Text("Ticket to Ride")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+
+                    if currentMode == .categorieen || currentMode == .liveRondes {
+                        if !activePlayerName.isEmpty {
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(activeColor)
+                                    .frame(width: 7, height: 7)
+                                Text(activePlayerName)
+                                    .font(.caption2)
+                                    .fontWeight(.heavy)
+                                    .foregroundColor(activeColor)
+                                Text("• \(effectiveScore(for: selectedPlayerIndex)) pt")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
         .navigationDestination(isPresented: $showWinnaarView) {
             WinnaarView(
                 gameName: "Ticket to Ride",
@@ -75,6 +134,21 @@ struct TicketToRideGameView: View {
                 sortedScores: sortedScores,
                 isLowestScoreWins: false
             )
+        }
+        .alert("Aangepaste Routepunten", isPresented: $showCustomPointsAlert) {
+            TextField("Punten (bijv. 9)", text: $customPointsInput)
+                .keyboardType(.numberPad)
+            Button("Toevoegen") {
+                if let pts = Int(customPointsInput), pts >= 0 {
+                    confirmLiveTurn(points: pts, description: "Aangepaste route (+\(pts) pt)")
+                }
+                customPointsInput = ""
+            }
+            Button("Annuleer", role: .cancel) {
+                customPointsInput = ""
+            }
+        } message: {
+            Text("Voer het aantal punten in voor de gelegde route van \(activePlayerName).")
         }
     }
 
@@ -88,10 +162,10 @@ struct TicketToRideGameView: View {
                     .scaledToFit()
                     .frame(width: 40, height: 40)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .shadow(color: .blue.opacity(0.3), radius: 3, x: 0, y: 1)
+                    .shadow(color: activeColor.opacity(0.3), radius: 3, x: 0, y: 1)
             } else {
                 Image(systemName: "tram.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(activeColor)
                     .font(.system(size: 32))
             }
 
@@ -99,7 +173,7 @@ struct TicketToRideGameView: View {
                 Text("Ticket to Ride")
                     .font(.title2)
                     .fontWeight(.bold)
-                Text(currentMode == .categorieen ? "Puntentelling per categorie" : "Directe totaalscores")
+                Text(modeSubtitle)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -108,6 +182,17 @@ struct TicketToRideGameView: View {
         }
         .padding(.horizontal)
         .padding(.top, 4)
+    }
+
+    private var modeSubtitle: String {
+        switch currentMode {
+        case .categorieen:
+            return "Eindtelling: routes, tickets & bonussen"
+        case .liveRondes:
+            return "Live bordspel: ronde per ronde invoeren"
+        case .direct:
+            return "Directe totaalscores invoeren"
+        }
     }
 
     // MARK: - Modus Wisselaar
@@ -122,40 +207,50 @@ struct TicketToRideGameView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Categorieën Weergave
+    // MARK: - Categorieën Weergave (Eindtelling)
 
     private var categoriesView: some View {
         VStack(spacing: 16) {
-            // Speler Selector Tabs
+            // Speler Selector Tabs met treinkleuren
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(spelers.indices, id: \.self) { idx in
                         let isSelected = selectedPlayerIndex == idx
+                        let pColor = playerColors[safe: idx] ?? .blauw
                         let total = effectiveScore(for: idx)
 
                         Button(action: {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation { selectedPlayerIndex = idx }
-                        }) {
-                            VStack(spacing: 4) {
-                                Text(spelers[idx])
-                                    .font(.subheadline)
-                                    .fontWeight(isSelected ? .bold : .medium)
-
-                                Text("\(total) pt")
-                                    .font(.caption2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(isSelected ? .white : .blue)
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                selectedPlayerIndex = idx
                             }
-                            .padding(.horizontal, 16)
+                        }) {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(isSelected ? pColor.onColorTextColor : pColor.color)
+                                    .frame(width: 10, height: 10)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(spelers[idx])
+                                        .font(.subheadline)
+                                        .fontWeight(isSelected ? .bold : .medium)
+
+                                    Text("\(total) pt")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(isSelected ? pColor.onColorTextColor.opacity(0.9) : pColor.color)
+                                }
+                            }
+                            .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(isSelected ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
-                            .foregroundColor(isSelected ? .white : .primary)
-                            .cornerRadius(10)
+                            .background(isSelected ? pColor.color : pColor.lightBgColor)
+                            .foregroundColor(isSelected ? pColor.onColorTextColor : .primary)
+                            .cornerRadius(12)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(isSelected ? Color.blue : Color.secondary.opacity(0.2), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(pColor.color.opacity(isSelected ? 0 : 0.4), lineWidth: 1.5)
                             )
+                            .shadow(color: isSelected ? pColor.color.opacity(0.35) : Color.clear, radius: 4, x: 0, y: 2)
                         }
                         .buttonStyle(.plain)
                     }
@@ -166,28 +261,48 @@ struct TicketToRideGameView: View {
             // Geselecteerde Speler Formulier
             if let activePlayer = spelers[safe: selectedPlayerIndex] {
                 VStack(spacing: 14) {
-                    // Header kaart van actieve speler
-                    HStack {
+                    // Header kaart van actieve speler in zijn/haar treinkleur
+                    HStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(activeColor.opacity(0.2))
+                                .frame(width: 44, height: 44)
+                            Image(systemName: "tram.fill")
+                                .font(.title3)
+                                .foregroundColor(activeColor)
+                        }
+
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Score van \(activePlayer)")
-                                .font(.headline)
-                            Text("Routes, bestemmingskaarten en bonussen")
+                            Text("Punten invoeren voor:")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
+                                .textCase(.uppercase)
+
+                            Text(activePlayer)
+                                .font(.title2)
+                                .fontWeight(.black)
+                                .foregroundColor(activeColor)
                         }
 
                         Spacer()
 
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("\(playerScores[selectedPlayerIndex].calculatedTotal()) pt")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                            Text("Totaal")
+                                .font(.title)
+                                .fontWeight(.heavy)
+                                .foregroundColor(activeColor)
+                            Text("Totaalscore")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .padding()
+                    .background(activeLightBg)
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(activeColor.opacity(0.4), lineWidth: 1.5)
+                    )
                     .padding(.horizontal)
 
                     // 1. Routepunten (Treintrajecten)
@@ -199,7 +314,7 @@ struct TicketToRideGameView: View {
                     // 3. Bonussen & Stations
                     bonusesSection
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, 4)
             }
         }
     }
@@ -212,13 +327,14 @@ struct TicketToRideGameView: View {
                 Label("1. Routepunten (Treintrajecten)", systemImage: "tram.fill")
                     .font(.subheadline)
                     .fontWeight(.bold)
-                    .foregroundColor(.blue)
+                    .foregroundColor(activeColor)
 
                 Spacer()
 
                 Text("\(playerScores[selectedPlayerIndex].routePoints) pt")
                     .font(.subheadline)
                     .fontWeight(.bold)
+                    .foregroundColor(activeColor)
             }
 
             // Snelle presets gebaseerd op officiële treinlengtes:
@@ -258,7 +374,8 @@ struct TicketToRideGameView: View {
                             .fontWeight(.bold)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 4)
-                            .background(Color.secondary.opacity(0.12))
+                            .background(activeLightBg)
+                            .foregroundColor(activeColor)
                             .cornerRadius(6)
                     }
 
@@ -276,7 +393,7 @@ struct TicketToRideGameView: View {
                         score: $playerScores[selectedPlayerIndex].routePoints,
                         allowNegative: false,
                         range: 0...400,
-                        tintColor: .blue,
+                        tintColor: activeColor,
                         minWidth: 44,
                         height: 28,
                         font: .subheadline
@@ -287,7 +404,7 @@ struct TicketToRideGameView: View {
                     }) {
                         Image(systemName: "plus.circle.fill")
                             .font(.subheadline)
-                            .foregroundColor(.green)
+                            .foregroundColor(activeColor)
                     }
 
                     Button(action: {
@@ -298,7 +415,8 @@ struct TicketToRideGameView: View {
                             .fontWeight(.bold)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 4)
-                            .background(Color.secondary.opacity(0.12))
+                            .background(activeLightBg)
+                            .foregroundColor(activeColor)
                             .cornerRadius(6)
                     }
                 }
@@ -307,6 +425,10 @@ struct TicketToRideGameView: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(activeColor.opacity(0.15), lineWidth: 1)
+        )
         .padding(.horizontal)
     }
 
@@ -323,12 +445,17 @@ struct TicketToRideGameView: View {
                     .fontWeight(.bold)
                 Text("+\(points)")
                     .font(.caption2)
-                    .foregroundColor(.blue)
+                    .fontWeight(.bold)
+                    .foregroundColor(activeColor)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.blue.opacity(0.12))
+            .background(activeLightBg)
             .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(activeColor.opacity(0.35), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -340,12 +467,12 @@ struct TicketToRideGameView: View {
             Label("2. Bestemmingskaarten (Tickets)", systemImage: "ticket.fill")
                 .font(.subheadline)
                 .fontWeight(.bold)
-                .foregroundColor(.indigo)
+                .foregroundColor(activeColor)
 
             // Voltooide tickets
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Voltooide tickets")
+                    Text("Voltooide tickets (Pluspunten)")
                         .font(.body)
                         .fontWeight(.medium)
                     Text("Totale punten van behaalde routes")
@@ -365,7 +492,8 @@ struct TicketToRideGameView: View {
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 4)
-                            .background(Color.secondary.opacity(0.1))
+                            .background(activeLightBg)
+                            .foregroundColor(activeColor)
                             .cornerRadius(6)
                     }
 
@@ -374,14 +502,14 @@ struct TicketToRideGameView: View {
                             playerScores[selectedPlayerIndex].completedTickets -= 1
                         }
                     }) {
-                        Image(systemName: "minus.circle.fill").foregroundColor(.red)
+                        Image(systemName: "minus.circle.fill").foregroundColor(.secondary)
                     }
 
                     NumericScoreInputView(
                         score: $playerScores[selectedPlayerIndex].completedTickets,
                         allowNegative: false,
                         range: 0...400,
-                        tintColor: .green,
+                        tintColor: activeColor,
                         minWidth: 44,
                         height: 28,
                         font: .subheadline
@@ -390,7 +518,7 @@ struct TicketToRideGameView: View {
                     Button(action: {
                         playerScores[selectedPlayerIndex].completedTickets += 1
                     }) {
-                        Image(systemName: "plus.circle.fill").foregroundColor(.green)
+                        Image(systemName: "plus.circle.fill").foregroundColor(activeColor)
                     }
 
                     Button(action: {
@@ -400,7 +528,8 @@ struct TicketToRideGameView: View {
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 4)
-                            .background(Color.secondary.opacity(0.1))
+                            .background(activeLightBg)
+                            .foregroundColor(activeColor)
                             .cornerRadius(6)
                     }
                 }
@@ -411,10 +540,10 @@ struct TicketToRideGameView: View {
             // Niet-voltooide tickets (Strafpunten)
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Mislukte tickets (Minpunten)")
+                    Text("Mislukte tickets (Aftrek)")
                         .font(.body)
                         .fontWeight(.medium)
-                    Text("Aftrek voor niet-behaalde routes")
+                    Text("Minpunten voor niet-behaalde routes")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -440,7 +569,7 @@ struct TicketToRideGameView: View {
                             playerScores[selectedPlayerIndex].failedTickets -= 1
                         }
                     }) {
-                        Image(systemName: "minus.circle.fill").foregroundColor(.secondary)
+                        Image(systemName: "minus.circle.fill").foregroundColor(.red)
                     }
 
                     NumericScoreInputView(
@@ -475,6 +604,10 @@ struct TicketToRideGameView: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(activeColor.opacity(0.15), lineWidth: 1)
+        )
         .padding(.horizontal)
     }
 
@@ -485,13 +618,13 @@ struct TicketToRideGameView: View {
             Label("3. Bonussen & Stations", systemImage: "star.fill")
                 .font(.subheadline)
                 .fontWeight(.bold)
-                .foregroundColor(.orange)
+                .foregroundColor(activeColor)
 
             // Langste Route (+10 pt)
             Toggle(isOn: $playerScores[selectedPlayerIndex].hasLongestRoute) {
                 HStack(spacing: 8) {
                     Image(systemName: "road.lanes")
-                        .foregroundColor(.orange)
+                        .foregroundColor(activeColor)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Langste aaneengesloten route")
                             .font(.body)
@@ -501,7 +634,7 @@ struct TicketToRideGameView: View {
                     }
                 }
             }
-            .tint(.orange)
+            .tint(activeColor)
 
             Divider()
 
@@ -509,7 +642,7 @@ struct TicketToRideGameView: View {
             Toggle(isOn: $playerScores[selectedPlayerIndex].hasGlobetrotter) {
                 HStack(spacing: 8) {
                     Image(systemName: "globe.europe.africa.fill")
-                        .foregroundColor(.teal)
+                        .foregroundColor(activeColor)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Globetrotter (meeste tickets)")
                             .font(.body)
@@ -519,7 +652,7 @@ struct TicketToRideGameView: View {
                     }
                 }
             }
-            .tint(.teal)
+            .tint(activeColor)
 
             Divider()
 
@@ -527,7 +660,7 @@ struct TicketToRideGameView: View {
             HStack {
                 HStack(spacing: 8) {
                     Image(systemName: "building.2.fill")
-                        .foregroundColor(.blue)
+                        .foregroundColor(activeColor)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Overgebleven stations")
                             .font(.body)
@@ -559,13 +692,14 @@ struct TicketToRideGameView: View {
                             playerScores[selectedPlayerIndex].unusedStations += 1
                         }
                     }) {
-                        Image(systemName: "plus.circle.fill").foregroundColor(.blue)
+                        Image(systemName: "plus.circle.fill").foregroundColor(activeColor)
                     }
                     .disabled(playerScores[selectedPlayerIndex].unusedStations >= 3)
 
                     Text("(+\(playerScores[selectedPlayerIndex].unusedStations * 4) pt)")
                         .font(.caption2)
-                        .foregroundColor(.blue)
+                        .fontWeight(.bold)
+                        .foregroundColor(activeColor)
                         .frame(minWidth: 44)
                 }
             }
@@ -573,7 +707,333 @@ struct TicketToRideGameView: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(activeColor.opacity(0.15), lineWidth: 1)
+        )
         .padding(.horizontal)
+    }
+
+    // MARK: - 3. Live Ronde-per-Ronde Weergave
+
+    private var roundTurns: [(round: Int, playerIndex: Int, points: Int, description: String)] {
+        turnHistory.filter { $0.round == currentRound }
+    }
+
+    private var liveRondesView: some View {
+        VStack(spacing: 16) {
+            // Ronde & Beurt voortgangsbalk
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "flag.checkered")
+                        .font(.caption)
+                        .foregroundColor(activeColor)
+                    Text("Ronde \(currentRound)")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(activeLightBg)
+                .cornerRadius(20)
+
+                Spacer()
+
+                Text("Beurt \(turnIndexInRound + 1) van \(spelers.count)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal)
+
+            // Spelers Voortgang Dots in huidige ronde
+            HStack(spacing: 6) {
+                ForEach(spelers.indices, id: \.self) { idx in
+                    let isDone = idx < turnIndexInRound
+                    let isCurrent = idx == turnIndexInRound
+                    let pColor = playerColors[safe: idx] ?? .blauw
+
+                    Button(action: {
+                        withAnimation {
+                            turnIndexInRound = idx
+                            selectedPlayerIndex = idx
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(isCurrent ? pColor.color : (isDone ? pColor.color.opacity(0.6) : Color.gray.opacity(0.3)))
+                                .frame(width: isCurrent ? 12 : 9, height: isCurrent ? 12 : 9)
+                            Text(spelers[idx])
+                                .font(.caption2)
+                                .fontWeight(isCurrent ? .bold : .regular)
+                                .foregroundColor(isCurrent ? pColor.color : (isDone ? .primary : .secondary))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(isCurrent ? pColor.lightBgColor : Color.clear)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(isCurrent ? pColor.color.opacity(0.5) : Color.clear, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal)
+
+            // Actieve Speler Beurt Kaart in diens treinkleur
+            VStack(spacing: 14) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(activeColor.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                        Image(systemName: "tram.fill")
+                            .font(.title2)
+                            .foregroundColor(activeColor)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Aan de beurt:")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .textCase(.uppercase)
+                        Text(activePlayerName)
+                            .font(.title2)
+                            .fontWeight(.black)
+                            .foregroundColor(activeColor)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(playerScores[selectedPlayerIndex].routePoints) pt")
+                            .font(.title)
+                            .fontWeight(.heavy)
+                            .foregroundColor(activeColor)
+                        Text("Routes totaal")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Divider()
+
+                // Actie Kiezer voor deze beurt
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Wat heeft \(activePlayerName) gedaan deze beurt?")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.secondary)
+
+                    // Optie 1: Geen route gelegd
+                    Button(action: {
+                        confirmLiveTurn(points: 0, description: "Kaarten gepakt")
+                    }) {
+                        HStack {
+                            Image(systemName: "hand.raised.fill")
+                                .foregroundColor(.secondary)
+                            Text("Geen route gelegd (kaarten pakken)")
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text("+0 pt")
+                                .fontWeight(.bold)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(12)
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                        )
+                    }
+                    .foregroundColor(.primary)
+
+                    Text("Of claim een treintraject (routepunten):")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
+
+                    // Trein presets (1..8 wagons)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        liveTrainPresetButton(length: 1, points: 1)
+                        liveTrainPresetButton(length: 2, points: 2)
+                        liveTrainPresetButton(length: 3, points: 4)
+                        liveTrainPresetButton(length: 4, points: 7)
+                        liveTrainPresetButton(length: 5, points: 10)
+                        liveTrainPresetButton(length: 6, points: 15)
+                        liveTrainPresetButton(length: 8, points: 21)
+                        liveCustomPointsButton
+                    }
+                }
+            }
+            .padding()
+            .background(activeLightBg)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(activeColor.opacity(0.4), lineWidth: 1.5)
+            )
+            .padding(.horizontal)
+
+            // Beurt Geschiedenis van deze ronde
+            if !roundTurns.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.caption)
+                        Text("Beurten in Ronde \(currentRound)")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                        Spacer()
+                        if !turnHistory.isEmpty {
+                            Button("Herstel vorige beurt") {
+                                undoLastTurn()
+                            }
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                        }
+                    }
+                    .foregroundColor(.secondary)
+
+                    ForEach(roundTurns.indices, id: \.self) { i in
+                        let t = roundTurns[i]
+                        let pColor = playerColors[safe: t.playerIndex] ?? .blauw
+                        HStack {
+                            Circle().fill(pColor.color).frame(width: 8, height: 8)
+                            Text(spelers[safe: t.playerIndex] ?? "")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("• \(t.description)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("+\(t.points) pt")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(t.points > 0 ? pColor.color : .secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                .padding()
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(12)
+                .padding(.horizontal)
+            }
+
+            // Knop: Naar Eindtelling
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation {
+                    currentMode = .categorieen
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "flag.checkered.circle.fill")
+                        .font(.title3)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Spel afgelopen? Ga naar Eindtelling")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                        Text("Voer bestemmingskaarten, bonussen en stations in")
+                            .font(.caption2)
+                            .opacity(0.9)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.headline)
+                }
+                .foregroundColor(activePlayerColor.onColorTextColor)
+                .padding()
+                .background(activeColor)
+                .cornerRadius(14)
+                .shadow(color: activeColor.opacity(0.35), radius: 6, x: 0, y: 3)
+            }
+            .padding(.horizontal)
+            .padding(.top, 4)
+        }
+    }
+
+    private func liveTrainPresetButton(length: Int, points: Int) -> some View {
+        Button(action: {
+            confirmLiveTurn(points: points, description: "\(length)🚃 route (+\(points) pt)")
+        }) {
+            VStack(spacing: 2) {
+                Text("\(length) 🚃")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                Text("+\(points)")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(activeColor)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(activeColor.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var liveCustomPointsButton: some View {
+        Button(action: {
+            showCustomPointsAlert = true
+        }) {
+            VStack(spacing: 2) {
+                Text("✏️ Anders")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                Text("Vrij getal")
+                    .font(.caption2)
+                    .foregroundColor(activeColor)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(activeColor.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func confirmLiveTurn(points: Int, description: String) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        let activeIdx = selectedPlayerIndex
+        playerScores[activeIdx].routePoints += points
+        turnHistory.append((round: currentRound, playerIndex: activeIdx, points: points, description: description))
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            if turnIndexInRound + 1 < spelers.count {
+                turnIndexInRound += 1
+                selectedPlayerIndex = turnIndexInRound
+            } else {
+                turnIndexInRound = 0
+                currentRound += 1
+                selectedPlayerIndex = 0
+            }
+        }
+    }
+
+    private func undoLastTurn() {
+        guard let last = turnHistory.popLast() else { return }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        playerScores[last.playerIndex].routePoints = max(0, playerScores[last.playerIndex].routePoints - last.points)
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            currentRound = last.round
+            turnIndexInRound = last.playerIndex
+            selectedPlayerIndex = last.playerIndex
+        }
     }
 
     // MARK: - Directe Score Weergave
@@ -592,9 +1052,16 @@ struct TicketToRideGameView: View {
             .padding(.top, 2)
 
             ForEach(spelers.indices, id: \.self) { idx in
+                let pColor = playerColors[safe: idx] ?? .blauw
                 HStack(spacing: 12) {
-                    Text(spelers[idx])
-                        .font(.headline)
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(pColor.color)
+                            .frame(width: 12, height: 12)
+
+                        Text(spelers[idx])
+                            .font(.headline)
+                    }
 
                     Spacer()
 
@@ -607,7 +1074,8 @@ struct TicketToRideGameView: View {
                                 .fontWeight(.bold)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 6)
-                                .background(Color.secondary.opacity(0.12))
+                                .background(pColor.lightBgColor)
+                                .foregroundColor(pColor.color)
                                 .cornerRadius(6)
                         }
 
@@ -623,7 +1091,7 @@ struct TicketToRideGameView: View {
                             score: $playerScores[idx].directScore,
                             allowNegative: true,
                             range: -100...400,
-                            tintColor: .blue,
+                            tintColor: pColor.color,
                             minWidth: 54,
                             height: 36
                         )
@@ -633,7 +1101,7 @@ struct TicketToRideGameView: View {
                         }) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title3)
-                                .foregroundColor(.green)
+                                .foregroundColor(pColor.color)
                         }
 
                         Button(action: {
@@ -644,7 +1112,8 @@ struct TicketToRideGameView: View {
                                 .fontWeight(.bold)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 6)
-                                .background(Color.secondary.opacity(0.12))
+                                .background(pColor.lightBgColor)
+                                .foregroundColor(pColor.color)
                                 .cornerRadius(6)
                         }
                     }
@@ -652,6 +1121,10 @@ struct TicketToRideGameView: View {
                 .padding()
                 .background(Color(UIColor.secondarySystemGroupedBackground))
                 .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(pColor.color.opacity(0.2), lineWidth: 1)
+                )
                 .padding(.horizontal)
             }
         }
@@ -668,12 +1141,12 @@ struct TicketToRideGameView: View {
                 Text("Spel Voltooien & Uitslag Bekijken")
             }
             .font(.headline)
-            .foregroundColor(.white)
+            .foregroundColor(activePlayerColor.onColorTextColor)
             .frame(maxWidth: .infinity)
             .padding()
-            .background(Color.blue)
+            .background(activeColor)
             .cornerRadius(14)
-            .shadow(color: Color.blue.opacity(0.35), radius: 6, x: 0, y: 3)
+            .shadow(color: activeColor.opacity(0.35), radius: 6, x: 0, y: 3)
         }
         .padding(.horizontal)
     }
