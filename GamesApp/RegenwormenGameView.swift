@@ -962,53 +962,43 @@ struct RegenwormenGameView: View {
                 }
             }
 
-            // SECTIE 3: Snelle beurt acties (Mislukte worp / Pas)
+            // SECTIE 3: Mislukte Worp
             VStack(spacing: 8) {
-                HStack(spacing: 12) {
-                    // Mislukte worp knop
-                    Button(action: {
-                        HapticManager.shared.light()
-                        showConfirmMisluktDialog = true
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "xmark.circle.fill")
-                            Text("Mislukte Worp (\(actieveSpeler.name))")
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.red)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.red.opacity(0.12))
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                        )
-                    }
+                Button(action: {
+                    HapticManager.shared.light()
+                    showConfirmMisluktDialog = true
+                }) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "xmark.octagon.fill")
+                            .font(.title3)
 
-                    // Pas / Geen steen beurt
-                    Button(action: {
-                        HapticManager.shared.light()
-                        volgendeBeurt(actieOmschrijving: "\(actieveSpeler.name) past (geen steen)")
-                    }) {
-                        HStack(spacing: 6) {
-                            Text("\(actieveSpeler.name) past")
-                            Image(systemName: "arrow.right.circle.fill")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Mislukte Worp (\(actieveSpeler.name))")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            Text("Bovenste steen terugleggen & hoogste open steen omdraaien")
+                                .font(.caption2)
+                                .foregroundColor(.red.opacity(0.85))
                         }
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color(UIColor.secondarySystemGroupedBackground))
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
-                        )
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.red.opacity(0.6))
                     }
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.red.opacity(0.12))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.red.opacity(0.35), lineWidth: 1.5)
+                    )
                 }
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.horizontal)
             }
         }
