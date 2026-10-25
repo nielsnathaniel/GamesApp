@@ -1,10 +1,28 @@
 import SwiftUI
 
+struct JattenRondeEntry: Identifiable {
+    let id: UUID
+    let ronde: Int
+    let starter: String
+
+    init(id: UUID = UUID(), ronde: Int, starter: String) {
+        self.id = id
+        self.ronde = ronde
+        self.starter = starter
+    }
+}
+
 struct JattenGameView: View {
     var spelers: [Player]
 
+    @ObservedObject private var scoreManager = ScoreManager.shared
+
     @State private var huidigeRonde: Int = 1
     @State private var startSpelerIndex: Int = 0
+    @State private var rondeGeschiedenis: [JattenRondeEntry] = []
+    @State private var toonGeschiedenisSheet: Bool = false
+    @State private var restoreTargetEntry: JattenRondeEntry? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaar: Player?
     @State private var showZesDezelfdeAlert: Bool = false
@@ -167,7 +185,10 @@ struct JattenGameView: View {
                 // Knoppen onderin: Volgende beurt & Afronden
                 VStack(spacing: 10) {
                     Button(action: {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         withAnimation {
+                            let starterName = spelers[safe: huidigeStarterIndex]?.name ?? ""
+                            rondeGeschiedenis.append(JattenRondeEntry(ronde: huidigeRonde, starter: starterName))
                             huidigeRonde += 1
                         }
                     }) {
@@ -194,6 +215,36 @@ struct JattenGameView: View {
                 .padding(.horizontal)
             }
             .padding(.vertical)
+        }
+        .navigationTitle("Jatten")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    toonGeschiedenisSheet = true
+                }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+            }
+        }
+        .sheet(isPresented: $toonGeschiedenisSheet) {
+            historySheetView
+        }
+        .confirmationDialog(
+            "Herstel naar Ronde \(restoreTargetEntry?.ronde ?? 1)?",
+            isPresented: $showRestoreDialog,
+            titleVisibility: .visible
+        ) {
+            if let entry = restoreTargetEntry {
+                Button("Herstel naar start van Beurt \(entry.ronde)", role: .destructive) {
+                    herstelNaarRonde(entry)
+                }
+                Button("Annuleren", role: .cancel) {}
+            }
+        } message: {
+            if let entry = restoreTargetEntry {
+                Text("Wil je de beurt en starter terugzetten naar beurt \(entry.ronde) (\(entry.starter))?")
+            }
         }
         .alert("6 dezelfde!", isPresented: $showZesDezelfdeAlert) {
             Button("Ja, winnaar!") {
@@ -234,7 +285,89 @@ struct JattenGameView: View {
 
     private func spelerWintMetZesDezelfde(index: Int) {
         winnaar = spelers[index]
+        let detailed = spelers.indices.map { i in
+            (name: spelers[i].name, score: i == index ? 6 : 0)
+        }
+        scoreManager.saveGame(gameName: "Jatten", playerScores: detailed, winnerName: spelers[index].name)
         showWinnaarView = true
+    }
+
+    // MARK: - Rondegeschiedenis & Herstel
+
+    private var historySheetView: some View {
+        NavigationStack {
+            List {
+                if rondeGeschiedenis.isEmpty {
+                    Text("Er zijn nog geen beurten gespeeld.")
+                        .foregroundColor(.secondary)
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een beurt ingedrukt om daarnaartoe te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    ForEach(rondeGeschiedenis) { entry in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Beurt \(entry.ronde)")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                Text("Aan de beurt: \(entry.starter)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Button(action: {
+                                restoreTargetEntry = entry
+                                showRestoreDialog = true
+                            }) {
+                                Image(systemName: "arrow.uturn.backward.circle")
+                                    .font(.title3)
+                                    .foregroundColor(.orange)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            restoreTargetEntry = entry
+                            showRestoreDialog = true
+                        }
+                        .contextMenu {
+                            Button(role: .destructive, action: {
+                                herstelNaarRonde(entry)
+                            }) {
+                                Label("Herstel naar Beurt \(entry.ronde)", systemImage: "arrow.uturn.backward")
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Beurtgeschiedenis")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Klaar") {
+                        toonGeschiedenisSheet = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func herstelNaarRonde(_ entry: JattenRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = rondeGeschiedenis.firstIndex(where: { $0.id == entry.id }) else { return }
+        huidigeRonde = entry.ronde
+        rondeGeschiedenis = Array(rondeGeschiedenis.prefix(idx))
+        toonGeschiedenisSheet = false
     }
 }
 

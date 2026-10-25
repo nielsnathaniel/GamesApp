@@ -28,6 +28,8 @@ struct BalzakkenGameView: View {
     @State private var startSpelerIndex: Int = 0
     @State private var rondeGeschiedenis: [BalzakkenRondeEntry] = []
     @State private var toonGeschiedenisSheet: Bool = false
+    @State private var restoreTargetEntry: BalzakkenRondeEntry? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var isExpanded: [Bool] = []
     @State private var showWinnaarView: Bool = false
     @State private var winnaar: Player?
@@ -458,8 +460,32 @@ struct BalzakkenGameView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                 } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een ronde ingedrukt om punten te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
                     ForEach(rondeGeschiedenis.reversed()) { entry in
-                        Section(header: Text("Ronde \(entry.ronde) • Begonnen door \(entry.starter)")) {
+                        Section(header:
+                            HStack {
+                                Text("Ronde \(entry.ronde) • Begonnen door \(entry.starter)")
+                                Spacer()
+                                Button(action: {
+                                    restoreTargetEntry = entry
+                                    showRestoreDialog = true
+                                }) {
+                                    Label("Herstel", systemImage: "arrow.uturn.backward.circle")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        ) {
                             ForEach(spelers.indices, id: \.self) { sIdx in
                                 HStack {
                                     Text(spelers[sIdx].name)
@@ -488,6 +514,24 @@ struct BalzakkenGameView: View {
                                 }
                             }
                         }
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            restoreTargetEntry = entry
+                            showRestoreDialog = true
+                        }
+                        .contextMenu {
+                            Button(role: .destructive, action: {
+                                herstelNaarStartVanRonde(entry)
+                            }) {
+                                Label("Herstel naar start van Ronde \(entry.ronde)", systemImage: "arrow.uturn.backward")
+                            }
+                            Button(action: {
+                                herstelNaarEindeVanRonde(entry)
+                            }) {
+                                Label("Herstel naar einde van Ronde \(entry.ronde)", systemImage: "arrow.uturn.forward")
+                            }
+                        }
                     }
                 }
             }
@@ -500,7 +544,50 @@ struct BalzakkenGameView: View {
                     }
                 }
             }
+            .confirmationDialog(
+                "Herstel Ronde \(restoreTargetEntry?.ronde ?? 1)?",
+                isPresented: $showRestoreDialog,
+                titleVisibility: .visible
+            ) {
+                if let entry = restoreTargetEntry {
+                    Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
+                        herstelNaarStartVanRonde(entry)
+                    }
+                    Button("Zet stand terug naar na Ronde \(entry.ronde)") {
+                        herstelNaarEindeVanRonde(entry)
+                    }
+                    Button("Annuleren", role: .cancel) {}
+                }
+            } message: {
+                if let entry = restoreTargetEntry {
+                    Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)?")
+                }
+            }
         }
+    }
+
+    private func herstelNaarStartVanRonde(_ entry: BalzakkenRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        var vorigTotaleScores = entry.totalenNaRonde
+        for i in vorigTotaleScores.indices {
+            vorigTotaleScores[i] -= (entry.scoresDezeRonde[safe: i] ?? 0)
+        }
+        totaleScores = vorigTotaleScores
+        rondeScores = Array(repeating: 0, count: spelers.count)
+        rondeStatus = Array(repeating: .geen, count: spelers.count)
+        huidigeRonde = entry.ronde
+        rondeGeschiedenis.removeAll { $0.ronde >= entry.ronde }
+        toonGeschiedenisSheet = false
+    }
+
+    private func herstelNaarEindeVanRonde(_ entry: BalzakkenRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        totaleScores = entry.totalenNaRonde
+        rondeScores = Array(repeating: 0, count: spelers.count)
+        rondeStatus = Array(repeating: .geen, count: spelers.count)
+        huidigeRonde = entry.ronde + 1
+        rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
+        toonGeschiedenisSheet = false
     }
 
     private func volgendeRonde() {

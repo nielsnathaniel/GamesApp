@@ -24,6 +24,8 @@ struct QuickstopGameView: View {
     @State private var winnaarPlayer: Player = Player(name: "")
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var showFinishConfirm: Bool = false
+    @State private var restoreTargetEntry: QuickstopRondeEntry? = nil
+    @State private var showRestoreDialog: Bool = false
 
     // Thema inspiratie generator
     @State private var huidigeThema: String = "Iets wat in de koelkast staat"
@@ -562,8 +564,32 @@ struct QuickstopGameView: View {
                     Text("Er zijn nog geen voltooide rondes.")
                         .foregroundColor(.secondary)
                 } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een ronde ingedrukt om punten te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
                     ForEach(rondeGeschiedenis) { entry in
-                        Section(header: Text("Ronde \(entry.ronde) • Starter: \(entry.starter)")) {
+                        Section(header:
+                            HStack {
+                                Text("Ronde \(entry.ronde) • Starter: \(entry.starter)")
+                                Spacer()
+                                Button(action: {
+                                    restoreTargetEntry = entry
+                                    showRestoreDialog = true
+                                }) {
+                                    Label("Herstel", systemImage: "arrow.uturn.backward.circle")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        ) {
                             ForEach(spelers.indices, id: \.self) { idx in
                                 HStack {
                                     Text(spelers[idx])
@@ -577,6 +603,24 @@ struct QuickstopGameView: View {
                                         .frame(minWidth: 70, alignment: .trailing)
                                 }
                             }
+                            .contentShape(Rectangle())
+                            .onLongPressGesture {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                restoreTargetEntry = entry
+                                showRestoreDialog = true
+                            }
+                            .contextMenu {
+                                Button(role: .destructive, action: {
+                                    herstelNaarStartVanRonde(entry)
+                                }) {
+                                    Label("Herstel naar start van Ronde \(entry.ronde)", systemImage: "arrow.uturn.backward")
+                                }
+                                Button(action: {
+                                    herstelNaarEindeVanRonde(entry)
+                                }) {
+                                    Label("Herstel naar einde van Ronde \(entry.ronde)", systemImage: "arrow.uturn.forward")
+                                }
+                            }
                         }
                     }
                 }
@@ -588,7 +632,48 @@ struct QuickstopGameView: View {
                     Button("Klaar") { toonGeschiedenisSheet = false }
                 }
             }
+            .confirmationDialog(
+                "Herstel Ronde \(restoreTargetEntry?.ronde ?? 1)?",
+                isPresented: $showRestoreDialog,
+                titleVisibility: .visible
+            ) {
+                if let entry = restoreTargetEntry {
+                    Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
+                        herstelNaarStartVanRonde(entry)
+                    }
+                    Button("Zet stand terug naar na Ronde \(entry.ronde)") {
+                        herstelNaarEindeVanRonde(entry)
+                    }
+                    Button("Annuleren", role: .cancel) {}
+                }
+            } message: {
+                if let entry = restoreTargetEntry {
+                    Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)?")
+                }
+            }
         }
+    }
+
+    private func herstelNaarStartVanRonde(_ entry: QuickstopRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        var vorigTotaleScores = entry.totalenNaRonde
+        for i in vorigTotaleScores.indices {
+            vorigTotaleScores[i] -= (entry.scoresDezeRonde[safe: i] ?? 0)
+        }
+        totaleScores = vorigTotaleScores
+        rondeScores = Array(repeating: 0, count: spelers.count)
+        huidigeRonde = entry.ronde
+        rondeGeschiedenis.removeAll { $0.ronde >= entry.ronde }
+        toonGeschiedenisSheet = false
+    }
+
+    private func herstelNaarEindeVanRonde(_ entry: QuickstopRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        totaleScores = entry.totalenNaRonde
+        rondeScores = Array(repeating: 0, count: spelers.count)
+        huidigeRonde = entry.ronde + 1
+        rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
+        toonGeschiedenisSheet = false
     }
 }
 

@@ -1,5 +1,19 @@
 import SwiftUI
 
+struct CurrentGameRondeEntry: Identifiable {
+    let id: UUID
+    let ronde: Int
+    let rondeScores: [Int]
+    let totaleScoresNaRonde: [Int]
+
+    init(id: UUID = UUID(), ronde: Int, rondeScores: [Int], totaleScoresNaRonde: [Int]) {
+        self.id = id
+        self.ronde = ronde
+        self.rondeScores = rondeScores
+        self.totaleScoresNaRonde = totaleScoresNaRonde
+    }
+}
+
 struct CurrentGameView: View {
     var gameName: String
     var imageName: String
@@ -9,11 +23,17 @@ struct CurrentGameView: View {
     var aantalRondes: Int
     var totaleScore: Int
 
+    @ObservedObject private var scoreManager = ScoreManager.shared
+
     @State private var huidigeRonde: Int = 1
     @State private var scores: [Int] = []
     @State private var laagScores: [[Int]] = []
     @State private var totaleScores: [Int] = []
     @State private var isExpanded: [Bool] = []
+    @State private var rondeGeschiedenis: [CurrentGameRondeEntry] = []
+    @State private var toonGeschiedenisSheet: Bool = false
+    @State private var restoreTargetEntry: CurrentGameRondeEntry? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var showAlert: Bool = false
     @State private var alertMessage: String = ""
     @State private var showWinnaarView: Bool = false
@@ -198,11 +218,50 @@ struct CurrentGameView: View {
             }
         }
         .padding()
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    toonGeschiedenisSheet = true
+                }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+            }
+        }
+        .sheet(isPresented: $toonGeschiedenisSheet) {
+            historySheetView
+        }
+        .confirmationDialog(
+            "Herstel Ronde \(restoreTargetEntry?.ronde ?? 1)?",
+            isPresented: $showRestoreDialog,
+            titleVisibility: .visible
+        ) {
+            if let entry = restoreTargetEntry {
+                Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
+                    herstelNaarStartVanRonde(entry)
+                }
+                Button("Zet stand terug naar na Ronde \(entry.ronde)") {
+                    herstelNaarEindeVanRonde(entry)
+                }
+                Button("Annuleren", role: .cancel) {}
+            }
+        } message: {
+            if let entry = restoreTargetEntry {
+                Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)?")
+            }
+        }
         .onAppear {
-            scores = Array(repeating: 0, count: spelers.count)
-            laagScores = Array(repeating: Array(repeating: 0, count: 5), count: spelers.count)
-            totaleScores = Array(repeating: 0, count: spelers.count)
-            isExpanded = Array(repeating: false, count: spelers.count)
+            if scores.isEmpty {
+                scores = Array(repeating: 0, count: spelers.count)
+            }
+            if laagScores.isEmpty {
+                laagScores = Array(repeating: Array(repeating: 0, count: 5), count: spelers.count)
+            }
+            if totaleScores.isEmpty {
+                totaleScores = Array(repeating: 0, count: spelers.count)
+            }
+            if isExpanded.isEmpty {
+                isExpanded = Array(repeating: false, count: spelers.count)
+            }
             resetRandomNumbers()
         }
     }
@@ -213,6 +272,7 @@ struct CurrentGameView: View {
     }
 
     private func berekenScores() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         for index in spelers.indices {
             var rondeScore = 0
             for laag in 0..<5 {
@@ -226,6 +286,14 @@ struct CurrentGameView: View {
                 totaleScores[index] += rondeScore
             }
         }
+
+        rondeGeschiedenis.append(
+            CurrentGameRondeEntry(
+                ronde: huidigeRonde,
+                rondeScores: scores,
+                totaleScoresNaRonde: totaleScores
+            )
+        )
     }
 
     private func naarVolgendeRonde() {
@@ -236,18 +304,145 @@ struct CurrentGameView: View {
     private func checkWinnaar() -> Player? {
         let winnaars = spelers.enumerated().filter { $0.offset < totaleScores.count && totaleScores[$0.offset] >= totaleScore }
         if winnaars.count > 0 {
-            return winnaars.max(by: { $0.offset < totaleScores.count && totaleScores[$0.offset] < totaleScores[$1.offset] })?.element
+            let winner = winnaars.max(by: { $0.offset < totaleScores.count && totaleScores[$0.offset] < totaleScores[$1.offset] })?.element
+            if let w = winner {
+                let detailed = spelers.indices.map { i in
+                    (name: spelers[i].name, score: totaleScores[safe: i] ?? 0)
+                }
+                scoreManager.saveGame(gameName: gameName, playerScores: detailed, winnerName: w.name)
+            }
+            return winner
         }
         return nil
     }
 
     private func bepaalWinnaar() -> Player {
-        return spelers.enumerated().max(by: { $0.offset < totaleScores.count && totaleScores[$0.offset] < totaleScores[$1.offset] })!.element
+        let winner = spelers.enumerated().max(by: { $0.offset < totaleScores.count && totaleScores[$0.offset] < totaleScores[$1.offset] })!.element
+        let detailed = spelers.indices.map { i in
+            (name: spelers[i].name, score: totaleScores[safe: i] ?? 0)
+        }
+        scoreManager.saveGame(gameName: gameName, playerScores: detailed, winnerName: winner.name)
+        return winner
     }
 
     private func resetRandomNumbers() {
         randomNumbers = (0...9).flatMap { Array(repeating: $0, count: 2) }.shuffled()
         currentRandomIndex = 0
+    }
+
+    // MARK: - Geschiedenis & Herstel Weergave
+
+    private var historySheetView: some View {
+        NavigationStack {
+            List {
+                if rondeGeschiedenis.isEmpty {
+                    Text("Er zijn nog geen voltooide rondes.")
+                        .foregroundColor(.secondary)
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een ronde ingedrukt om de stand daarnaartoe te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    ForEach(rondeGeschiedenis) { entry in
+                        Section(header:
+                            HStack {
+                                Text("Ronde \(entry.ronde)")
+                                Spacer()
+                                Button(action: {
+                                    restoreTargetEntry = entry
+                                    showRestoreDialog = true
+                                }) {
+                                    Label("Herstel", systemImage: "arrow.uturn.backward.circle")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        ) {
+                            ForEach(spelers.indices, id: \.self) { idx in
+                                HStack {
+                                    Text(spelers[idx].name)
+                                        .font(.subheadline)
+                                    Spacer()
+                                    let diff = entry.rondeScores[safe: idx] ?? 0
+                                    Text("+\(diff) pt")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                    Text("(\(entry.totaleScoresNaRonde[safe: idx] ?? 0) pt)")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.primary)
+                                        .frame(minWidth: 70, alignment: .trailing)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .onLongPressGesture {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                restoreTargetEntry = entry
+                                showRestoreDialog = true
+                            }
+                            .contextMenu {
+                                Button(role: .destructive, action: {
+                                    herstelNaarStartVanRonde(entry)
+                                }) {
+                                    Label("Herstel naar start van Ronde \(entry.ronde)", systemImage: "arrow.uturn.backward")
+                                }
+                                Button(action: {
+                                    herstelNaarEindeVanRonde(entry)
+                                }) {
+                                    Label("Herstel naar einde van Ronde \(entry.ronde)", systemImage: "arrow.uturn.forward")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Rondegeschiedenis")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Klaar") {
+                        toonGeschiedenisSheet = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func herstelNaarStartVanRonde(_ entry: CurrentGameRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = rondeGeschiedenis.firstIndex(where: { $0.id == entry.id }) else { return }
+        let kept = Array(rondeGeschiedenis.prefix(idx))
+
+        if let prev = kept.last {
+            totaleScores = prev.totaleScoresNaRonde
+        } else {
+            totaleScores = Array(repeating: 0, count: spelers.count)
+        }
+        scores = Array(repeating: 0, count: spelers.count)
+        laagScores = Array(repeating: Array(repeating: 0, count: 5), count: spelers.count)
+        huidigeRonde = entry.ronde
+        rondeGeschiedenis = kept
+        toonGeschiedenisSheet = false
+    }
+
+    private func herstelNaarEindeVanRonde(_ entry: CurrentGameRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = rondeGeschiedenis.firstIndex(where: { $0.id == entry.id }) else { return }
+        let kept = Array(rondeGeschiedenis.prefix(idx + 1))
+
+        totaleScores = entry.totaleScoresNaRonde
+        scores = Array(repeating: 0, count: spelers.count)
+        laagScores = Array(repeating: Array(repeating: 0, count: 5), count: spelers.count)
+        huidigeRonde = entry.ronde + 1
+        rondeGeschiedenis = kept
+        toonGeschiedenisSheet = false
     }
 }
 

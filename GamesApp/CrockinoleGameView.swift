@@ -1,11 +1,31 @@
 import SwiftUI
 
+struct CrokinoleRondeEntry: Identifiable {
+    let id: UUID
+    let ronde: Int
+    let scoreWit: Int
+    let scoreZwart: Int
+    let totaleScoresNaRonde: [Int]
+    let setScoresNaRonde: [Int]
+
+    init(id: UUID = UUID(), ronde: Int, scoreWit: Int, scoreZwart: Int, totaleScoresNaRonde: [Int], setScoresNaRonde: [Int]) {
+        self.id = id
+        self.ronde = ronde
+        self.scoreWit = scoreWit
+        self.scoreZwart = scoreZwart
+        self.totaleScoresNaRonde = totaleScoresNaRonde
+        self.setScoresNaRonde = setScoresNaRonde
+    }
+}
+
 struct CrockinoleGameView: View {
     var isTeamMode: Bool = false
     var teamWitNaam: String = "Wit"
     var teamWitSpelers: [String] = ["Wit"]
     var teamZwartNaam: String = "Zwart"
     var teamZwartSpelers: [String] = ["Zwart"]
+
+    @ObservedObject private var scoreManager = ScoreManager.shared
 
     // Telwijze kan nu ook tijdens het spelen worden aangepast!
     @State private var puntenMethode: String
@@ -17,6 +37,10 @@ struct CrockinoleGameView: View {
     // Cumulatieve score in de huidige set [Wit, Zwart]
     @State private var totaleScores: [Int] = [0, 0]
     @State private var huidigeRonde: Int = 1
+    @State private var rondeGeschiedenis: [CrokinoleRondeEntry] = []
+    @State private var toonGeschiedenisSheet: Bool = false
+    @State private var restoreTargetEntry: CrokinoleRondeEntry? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaarTeam: String?
 
@@ -206,17 +230,48 @@ struct CrockinoleGameView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button(action: { withAnimation { puntenMethode = "Alles" } }) {
-                        Label("Alles (Direct)", systemImage: puntenMethode == "Alles" ? "checkmark" : "")
+                HStack(spacing: 12) {
+                    Button(action: {
+                        toonGeschiedenisSheet = true
+                    }) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .foregroundColor(.blue)
                     }
-                    Button(action: { withAnimation { puntenMethode = "Berekend" } }) {
-                        Label("Berekend (Per schijf)", systemImage: puntenMethode == "Berekend" ? "checkmark" : "")
+
+                    Menu {
+                        Button(action: { withAnimation { puntenMethode = "Alles" } }) {
+                            Label("Alles (Direct)", systemImage: puntenMethode == "Alles" ? "checkmark" : "")
+                        }
+                        Button(action: { withAnimation { puntenMethode = "Berekend" } }) {
+                            Label("Berekend (Per schijf)", systemImage: puntenMethode == "Berekend" ? "checkmark" : "")
+                        }
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .foregroundColor(.blue)
                     }
-                } label: {
-                    Image(systemName: "gearshape")
-                        .foregroundColor(.blue)
                 }
+            }
+        }
+        .sheet(isPresented: $toonGeschiedenisSheet) {
+            historySheetView
+        }
+        .confirmationDialog(
+            "Herstel Ronde \(restoreTargetEntry?.ronde ?? 1)?",
+            isPresented: $showRestoreDialog,
+            titleVisibility: .visible
+        ) {
+            if let entry = restoreTargetEntry {
+                Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
+                    herstelNaarStartVanRonde(entry)
+                }
+                Button("Zet stand terug naar na Ronde \(entry.ronde)") {
+                    herstelNaarEindeVanRonde(entry)
+                }
+                Button("Annuleren", role: .cancel) {}
+            }
+        } message: {
+            if let entry = restoreTargetEntry {
+                Text("Wil je de setscores en punten terugzetten naar ronde \(entry.ronde)?")
             }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
@@ -660,6 +715,7 @@ struct CrockinoleGameView: View {
 
     // Crokinole differentieel puntentelling conform regels
     private func berekenRondeEnBeëindig() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let score0 = scores.indices.contains(0) ? scores[0] : 0
         let score1 = scores.indices.contains(1) ? scores[1] : 0
 
@@ -679,9 +735,26 @@ struct CrockinoleGameView: View {
             }
         }
 
+        // Sla snapshot van de ronde op
+        rondeGeschiedenis.append(
+            CrokinoleRondeEntry(
+                ronde: huidigeRonde,
+                scoreWit: score0,
+                scoreZwart: score1,
+                totaleScoresNaRonde: totaleScores,
+                setScoresNaRonde: setScores
+            )
+        )
+
         // Controleer of een team 3 sets heeft gewonnen
         if setScores.contains(where: { $0 >= 3 }) {
-            winnaarTeam = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
+            let winner = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
+            winnaarTeam = winner
+            let detailed = [
+                (name: teamWitNaam, score: setScores[0]),
+                (name: teamZwartNaam, score: setScores[1])
+            ]
+            scoreManager.saveGame(gameName: "Crockinole", playerScores: detailed, winnerName: winner)
             showWinnaarView = true
         }
 
@@ -692,6 +765,129 @@ struct CrockinoleGameView: View {
         if isTeamMode {
             huidigeSchutterIndex = (huidigeSchutterIndex + 1) % max(1, schuttersVolgorde.count)
         }
+    }
+
+    // MARK: - Rondegeschiedenis & Herstel
+
+    private var historySheetView: some View {
+        NavigationStack {
+            List {
+                if rondeGeschiedenis.isEmpty {
+                    Text("Er zijn nog geen voltooide rondes.")
+                        .foregroundColor(.secondary)
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een ronde ingedrukt om de stand daarnaartoe te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    ForEach(rondeGeschiedenis) { entry in
+                        Section(header:
+                            HStack {
+                                Text("Ronde \(entry.ronde)")
+                                Spacer()
+                                Button(action: {
+                                    restoreTargetEntry = entry
+                                    showRestoreDialog = true
+                                }) {
+                                    Label("Herstel", systemImage: "arrow.uturn.backward.circle")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        ) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("⚪ \(teamWitNaam): \(entry.scoreWit) pt")
+                                        .font(.subheadline)
+                                    Spacer()
+                                    Text("⚫ \(teamZwartNaam): \(entry.scoreZwart) pt")
+                                        .font(.subheadline)
+                                }
+
+                                Divider()
+
+                                HStack {
+                                    Text("Sets: \(entry.setScoresNaRonde[safe: 0] ?? 0) - \(entry.setScoresNaRonde[safe: 1] ?? 0)")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                    Text("Punten in set: \(entry.totaleScoresNaRonde[safe: 0] ?? 0) - \(entry.totaleScoresNaRonde[safe: 1] ?? 0)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                            .contentShape(Rectangle())
+                            .onLongPressGesture {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                restoreTargetEntry = entry
+                                showRestoreDialog = true
+                            }
+                            .contextMenu {
+                                Button(role: .destructive, action: {
+                                    herstelNaarStartVanRonde(entry)
+                                }) {
+                                    Label("Herstel naar start van Ronde \(entry.ronde)", systemImage: "arrow.uturn.backward")
+                                }
+                                Button(action: {
+                                    herstelNaarEindeVanRonde(entry)
+                                }) {
+                                    Label("Herstel naar einde van Ronde \(entry.ronde)", systemImage: "arrow.uturn.forward")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Rondegeschiedenis")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Klaar") {
+                        toonGeschiedenisSheet = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func herstelNaarStartVanRonde(_ entry: CrokinoleRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = rondeGeschiedenis.firstIndex(where: { $0.id == entry.id }) else { return }
+        let kept = Array(rondeGeschiedenis.prefix(idx))
+
+        if let prev = kept.last {
+            totaleScores = prev.totaleScoresNaRonde
+            setScores = prev.setScoresNaRonde
+        } else {
+            totaleScores = [0, 0]
+            setScores = [0, 0]
+        }
+        huidigeRonde = entry.ronde
+        resetRonde()
+        rondeGeschiedenis = kept
+        toonGeschiedenisSheet = false
+    }
+
+    private func herstelNaarEindeVanRonde(_ entry: CrokinoleRondeEntry) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = rondeGeschiedenis.firstIndex(where: { $0.id == entry.id }) else { return }
+        let kept = Array(rondeGeschiedenis.prefix(idx + 1))
+
+        totaleScores = entry.totaleScoresNaRonde
+        setScores = entry.setScoresNaRonde
+        huidigeRonde = entry.ronde + 1
+        resetRonde()
+        rondeGeschiedenis = kept
+        toonGeschiedenisSheet = false
     }
 }
 

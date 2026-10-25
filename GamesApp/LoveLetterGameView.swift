@@ -104,6 +104,8 @@ struct LoveLetterGameView: View {
     // Sheet voor invoeren ronde winst
     @State private var showRoundCompletionSheet: Bool = false
     @State private var showHistorySheet: Bool = false
+    @State private var restoreTargetRecord: LoveLetterRoundRecord? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaarPlayer: Player = Player(name: "")
 
@@ -383,6 +385,17 @@ struct LoveLetterGameView: View {
                     Text("Er zijn nog geen rondes voltooid.")
                         .foregroundColor(.secondary)
                 } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een ronde ingedrukt om de punten te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
                     ForEach(rondeGeschiedenis.reversed()) { round in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
@@ -402,6 +415,15 @@ struct LoveLetterGameView: View {
                                 }
 
                                 Spacer()
+
+                                Button(action: {
+                                    restoreTargetRecord = round
+                                    showRestoreDialog = true
+                                }) {
+                                    Label("Herstel", systemImage: "arrow.uturn.backward.circle")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                }
 
                                 HStack(spacing: 4) {
                                     Image(systemName: "heart.fill")
@@ -465,6 +487,24 @@ struct LoveLetterGameView: View {
                             }
                         }
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            restoreTargetRecord = round
+                            showRestoreDialog = true
+                        }
+                        .contextMenu {
+                            Button(role: .destructive, action: {
+                                herstelNaarRonde(round, includeThisRound: false)
+                            }) {
+                                Label("Herstel naar stand vóór deze ronde", systemImage: "arrow.uturn.backward")
+                            }
+                            Button(action: {
+                                herstelNaarRonde(round, includeThisRound: true)
+                            }) {
+                                Label("Zet stand terug naar na deze ronde", systemImage: "arrow.uturn.forward")
+                            }
+                        }
                     }
                     .onDelete { indexSet in
                         undoRounds(at: indexSet)
@@ -478,7 +518,54 @@ struct LoveLetterGameView: View {
                     Button("Klaar") { showHistorySheet = false }
                 }
             }
+            .confirmationDialog(
+                "Herstel Ronde \(restoreTargetRecord?.roundNumber ?? 1)?",
+                isPresented: $showRestoreDialog,
+                titleVisibility: .visible
+            ) {
+                if let record = restoreTargetRecord {
+                    Button("Herstel naar stand vóór Ronde \(record.roundNumber) (Wis ronde)", role: .destructive) {
+                        herstelNaarRonde(record, includeThisRound: false)
+                    }
+                    Button("Zet stand terug naar na Ronde \(record.roundNumber)") {
+                        herstelNaarRonde(record, includeThisRound: true)
+                    }
+                    Button("Annuleren", role: .cancel) {}
+                }
+            } message: {
+                if let record = restoreTargetRecord {
+                    Text("Wil je de stand van ronde \(record.roundNumber) herstellen?")
+                }
+            }
         }
+    }
+
+    private func herstelNaarRonde(_ record: LoveLetterRoundRecord, includeThisRound: Bool) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = rondeGeschiedenis.firstIndex(where: { $0.id == record.id }) else { return }
+
+        let keptRecords = includeThisRound ? Array(rondeGeschiedenis.prefix(idx + 1)) : Array(rondeGeschiedenis.prefix(idx))
+
+        // Herbereken de fiches van alle spelers
+        fichesPerSpeler = Array(repeating: 0, count: spelers.count)
+        for r in keptRecords {
+            if let wIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(r.winnerName) == .orderedSame }) {
+                fichesPerSpeler[wIdx] += 1
+            }
+            if let spy = r.spyBonusPlayer, let sIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(spy) == .orderedSame }) {
+                fichesPerSpeler[sIdx] += 1
+            }
+        }
+
+        rondeGeschiedenis = keptRecords
+        huidigeRonde = keptRecords.count + 1
+
+        if let last = keptRecords.last,
+           let wIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(last.winnerName) == .orderedSame }) {
+            huidigeStarterIndex = wIdx
+        }
+
+        showHistorySheet = false
     }
 
     // MARK: - Ronde Verwerken & Opslaan

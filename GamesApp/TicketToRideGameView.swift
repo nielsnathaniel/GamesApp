@@ -17,6 +17,22 @@ struct TTRPlayerScore {
     }
 }
 
+struct TTRTurnEntry: Identifiable, Equatable {
+    let id: UUID
+    let round: Int
+    let playerIndex: Int
+    let points: Int
+    let description: String
+
+    init(id: UUID = UUID(), round: Int, playerIndex: Int, points: Int, description: String) {
+        self.id = id
+        self.round = round
+        self.playerIndex = playerIndex
+        self.points = points
+        self.description = description
+    }
+}
+
 struct TicketToRideGameView: View {
     let spelers: [String]
     let initialMode: TicketToRideSetupView.TTRScoreMode
@@ -33,9 +49,12 @@ struct TicketToRideGameView: View {
     // Live ronde-per-ronde tracking
     @State private var currentRound: Int = 1
     @State private var turnIndexInRound: Int = 0
-    @State private var turnHistory: [(round: Int, playerIndex: Int, points: Int, description: String)] = []
+    @State private var turnHistory: [TTRTurnEntry] = []
     @State private var showCustomPointsAlert: Bool = false
     @State private var customPointsInput: String = ""
+    @State private var showRondesSheet: Bool = false
+    @State private var restoreTargetTurn: TTRTurnEntry? = nil
+    @State private var showRestoreDialog: Bool = false
 
     init(
         spelers: [String],
@@ -124,6 +143,35 @@ struct TicketToRideGameView: View {
                         }
                     }
                 }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showRondesSheet = true
+                }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+            }
+        }
+        .sheet(isPresented: $showRondesSheet) {
+            allRoundsSheetView
+        }
+        .confirmationDialog(
+            "Herstel beurt?",
+            isPresented: $showRestoreDialog,
+            titleVisibility: .visible
+        ) {
+            if let target = restoreTargetTurn {
+                Button("Herstel vóór beurt van \(spelers[safe: target.playerIndex] ?? "") (Wis deze beurt)", role: .destructive) {
+                    herstelNaarTurn(target, includeThisTurn: false)
+                }
+                Button("Herstel t/m beurt van \(spelers[safe: target.playerIndex] ?? "")") {
+                    herstelNaarTurn(target, includeThisTurn: true)
+                }
+                Button("Annuleren", role: .cancel) {}
+            }
+        } message: {
+            if let target = restoreTargetTurn {
+                Text("Wil je de routepunten en stand terugzetten naar beurt in Ronde \(target.round)?")
             }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
@@ -716,7 +764,7 @@ struct TicketToRideGameView: View {
 
     // MARK: - 3. Live Ronde-per-Ronde Weergave
 
-    private var roundTurns: [(round: Int, playerIndex: Int, points: Int, description: String)] {
+    private var roundTurns: [TTRTurnEntry] {
         turnHistory.filter { $0.round == currentRound }
     }
 
@@ -888,8 +936,14 @@ struct TicketToRideGameView: View {
                             .font(.caption)
                             .fontWeight(.bold)
                         Spacer()
+                        Button("Alle rondes") {
+                            showRondesSheet = true
+                        }
+                        .font(.caption2)
+                        .foregroundColor(activeColor)
+
                         if !turnHistory.isEmpty {
-                            Button("Herstel vorige beurt") {
+                            Button("Herstel vorige") {
                                 undoLastTurn()
                             }
                             .font(.caption2)
@@ -898,8 +952,16 @@ struct TicketToRideGameView: View {
                     }
                     .foregroundColor(.secondary)
 
-                    ForEach(roundTurns.indices, id: \.self) { i in
-                        let t = roundTurns[i]
+                    HStack(spacing: 4) {
+                        Image(systemName: "hand.tap.fill")
+                            .font(.caption2)
+                            .foregroundColor(.yellow)
+                        Text("Houd een beurt ingedrukt om de stand daarnaartoe te herstellen")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+
+                    ForEach(roundTurns) { t in
                         let pColor = playerColors[safe: t.playerIndex] ?? .blauw
                         HStack {
                             Circle().fill(pColor.color).frame(width: 8, height: 8)
@@ -914,8 +976,36 @@ struct TicketToRideGameView: View {
                                 .font(.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(t.points > 0 ? pColor.color : .secondary)
+
+                            Button(action: {
+                                restoreTargetTurn = t
+                                showRestoreDialog = true
+                            }) {
+                                Image(systemName: "arrow.uturn.backward.circle")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 3)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            restoreTargetTurn = t
+                            showRestoreDialog = true
+                        }
+                        .contextMenu {
+                            Button(role: .destructive, action: {
+                                herstelNaarTurn(t, includeThisTurn: false)
+                            }) {
+                                Label("Herstel vóór beurt van \(spelers[safe: t.playerIndex] ?? "")", systemImage: "arrow.uturn.backward")
+                            }
+                            Button(action: {
+                                herstelNaarTurn(t, includeThisTurn: true)
+                            }) {
+                                Label("Herstel t/m beurt van \(spelers[safe: t.playerIndex] ?? "")", systemImage: "arrow.uturn.forward")
+                            }
+                        }
                     }
                 }
                 .padding()
@@ -1010,7 +1100,8 @@ struct TicketToRideGameView: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let activeIdx = selectedPlayerIndex
         playerScores[activeIdx].routePoints += points
-        turnHistory.append((round: currentRound, playerIndex: activeIdx, points: points, description: description))
+        let entry = TTRTurnEntry(round: currentRound, playerIndex: activeIdx, points: points, description: description)
+        turnHistory.append(entry)
 
         withAnimation(.easeInOut(duration: 0.25)) {
             if turnIndexInRound + 1 < spelers.count {
@@ -1174,6 +1265,129 @@ struct TicketToRideGameView: View {
             (player: Player(name: spelers[i]), score: effectiveScore(for: i))
         }
         return pairs.sorted { $0.score > $1.score }.map { $0.score }
+    }
+
+    // MARK: - Alle Rondes Sheet & Herstel Functies
+
+    private var allRoundsSheetView: some View {
+        NavigationStack {
+            List {
+                if turnHistory.isEmpty {
+                    Text("Er zijn nog geen beurten geregistreerd.")
+                        .foregroundColor(.secondary)
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een beurt ingedrukt om de puntenstand daarnaartoe te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    let rounds = Array(Set(turnHistory.map { $0.round })).sorted()
+                    ForEach(rounds, id: \.self) { r in
+                        let turnsInR = turnHistory.filter { $0.round == r }
+                        Section(header: Text("Ronde \(r)")) {
+                            ForEach(turnsInR) { turn in
+                                let pColor = playerColors[safe: turn.playerIndex] ?? .blauw
+                                HStack {
+                                    Circle().fill(pColor.color).frame(width: 8, height: 8)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(spelers[safe: turn.playerIndex] ?? "")
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                        Text(turn.description)
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Text("+\(turn.points) pt")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(turn.points > 0 ? pColor.color : .secondary)
+
+                                    Button(action: {
+                                        restoreTargetTurn = turn
+                                        showRestoreDialog = true
+                                    }) {
+                                        Image(systemName: "arrow.uturn.backward.circle")
+                                            .font(.title3)
+                                            .foregroundColor(.orange)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.vertical, 3)
+                                .contentShape(Rectangle())
+                                .onLongPressGesture {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    restoreTargetTurn = turn
+                                    showRestoreDialog = true
+                                }
+                                .contextMenu {
+                                    Button(role: .destructive, action: {
+                                        herstelNaarTurn(turn, includeThisTurn: false)
+                                    }) {
+                                        Label("Herstel vóór beurt van \(spelers[safe: turn.playerIndex] ?? "")", systemImage: "arrow.uturn.backward")
+                                    }
+                                    Button(action: {
+                                        herstelNaarTurn(turn, includeThisTurn: true)
+                                    }) {
+                                        Label("Herstel t/m beurt van \(spelers[safe: turn.playerIndex] ?? "")", systemImage: "arrow.uturn.forward")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Rondegeschiedenis")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Klaar") {
+                        showRondesSheet = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func herstelNaarTurn(_ target: TTRTurnEntry, includeThisTurn: Bool) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = turnHistory.firstIndex(where: { $0.id == target.id }) else { return }
+        let cutoff = includeThisTurn ? idx + 1 : idx
+        let keptTurns = Array(turnHistory.prefix(cutoff))
+
+        // Reset and recompute routePoints
+        for i in playerScores.indices {
+            playerScores[i].routePoints = 0
+        }
+        for turn in keptTurns {
+            if turn.playerIndex < playerScores.count {
+                playerScores[turn.playerIndex].routePoints += turn.points
+            }
+        }
+        turnHistory = keptTurns
+
+        if let last = keptTurns.last {
+            if last.playerIndex + 1 < spelers.count {
+                turnIndexInRound = last.playerIndex + 1
+                currentRound = last.round
+                selectedPlayerIndex = turnIndexInRound
+            } else {
+                turnIndexInRound = 0
+                currentRound = last.round + 1
+                selectedPlayerIndex = 0
+            }
+        } else {
+            currentRound = 1
+            turnIndexInRound = 0
+            selectedPlayerIndex = 0
+        }
+        showRondesSheet = false
     }
 }
 

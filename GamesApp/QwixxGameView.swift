@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct QwixxPlayerScore {
+struct QwixxPlayerScore: Equatable {
     var red: Int = 0        // 0..12
     var yellow: Int = 0     // 0..12
     var green: Int = 0      // 0..12
@@ -23,6 +23,20 @@ struct QwixxPlayerScore {
     }
 }
 
+struct QwixxSnapshotEntry: Identifiable, Equatable {
+    let id: UUID
+    let timestamp: Date
+    let beschrijving: String
+    let snapshot: [QwixxPlayerScore]
+
+    init(id: UUID = UUID(), timestamp: Date = Date(), beschrijving: String, snapshot: [QwixxPlayerScore]) {
+        self.id = id
+        self.timestamp = timestamp
+        self.beschrijving = beschrijving
+        self.snapshot = snapshot
+    }
+}
+
 struct QwixxGameView: View {
     let spelers: [String]
     let initialMode: QwixxSetupView.QwixxScoreMode
@@ -32,6 +46,10 @@ struct QwixxGameView: View {
     @State private var currentMode: QwixxSetupView.QwixxScoreMode
     @State private var playerScores: [QwixxPlayerScore]
     @State private var selectedPlayerIndex: Int = 0
+    @State private var geschiedenis: [QwixxSnapshotEntry] = []
+    @State private var toonGeschiedenisSheet: Bool = false
+    @State private var restoreTargetEntry: QwixxSnapshotEntry? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaarPlayer: Player = Player(name: "")
 
@@ -81,6 +99,37 @@ struct QwixxGameView: View {
                 sortedScores: sortedScores,
                 isLowestScoreWins: false
             )
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    toonGeschiedenisSheet = true
+                }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+            }
+        }
+        .sheet(isPresented: $toonGeschiedenisSheet) {
+            historySheetView
+        }
+        .confirmationDialog(
+            "Herstel naar stand?",
+            isPresented: $showRestoreDialog,
+            titleVisibility: .visible
+        ) {
+            if let entry = restoreTargetEntry {
+                Button("Herstel vóór: \(entry.beschrijving)", role: .destructive) {
+                    herstelNaarSnapshot(entry, includeThisSnapshot: false)
+                }
+                Button("Herstel t/m: \(entry.beschrijving)") {
+                    herstelNaarSnapshot(entry, includeThisSnapshot: true)
+                }
+                Button("Annuleren", role: .cancel) {}
+            }
+        } message: {
+            if let entry = restoreTargetEntry {
+                Text("Wil je het spel terugzetten naar deze stand?")
+            }
         }
     }
 
@@ -244,7 +293,10 @@ struct QwixxGameView: View {
             // Stepper knoppen
             HStack(spacing: 8) {
                 Button(action: {
-                    if crosses.wrappedValue > 0 { crosses.wrappedValue -= 1 }
+                    if crosses.wrappedValue > 0 {
+                        crosses.wrappedValue -= 1
+                        recordSnapshot(beschrijving: "\(title) -1 bij \(spelers[safe: selectedPlayerIndex] ?? "")")
+                    }
                 }) {
                     Image(systemName: "minus.circle.fill")
                         .font(.title3)
@@ -258,7 +310,10 @@ struct QwixxGameView: View {
                     .frame(minWidth: 24)
 
                 Button(action: {
-                    if crosses.wrappedValue < 12 { crosses.wrappedValue += 1 }
+                    if crosses.wrappedValue < 12 {
+                        crosses.wrappedValue += 1
+                        recordSnapshot(beschrijving: "\(title) +1 bij \(spelers[safe: selectedPlayerIndex] ?? "")")
+                    }
                 }) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
@@ -302,7 +357,10 @@ struct QwixxGameView: View {
 
             HStack(spacing: 8) {
                 Button(action: {
-                    if misworpen.wrappedValue > 0 { misworpen.wrappedValue -= 1 }
+                    if misworpen.wrappedValue > 0 {
+                        misworpen.wrappedValue -= 1
+                        recordSnapshot(beschrijving: "Misworp -1 bij \(spelers[safe: selectedPlayerIndex] ?? "")")
+                    }
                 }) {
                     Image(systemName: "minus.circle.fill")
                         .font(.title3)
@@ -316,7 +374,10 @@ struct QwixxGameView: View {
                     .frame(minWidth: 24)
 
                 Button(action: {
-                    if misworpen.wrappedValue < 4 { misworpen.wrappedValue += 1 }
+                    if misworpen.wrappedValue < 4 {
+                        misworpen.wrappedValue += 1
+                        recordSnapshot(beschrijving: "Misworp +1 bij \(spelers[safe: selectedPlayerIndex] ?? "")")
+                    }
                 }) {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
@@ -486,6 +547,110 @@ struct QwixxGameView: View {
             (player: Player(name: spelers[i]), score: effectiveScore(for: i))
         }
         return pairs.sorted { $0.score > $1.score }.map { $0.score }
+    }
+
+    // MARK: - Geschiedenis & Herstel
+
+    private func recordSnapshot(beschrijving: String) {
+        let entry = QwixxSnapshotEntry(beschrijving: beschrijving, snapshot: playerScores)
+        if let last = geschiedenis.last, last.snapshot == playerScores {
+            return
+        }
+        geschiedenis.append(entry)
+    }
+
+    private var historySheetView: some View {
+        NavigationStack {
+            List {
+                if geschiedenis.isEmpty {
+                    Text("Er zijn nog geen beurten of acties geregistreerd.")
+                        .foregroundColor(.secondary)
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een stand ingedrukt om de punten daarnaartoe te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    ForEach(geschiedenis) { entry in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(entry.beschrijving)
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                Spacer()
+                                Button(action: {
+                                    restoreTargetEntry = entry
+                                    showRestoreDialog = true
+                                }) {
+                                    Image(systemName: "arrow.uturn.backward.circle")
+                                        .font(.title3)
+                                        .foregroundColor(.orange)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            HStack(spacing: 8) {
+                                ForEach(spelers.indices, id: \.self) { idx in
+                                    let score = currentMode == .formulier ? entry.snapshot[safe: idx]?.calculatedTotal() ?? 0 : entry.snapshot[safe: idx]?.directScore ?? 0
+                                    Text("\(spelers[idx]): \(score) pt")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            restoreTargetEntry = entry
+                            showRestoreDialog = true
+                        }
+                        .contextMenu {
+                            Button(role: .destructive, action: {
+                                herstelNaarSnapshot(entry, includeThisSnapshot: false)
+                            }) {
+                                Label("Herstel vóór deze stand", systemImage: "arrow.uturn.backward")
+                            }
+                            Button(action: {
+                                herstelNaarSnapshot(entry, includeThisSnapshot: true)
+                            }) {
+                                Label("Herstel t/m deze stand", systemImage: "arrow.uturn.forward")
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Rondegeschiedenis")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Klaar") {
+                        toonGeschiedenisSheet = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func herstelNaarSnapshot(_ entry: QwixxSnapshotEntry, includeThisSnapshot: Bool) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = geschiedenis.firstIndex(where: { $0.id == entry.id }) else { return }
+        let cutoff = includeThisSnapshot ? idx + 1 : idx
+        let kept = Array(geschiedenis.prefix(cutoff))
+
+        if let target = includeThisSnapshot ? entry : kept.last {
+            playerScores = target.snapshot
+        } else {
+            playerScores = Array(repeating: QwixxPlayerScore(), count: spelers.count)
+        }
+        geschiedenis = kept
+        toonGeschiedenisSheet = false
     }
 }
 

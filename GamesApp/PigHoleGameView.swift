@@ -1,5 +1,23 @@
 import SwiftUI
 
+struct PigHoleActionEntry: Identifiable {
+    let id: UUID
+    let timestamp: Date
+    let ronde: Int
+    let beurtSpeler: String
+    let actie: String
+    let varkensStand: [Int]
+
+    init(id: UUID = UUID(), timestamp: Date = Date(), ronde: Int, beurtSpeler: String, actie: String, varkensStand: [Int]) {
+        self.id = id
+        self.timestamp = timestamp
+        self.ronde = ronde
+        self.beurtSpeler = beurtSpeler
+        self.actie = actie
+        self.varkensStand = varkensStand
+    }
+}
+
 struct PigHoleGameView: View {
     let spelers: [String]
     let startVarkens: Int
@@ -9,6 +27,10 @@ struct PigHoleGameView: View {
     @State private var varkens: [Int]
     @State private var huidigeRonde: Int = 1
     @State private var beurtIndex: Int = 0
+    @State private var geschiedenis: [PigHoleActionEntry] = []
+    @State private var toonGeschiedenisSheet: Bool = false
+    @State private var restoreTargetEntry: PigHoleActionEntry? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaarPlayer: Player = Player(name: "")
     @State private var showFinishConfirm: Bool = false
@@ -68,6 +90,37 @@ struct PigHoleGameView: View {
         } message: {
             Text("De speler met de minste overgebleven varkentjes (idealiter 0) wint!")
         }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    toonGeschiedenisSheet = true
+                }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+            }
+        }
+        .sheet(isPresented: $toonGeschiedenisSheet) {
+            historySheetView
+        }
+        .confirmationDialog(
+            "Herstel actie / ronde?",
+            isPresented: $showRestoreDialog,
+            titleVisibility: .visible
+        ) {
+            if let entry = restoreTargetEntry {
+                Button("Herstel vóór deze actie (Wis deze actie)", role: .destructive) {
+                    herstelNaarActie(entry, includeThisAction: false)
+                }
+                Button("Herstel t/m deze actie") {
+                    herstelNaarActie(entry, includeThisAction: true)
+                }
+                Button("Annuleren", role: .cancel) {}
+            }
+        } message: {
+            if let entry = restoreTargetEntry {
+                Text("Wil je de stand van het spel terugzetten naar: \(entry.actie) (Ronde \(entry.ronde))?")
+            }
+        }
     }
 
     // MARK: - Header
@@ -115,7 +168,10 @@ struct PigHoleGameView: View {
             Spacer()
 
             Button(action: {
-                withAnimation { huidigeRonde += 1 }
+                withAnimation {
+                    huidigeRonde += 1
+                    recordAction(player: spelers[safe: beurtIndex] ?? "", actie: "Start Ronde \(huidigeRonde)")
+                }
             }) {
                 HStack(spacing: 4) {
                     Text("Volgende ronde")
@@ -246,6 +302,7 @@ struct PigHoleGameView: View {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 withAnimation {
                                     varkens[idx] -= 1
+                                    recordAction(player: spelers[idx], actie: "-1 varken (kwijt)")
                                     if varkens[idx] == 0 {
                                         finalizeGame()
                                     }
@@ -269,7 +326,10 @@ struct PigHoleGameView: View {
                         // Vakje bezet / gepakt (+1)
                         Button(action: {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation { varkens[idx] += 1 }
+                            withAnimation {
+                                varkens[idx] += 1
+                                recordAction(player: spelers[idx], actie: "+1 varken")
+                            }
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "plus.circle.fill")
@@ -287,7 +347,10 @@ struct PigHoleGameView: View {
                         // Vakje bezet / gepakt (+2)
                         Button(action: {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation { varkens[idx] += 2 }
+                            withAnimation {
+                                varkens[idx] += 2
+                                recordAction(player: spelers[idx], actie: "+2 varkens")
+                            }
                         }) {
                             Text("+2")
                                 .font(.subheadline)
@@ -358,6 +421,120 @@ struct PigHoleGameView: View {
             (player: Player(name: spelers[i]), score: varkens[i])
         }
         return pairs.sorted { $0.score < $1.score }.map { $0.score }
+    }
+
+    // MARK: - Geschiedenis & Herstel
+
+    private func recordAction(player: String, actie: String) {
+        let entry = PigHoleActionEntry(
+            ronde: huidigeRonde,
+            beurtSpeler: player,
+            actie: actie,
+            varkensStand: varkens
+        )
+        geschiedenis.append(entry)
+    }
+
+    private var historySheetView: some View {
+        NavigationStack {
+            List {
+                if geschiedenis.isEmpty {
+                    Text("Er zijn nog geen beurten of acties geregistreerd.")
+                        .foregroundColor(.secondary)
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een beurt ingedrukt om de stand daarnaartoe te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    ForEach(geschiedenis) { entry in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Ronde \(entry.ronde) • \(entry.beurtSpeler)")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                Spacer()
+                                Text(entry.actie)
+                                    .font(.caption)
+                                    .foregroundColor(.pink)
+                                Button(action: {
+                                    restoreTargetEntry = entry
+                                    showRestoreDialog = true
+                                }) {
+                                    Image(systemName: "arrow.uturn.backward.circle")
+                                        .font(.title3)
+                                        .foregroundColor(.orange)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            HStack(spacing: 8) {
+                                ForEach(spelers.indices, id: \.self) { idx in
+                                    Text("\(spelers[idx]): \(entry.varkensStand[safe: idx] ?? 0)🐷")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            restoreTargetEntry = entry
+                            showRestoreDialog = true
+                        }
+                        .contextMenu {
+                            Button(role: .destructive, action: {
+                                herstelNaarActie(entry, includeThisAction: false)
+                            }) {
+                                Label("Herstel vóór deze actie", systemImage: "arrow.uturn.backward")
+                            }
+                            Button(action: {
+                                herstelNaarActie(entry, includeThisAction: true)
+                            }) {
+                                Label("Herstel t/m deze actie", systemImage: "arrow.uturn.forward")
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Rondegeschiedenis")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Klaar") {
+                        toonGeschiedenisSheet = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func herstelNaarActie(_ entry: PigHoleActionEntry, includeThisAction: Bool) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = geschiedenis.firstIndex(where: { $0.id == entry.id }) else { return }
+        let cutoff = includeThisAction ? idx + 1 : idx
+        let kept = Array(geschiedenis.prefix(cutoff))
+
+        if let target = includeThisAction ? entry : kept.last {
+            varkens = target.varkensStand
+            huidigeRonde = target.ronde
+            if let sIdx = spelers.firstIndex(of: target.beurtSpeler) {
+                beurtIndex = sIdx
+            }
+        } else {
+            varkens = Array(repeating: startVarkens, count: spelers.count)
+            huidigeRonde = 1
+            beurtIndex = 0
+        }
+        geschiedenis = kept
+        toonGeschiedenisSheet = false
     }
 }
 

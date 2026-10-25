@@ -58,6 +58,8 @@ struct ThirtySecondsGameView: View {
     // Geschiedenis & Navigatie
     @State private var geschiedenis: [ThirtySecondsRoundEntry] = []
     @State private var showHistorySheet: Bool = false
+    @State private var restoreTargetEntry: ThirtySecondsRoundEntry? = nil
+    @State private var showRestoreDialog: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winningTeam: ThirtySecondsTeam? = nil
 
@@ -502,6 +504,17 @@ struct ThirtySecondsGameView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                 } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Houd een beurt ingedrukt om de puntenstand te herstellen.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
                     ForEach(geschiedenis.reversed()) { entry in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
@@ -509,6 +522,15 @@ struct ThirtySecondsGameView: View {
                                     .font(.headline)
 
                                 Spacer()
+
+                                Button(action: {
+                                    restoreTargetEntry = entry
+                                    showRestoreDialog = true
+                                }) {
+                                    Label("Herstel", systemImage: "arrow.uturn.backward.circle")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                }
 
                                 Text("+\(entry.pointsGained) pt")
                                     .font(.subheadline)
@@ -558,6 +580,24 @@ struct ThirtySecondsGameView: View {
                                 .foregroundColor(.secondary)
                         }
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .onLongPressGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            restoreTargetEntry = entry
+                            showRestoreDialog = true
+                        }
+                        .contextMenu {
+                            Button(role: .destructive, action: {
+                                herstelBeurt(entry, includeThisTurn: false)
+                            }) {
+                                Label("Herstel naar stand vóór deze beurt", systemImage: "arrow.uturn.backward")
+                            }
+                            Button(action: {
+                                herstelBeurt(entry, includeThisTurn: true)
+                            }) {
+                                Label("Zet stand terug naar na deze beurt", systemImage: "arrow.uturn.forward")
+                            }
+                        }
                     }
                 }
             }
@@ -568,7 +608,64 @@ struct ThirtySecondsGameView: View {
                     Button("Sluit") { showHistorySheet = false }
                 }
             }
+            .confirmationDialog(
+                "Herstel stand naar Ronde \(restoreTargetEntry?.roundNumber ?? 1)?",
+                isPresented: $showRestoreDialog,
+                titleVisibility: .visible
+            ) {
+                if let entry = restoreTargetEntry {
+                    Button("Herstel naar stand vóór deze beurt (Wis beurt)", role: .destructive) {
+                        herstelBeurt(entry, includeThisTurn: false)
+                    }
+                    Button("Zet stand terug naar na deze beurt") {
+                        herstelBeurt(entry, includeThisTurn: true)
+                    }
+                    Button("Annuleren", role: .cancel) {}
+                }
+            } message: {
+                if let entry = restoreTargetEntry {
+                    Text("Wil je de beurt van \(entry.teamName) in ronde \(entry.roundNumber) herstellen?")
+                }
+            }
         }
+    }
+
+    private func herstelBeurt(_ targetEntry: ThirtySecondsRoundEntry, includeThisTurn: Bool) {
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        guard let idx = geschiedenis.firstIndex(where: { $0.id == targetEntry.id }) else { return }
+
+        let keptEntries = includeThisTurn ? Array(geschiedenis.prefix(idx + 1)) : Array(geschiedenis.prefix(idx))
+
+        // Herbereken alle teamscores exact op basis van behouden beurten
+        for tIdx in teams.indices {
+            teams[tIdx].score = 0
+            teams[tIdx].beurtenGespeeld = 0
+        }
+
+        for e in keptEntries {
+            if let tIdx = teams.firstIndex(where: { $0.name == e.teamName }) {
+                teams[tIdx].score += e.pointsGained
+                teams[tIdx].beurtenGespeeld += 1
+            }
+        }
+
+        geschiedenis = keptEntries
+
+        if let last = keptEntries.last {
+            huidigeRonde = last.roundNumber
+            if let lastTeamIdx = teams.firstIndex(where: { $0.name == last.teamName }) {
+                let nextIdx = (lastTeamIdx + 1) % teams.count
+                if nextIdx == 0 {
+                    huidigeRonde += 1
+                }
+                activeTeamIndex = nextIdx
+            }
+        } else {
+            huidigeRonde = 1
+            activeTeamIndex = 0
+        }
+
+        showHistorySheet = false
     }
 
     // MARK: - Spel Logica
