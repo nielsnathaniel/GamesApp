@@ -385,7 +385,7 @@ struct ContentView: View {
         case "Quickstop": return "bolt.fill"
         case "30 Seconds": return "timer"
         case "Cranium": return "brain.head.profile"
-        case "Fifty Fifty": return "circle.lefthalf.filled"
+        case "Fifty Fifty": return "square.stack.3d.up.fill"
         case "Wie begint?": return "hand.tap.fill"
         default: return "gamecontroller.fill"
         }
@@ -404,7 +404,7 @@ struct ContentView: View {
         case "Quickstop": return .yellow
         case "30 Seconds": return .orange
         case "Cranium": return .purple
-        case "Fifty Fifty": return .blue
+        case "Fifty Fifty": return .orange
         case "Wie begint?": return .yellow
         default: return .green
         }

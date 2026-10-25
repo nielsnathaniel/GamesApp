@@ -1,15 +1,15 @@
 import SwiftUI
 
-enum FiftyFiftyGameMode: String, CaseIterable, Identifiable {
-    case rondes = "Rondes & Slagen"
-    case snelleTelling = "Snelle Telling"
+enum FiftyFiftyWhiteGoblinMode: String, CaseIterable, Identifiable {
+    case rondes = "Ronde per ronde"
+    case enkelePot = "Enkele pot"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
         case .rondes: return "arrow.triangle.2.circlepath"
-        case .snelleTelling: return "sum"
+        case .enkelePot: return "1.circle"
         }
     }
 }
@@ -18,10 +18,10 @@ struct FiftyFiftySetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
 
     @State private var aantalSpelers: Int = 4
-    @State private var gameMode: FiftyFiftyGameMode = .rondes
-    @State private var limietStrafpunten: Int = 15
+    @State private var gameMode: FiftyFiftyWhiteGoblinMode = .rondes
+    @State private var aantalRondesDoel: Int = 3
     @State private var gebruikLimiet: Bool = false
-    @State private var aantalRondesDoel: Int = 5
+    @State private var limietStrafkaarten: Int = 25
     @State private var spelers: [String] = Array(repeating: "", count: 6)
 
     var body: some View {
@@ -33,23 +33,23 @@ struct FiftyFiftySetupView: View {
                         Image("FiftyFifty")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 46, height: 46)
+                            .frame(width: 48, height: 48)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
+                            .shadow(color: .orange.opacity(0.35), radius: 4, x: 0, y: 2)
                     } else {
                         ZStack {
-                            Circle()
+                            RoundedRectangle(cornerRadius: 12)
                                 .fill(
                                     LinearGradient(
-                                        colors: [Color.blue, Color.yellow],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                                        colors: [Color.orange, Color.purple],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
                                     )
                                 )
-                                .frame(width: 44, height: 44)
+                                .frame(width: 46, height: 46)
 
-                            Image(systemName: "circle.lefthalf.filled")
-                                .font(.system(size: 26))
+                            Text("50")
+                                .font(.system(size: 22, weight: .black))
                                 .foregroundColor(.white)
                         }
                     }
@@ -58,7 +58,7 @@ struct FiftyFiftySetupView: View {
                         Text("Fifty Fifty")
                             .font(.largeTitle)
                             .fontWeight(.bold)
-                        Text("Reiner Knizia • Winnen is verliezen... tenzij 50/50! ☀️🌙")
+                        Text("White Goblin Games • Minste strafkaarten wint! 🦊🃏")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -66,28 +66,33 @@ struct FiftyFiftySetupView: View {
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity, alignment: .center)
 
-                // Uitleg Kaartje: De 50/50 regel
+                // Spelregels samenvatting
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 6) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundColor(.blue)
-                        Text("Hoe werkt de puntentelling?")
+                        Image(systemName: "questionmark.circle.fill")
+                            .foregroundColor(.orange)
+                        Text("Spelregels in het kort")
                             .font(.subheadline)
                             .fontWeight(.bold)
                     }
 
-                    Text("• Hoogste kaart = **Blauw fiche (☀️)** • Laagste kaart = **Geel fiche (🌙)**\n• **1 Blauw + 1 Geel heffen elkaar op!**\n• Wie de **minste strafpunten** overhoudt, wint het spel.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• **Spelen:** Leg een **hoger getal** neer óf vervang de laatste kaart door een **lager getal** tussen de voorlaatste en laatste.")
+                        Text("• **Niet kunnen:** Pak kaarten uit de rij als **strafkaarten** (1 punt per kaart).")
+                        Text("• **🦊 Voskaarten:** Gebruik om te passen of te redden. **Pas op:** Heb je aan het einde nog een vos op hand? Dan heb je **direct verloren!**")
+                            .foregroundColor(.red)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.blue.opacity(0.08))
+                .background(Color.orange.opacity(0.08))
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.orange.opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal)
 
@@ -98,7 +103,7 @@ struct FiftyFiftySetupView: View {
                         .padding(.horizontal)
 
                     Picker("Spelmodus", selection: $gameMode) {
-                        ForEach(FiftyFiftyGameMode.allCases) { mode in
+                        ForEach(FiftyFiftyWhiteGoblinMode.allCases) { mode in
                             Label(mode.rawValue, systemImage: mode.icon).tag(mode)
                         }
                     }
@@ -121,14 +126,14 @@ struct FiftyFiftySetupView: View {
                                 Text("\(number)")
                                     .font(.title3)
                                     .fontWeight(.bold)
-                                    .foregroundColor(aantalSpelers == number ? .white : .blue)
+                                    .foregroundColor(aantalSpelers == number ? .white : .orange)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 12)
-                                    .background(aantalSpelers == number ? Color.blue : Color(UIColor.secondarySystemGroupedBackground))
+                                    .background(aantalSpelers == number ? Color.orange : Color(UIColor.secondarySystemGroupedBackground))
                                     .cornerRadius(10)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
-                                            .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                                            .stroke(Color.orange.opacity(0.2), lineWidth: 1)
                                     )
                             }
                         }
@@ -136,41 +141,76 @@ struct FiftyFiftySetupView: View {
                     .padding(.horizontal)
                 }
 
-                // Eindlimiet / Doel
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Spelen tot een strafpunt-limiet", isOn: $gebruikLimiet)
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    if gebruikLimiet {
-                        HStack(spacing: 8) {
-                            Text("Limiet:")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                // Rondes Doel of Limiet
+                if gameMode == .rondes {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Aantal Rondes")
+                                    .font(.headline)
+                                Text("Aantal te spelen rondes (optellen van strafkaarten)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
 
                             Spacer()
 
-                            ForEach([10, 15, 20, 25], id: \.self) { limit in
-                                Button(action: {
-                                    HapticManager.shared.light()
-                                    limietStrafpunten = limit
-                                }) {
-                                    Text("\(limit) pnt")
-                                        .font(.subheadline)
-                                        .fontWeight(limietStrafpunten == limit ? .bold : .medium)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(limietStrafpunten == limit ? Color.blue.opacity(0.25) : Color(UIColor.secondarySystemGroupedBackground))
-                                        .foregroundColor(limietStrafpunten == limit ? .blue : .primary)
-                                        .cornerRadius(8)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .stroke(limietStrafpunten == limit ? Color.blue : Color.clear, lineWidth: 1.5)
-                                        )
+                            HStack(spacing: 6) {
+                                ForEach([3, 4, 5, 8], id: \.self) { r in
+                                    Button(action: {
+                                        HapticManager.shared.light()
+                                        aantalRondesDoel = r
+                                    }) {
+                                        Text("\(r)")
+                                            .font(.subheadline)
+                                            .fontWeight(aantalRondesDoel == r ? .bold : .medium)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
+                                            .background(aantalRondesDoel == r ? Color.orange.opacity(0.25) : Color(UIColor.secondarySystemGroupedBackground))
+                                            .foregroundColor(aantalRondesDoel == r ? .orange : .primary)
+                                            .cornerRadius(8)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(aantalRondesDoel == r ? Color.orange : Color.clear, lineWidth: 1.5)
+                                            )
+                                    }
                                 }
                             }
                         }
                         .padding(.horizontal)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Spelen tot een strafkaart-limiet", isOn: $gebruikLimiet)
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        if gebruikLimiet {
+                            HStack(spacing: 8) {
+                                Text("Limiet:")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+
+                                Spacer()
+
+                                ForEach([15, 20, 25, 30], id: \.self) { limit in
+                                    Button(action: {
+                                        HapticManager.shared.light()
+                                        limietStrafkaarten = limit
+                                    }) {
+                                        Text("\(limit) 🃏")
+                                            .font(.subheadline)
+                                            .fontWeight(limietStrafkaarten == limit ? .bold : .medium)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
+                                            .background(limietStrafkaarten == limit ? Color.orange.opacity(0.25) : Color(UIColor.secondarySystemGroupedBackground))
+                                            .foregroundColor(limietStrafkaarten == limit ? .orange : .primary)
+                                            .cornerRadius(8)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
                     }
                 }
 
@@ -178,7 +218,7 @@ struct FiftyFiftySetupView: View {
                 SavedPlayersQuickChipsView(
                     spelers: $spelers,
                     aantalSpelers: aantalSpelers,
-                    tintColor: .blue
+                    tintColor: .orange
                 )
 
                 // Invoervelden voor spelersnamen
@@ -207,8 +247,9 @@ struct FiftyFiftySetupView: View {
                     destination: FiftyFiftyGameView(
                         spelers: Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }),
                         gameMode: gameMode,
+                        aantalRondesDoel: aantalRondesDoel,
                         gebruikLimiet: gebruikLimiet,
-                        limietStrafpunten: limietStrafpunten
+                        limietStrafkaarten: limietStrafkaarten
                     )
                 ) {
                     HStack(spacing: 8) {
@@ -220,9 +261,9 @@ struct FiftyFiftySetupView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
+                    .background(Color.orange)
                     .cornerRadius(12)
-                    .shadow(color: Color.blue.opacity(0.35), radius: 5, x: 0, y: 3)
+                    .shadow(color: Color.orange.opacity(0.35), radius: 5, x: 0, y: 3)
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     scoreManager.savePlayerNames(spelers.prefix(aantalSpelers).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
