@@ -766,10 +766,10 @@ struct RegenwormenGameView: View {
 
     private var beurtInvoerView: some View {
         VStack(spacing: 20) {
-            // SECTIE 1: Stenen op tafel (De Barbecue / Grill)
+            // SECTIE 1: Stenen op tafel
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("Stenen op tafel (Barbecue)", systemImage: "flame.fill")
+                    Label("Stenen op tafel", systemImage: "flame.fill")
                         .font(.headline)
                         .foregroundColor(.orange)
 
@@ -839,10 +839,10 @@ struct RegenwormenGameView: View {
                 }
             }
 
-            // SECTIE 2: Bovenste stenen van medespelers (Afpakken!)
+            // SECTIE 2: Steen afpakken
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("Bovenste stenen medespelers (Afpakken)", systemImage: "hand.raised.fill")
+                    Label("Steen afpakken", systemImage: "hand.raised.fill")
                         .font(.headline)
                         .foregroundColor(.purple)
 
