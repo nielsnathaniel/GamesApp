@@ -202,6 +202,21 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.vertical, 4)
                     }
+
+                    DisclosureGroup("Quickstop Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Doel: Zo min mogelijk strafpunten (bliksemschichten ⚡️) verzamelen; minste strafpunten wint!")
+                            Text("• Kaarten: Elke speler start elke ronde met 5 letterkaarten")
+                            Text("• Spelverloop: Roep zo snel mogelijk een passend woord bij het openliggende thema en leg je letter af")
+                            Text("• Wissel van thema: Na 3 goede antwoorden wordt het volgende thema voorgelezen")
+                            Text("• Rondewinst: Wie als eerste al zijn handkaarten kwijt is, krijgt 0 strafpunten")
+                            Text("• Strafpunten: De andere spelers tellen de bliksems ⚡️ op hun overgebleven handkaarten")
+                            Text("• Einde spel: Zodra iemand 40 strafpunten (of de gekozen limiet) bereikt. De speler met de laagste score wint!")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 // 3. Over GamesApp
@@ -215,7 +230,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Ondersteunde Spellen")
                         Spacer()
-                        Text("13 spellen")
+                        Text("14 spellen")
                             .foregroundColor(.secondary)
                     }
                 }

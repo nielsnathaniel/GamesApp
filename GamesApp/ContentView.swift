@@ -41,6 +41,7 @@ struct ContentView: View {
         ("Qwixx", "Qwixx"),
         ("Pig Hole", "PigHole"),
         ("Ticket to Ride", "TicketToRide"),
+        ("Quickstop", "Quickstop"),
         ("30 Seconds", "ThirtySeconds"),
         ("Cranium", "Cranium")
     ]
@@ -202,6 +203,9 @@ struct ContentView: View {
         if assetName.caseInsensitiveCompare("tickettoride") == .orderedSame || assetName.caseInsensitiveCompare("ticket to ride") == .orderedSame {
             if UIImage(named: "TicketToRide") != nil { return "TicketToRide" }
         }
+        if assetName.caseInsensitiveCompare("quickstop") == .orderedSame || assetName.caseInsensitiveCompare("quick stop") == .orderedSame {
+            if UIImage(named: "Quickstop") != nil { return "Quickstop" }
+        }
         return nil
     }
 
@@ -244,6 +248,7 @@ struct ContentView: View {
         case "Qwixx": return "dice.fill"
         case "Pig Hole": return "circle.circle.fill"
         case "Ticket to Ride": return "tram.fill"
+        case "Quickstop": return "bolt.fill"
         case "30 Seconds": return "timer"
         case "Cranium": return "brain.head.profile"
         default: return "gamecontroller.fill"
@@ -260,6 +265,7 @@ struct ContentView: View {
         case "Qwixx": return .orange
         case "Pig Hole": return .pink
         case "Ticket to Ride": return .blue
+        case "Quickstop": return .yellow
         case "30 Seconds": return .orange
         case "Cranium": return .purple
         default: return .green
@@ -291,6 +297,8 @@ struct ContentView: View {
             PigHoleSetupView()
         case "Ticket to Ride":
             TicketToRideSetupView()
+        case "Quickstop":
+            QuickstopSetupView()
         case "30 Seconds":
             ThirtySecondsSetupView()
         case "Cranium":
