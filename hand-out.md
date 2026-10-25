@@ -36,7 +36,7 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
 
 ```
 [ Tab 0: Spellen ] ───► CurrentGameView (Spelkeuze & Actieve spelsessies)
-[ Tab 1: Statistieken ] ► StatisticsView (Analytics dashboard met 4 segmenten)
+[ Tab 1: Statistieken ] ► StatisticsView (Analytics dashboard met 5 segmenten incl. Per Spel)
 [ Tab 2: Instellingen ] ─► SettingsView (Spelersbeheer, Geschiedenis, Spelregels)
 ```
 
@@ -47,13 +47,19 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
     - **Populair**: Sorteert spellen op basis van het aantal gespeelde potjes (meest gespeeld bovenaan) met een subtiele vlam-badge (`🔥 Xx`) en speelfrequentie.
     - **Alfabetisch**: Sorteert de spellen op alfabetische volgorde (A-Z).
   - De geselecteerde sorteervoorkeur wordt bewaard via `@AppStorage` en toont een actieve vulling wanneer er een niet-standaard sortering actief is.
-* [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers`, winnaars, H2H-statistieken, 2v2 Duo-statistieken en Balzakken leaderboards.
+* [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers`, winnaars, H2H-statistieken, 2v2 Duo-statistieken, spelspecifieke ranglijsten en records (`gameLeaderboard`, `bestScoreEver`, `recentSessions`) en Balzakken leaderboards.
 * [`StatisticsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/StatisticsView.swift): Gloednieuw statistiekenscherm met een moderne horizontaal scrollende pill-navigatiebalk en interactieve filterbalk:
   1. *Overzicht:* KPI-tegels (totale potjes, actieve spelers, records) & populariteitsgrafieken.
-  2. *Spelers & Rangen:* Podium (🥇, 🥈, 🥉), winpercentages en ranglijsten.
-  3. *Duo's:* Partner-chemie en droomteams ranking voor Crokinole 2v2.
-  4. *Wie wint?:* Head-to-head rivaliteiten met een moderne interactieve filterbalk (gekleurde chips per spel, game-iconen en 'Wis filter'-knop ter vervanging van de oude dropdown picker).
-  5. *Balzakken:* Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, ranglijst juiste vs foute balzakken).
+  2. *Spelers:* Podium (🥇, 🥈, 🥉), winpercentages en ranglijsten voor alle spelers.
+  3. *Per Spel:* Universele spelselectie voor alle 14 spellen via scrollbare game-chips met icoon en speel-telling (`Xx`). Per spel toont dit:
+     - Header met 3D app-icoon/symbool, spelregels ("Minste strafpunten wint" / "Hoogste score wint") en totale speelsessies.
+     - 4 KPI-kaarten: Spel Kampioen, Beste Score Ooit (record), Aantal Deelnemers en Totaal Gespeeld.
+     - Spelspecifiek Podium (🥇, 🥈, 🥉) en volledige ranglijst per speler (gewonnen, gespeeld, win%, persoonlijk record, gemiddelde score).
+     - Geïntegreerde Balzakken Hall of Fame (Balzakken Koning & Gevaarlijkste Speler, juiste vs foute balzakken) wanneer Balzakken is geselecteerd.
+     - Recente gespeelde potjes van dit spel met datum, winnaar en interactieve scores.
+     - Vriendelijke lege staat met een directe "Start [Spelnaam]" knop indien een spel nog niet gespeeld is.
+  4. *Duo's:* Partner-chemie en droomteams ranking voor Crokinole 2v2.
+  5. *Wie wint?:* Head-to-head rivaliteiten met een moderne interactieve filterbalk (gekleurde chips per spel, game-iconen en 'Wis filter'-knop).
 * [`SettingsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SettingsView.swift), [`GegevensbeheerView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/GegevensbeheerView.swift), [`OpgeslagenSpelersView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/OpgeslagenSpelersView.swift) & [`SpelsessiesBeheerView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SpelsessiesBeheerView.swift):
   - *Gegevensbeheer Hub:* Onder Instellingen staat nu een overzichtelijke knop **Gegevensbeheer** die leidt naar een centrale beheermodule met samenvattende KPI-tegels (aantal spelers, aantal sessies) en twee hoofdknoppen:
     1. **Opgeslagen Spelers (`OpgeslagenSpelersView.swift`):** Nieuw eigen scherm voor spelersbeheer:

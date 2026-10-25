@@ -5,14 +5,40 @@ struct StatisticsView: View {
     @State private var selectedSegment: StatSegment = .overzicht
     @State private var selectedGameFilter: String = "Alle Spellen"
     @State private var selectedPartnerPlayer: String = ""
+    @State private var selectedDetailGame: String = "Balzakken"
     @Namespace private var categoryAnimation
+
+    struct AppGameInfo: Identifiable {
+        var id: String { name }
+        let name: String
+        let assetName: String
+        let defaultIcon: String
+        let defaultColor: Color
+    }
+
+    let allAppGames: [AppGameInfo] = [
+        AppGameInfo(name: "Balzakken", assetName: "Balzakken", defaultIcon: "flame.fill", defaultColor: .red),
+        AppGameInfo(name: "Qwixx", assetName: "Qwixx", defaultIcon: "dice.fill", defaultColor: .orange),
+        AppGameInfo(name: "Pig Hole", assetName: "PigHole", defaultIcon: "circle.circle.fill", defaultColor: .pink),
+        AppGameInfo(name: "Ticket to Ride", assetName: "TicketToRide", defaultIcon: "tram.fill", defaultColor: .blue),
+        AppGameInfo(name: "Quickstop", assetName: "Quickstop", defaultIcon: "bolt.fill", defaultColor: .yellow),
+        AppGameInfo(name: "Love Letter", assetName: "LoveLetter", defaultIcon: "heart.fill", defaultColor: .pink),
+        AppGameInfo(name: "Regenwormen", assetName: "Regenwormen", defaultIcon: "circle.hexagongrid.fill", defaultColor: .orange),
+        AppGameInfo(name: "Jatten", assetName: "Jatten", defaultIcon: "hand.raised.fill", defaultColor: .purple),
+        AppGameInfo(name: "30 Seconds", assetName: "ThirtySeconds", defaultIcon: "timer", defaultColor: .orange),
+        AppGameInfo(name: "Cranium", assetName: "Cranium", defaultIcon: "brain.head.profile", defaultColor: .purple),
+        AppGameInfo(name: "Crockinole", assetName: "Crockinole", defaultIcon: "circle.circle.fill", defaultColor: .blue),
+        AppGameInfo(name: "Beverbende", assetName: "Beverbende", defaultIcon: "pawprint.fill", defaultColor: .green),
+        AppGameInfo(name: "Duizenden", assetName: "Duizenden", defaultIcon: "suit.spade.fill", defaultColor: .blue),
+        AppGameInfo(name: "Nmbr9", assetName: "Nmbr9", defaultIcon: "number.square.fill", defaultColor: .indigo)
+    ]
 
     enum StatSegment: String, CaseIterable, Identifiable {
         case overzicht = "Overzicht"
         case spelers = "Spelers"
+        case perSpel = "Per Spel"
         case teams = "Duo's"
         case rivaliteiten = "Wie wint?"
-        case balzakken = "Balzakken"
 
         var id: String { rawValue }
 
@@ -20,9 +46,9 @@ struct StatisticsView: View {
             switch self {
             case .overzicht: return "chart.pie.fill"
             case .spelers: return "crown.fill"
+            case .perSpel: return "gamecontroller.fill"
             case .teams: return "person.2.fill"
             case .rivaliteiten: return "bolt.fill"
-            case .balzakken: return "flame.fill"
             }
         }
 
@@ -30,9 +56,9 @@ struct StatisticsView: View {
             switch self {
             case .overzicht: return .blue
             case .spelers: return .purple
+            case .perSpel: return .teal
             case .teams: return .indigo
             case .rivaliteiten: return .orange
-            case .balzakken: return .red
             }
         }
     }
@@ -57,12 +83,12 @@ struct StatisticsView: View {
                             overviewSection
                         case .spelers:
                             playersLeaderboardSection
+                        case .perSpel:
+                            perGameSection
                         case .teams:
                             teamsSection
                         case .rivaliteiten:
                             rivalriesSection
-                        case .balzakken:
-                            balzakkenSpecialSection
                         }
                     }
                     .padding()
@@ -86,6 +112,10 @@ struct StatisticsView: View {
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .onAppear {
                 scoreManager.refresh()
+                if let mostPlayed = scoreManager.mostPlayedGames().first?.gameName,
+                   scoreManager.playedGames.filter({ scoreManager.matchesGameName($0.gameName, selectedDetailGame) }).isEmpty {
+                    selectedDetailGame = mostPlayed
+                }
             }
         }
     }
@@ -525,33 +555,415 @@ struct StatisticsView: View {
         }
     }
 
-    // MARK: - 4. BALZAKKEN SPECIAAL (Juiste & Foute Balzakken)
+    // MARK: - 3. STATISTIEKEN PER SPEL
 
-    private var balzakkenSpecialSection: some View {
+    private var perGameSection: some View {
         VStack(spacing: 16) {
-            // Header kaart
-            HStack(spacing: 12) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 36))
-                    .foregroundColor(.red)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Balzakken Hall of Fame")
+            // Horizontale spelselectiebalk
+            gameSelectorBar
+
+            let activeGame = selectedDetailGame
+            let sessionCount = scoreManager.playedGames.filter { scoreManager.matchesGameName($0.gameName, activeGame) }.count
+            let isLowestWins = scoreManager.isLowestScoreWins(for: activeGame)
+
+            // Spelkop met icoon en doel
+            gameHeaderCard(gameName: activeGame, sessionCount: sessionCount, isLowestScoreWins: isLowestWins)
+
+            if sessionCount == 0 {
+                gameEmptyStateView(gameName: activeGame)
+            } else {
+                let leaderboard = scoreManager.gameLeaderboard(for: activeGame)
+                let bestScore = scoreManager.bestScoreEver(for: activeGame)
+                let recent = scoreManager.recentSessions(for: activeGame, limit: 10)
+
+                // 4 Snelle KPI Tegels voor dit spel
+                gameQuickStats(leaderboard: leaderboard, bestScore: bestScore, sessionCount: sessionCount)
+
+                // Podium Top 3 indien minstens 2 spelers
+                if leaderboard.count >= 2 {
+                    gamePodiumView(leaderboard: leaderboard)
+                }
+
+                // Volledige ranglijst voor dit spel
+                if !leaderboard.isEmpty {
+                    gameLeaderboardCard(leaderboard: leaderboard, gameName: activeGame)
+                }
+
+                // Balzakken Hall of Fame (als Balzakken geselecteerd is)
+                if scoreManager.matchesGameName(activeGame, "Balzakken") {
+                    balzakkenHallOfFameCard
+                }
+
+                // Recente potjes voor dit spel
+                gameRecentSessionsCard(recent: recent, gameName: activeGame)
+            }
+        }
+    }
+
+    // MARK: - Per Spel UI Componenten
+
+    private var gameSelectorBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "gamecontroller.fill")
+                    .foregroundColor(.teal)
+                    .font(.subheadline)
+                Text("Selecteer Spel")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                Text("\(allAppGames.count) spellen")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 4)
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(allAppGames) { game in
+                            let isSelected = scoreManager.matchesGameName(selectedDetailGame, game.name)
+                            let playCount = scoreManager.playedGames.filter { scoreManager.matchesGameName($0.gameName, game.name) }.count
+
+                            Button(action: {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                    selectedDetailGame = game.name
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    gameThumbnail(for: game.name, size: 20)
+
+                                    Text(game.name)
+                                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+
+                                    if playCount > 0 {
+                                        Text("\(playCount)x")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(isSelected ? Color.white.opacity(0.25) : Color.orange.opacity(0.18))
+                                            .foregroundColor(isSelected ? .white : .orange)
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background {
+                                    ZStack {
+                                        if isSelected {
+                                            game.defaultColor
+                                                .clipShape(Capsule())
+                                                .shadow(color: game.defaultColor.opacity(0.35), radius: 5, x: 0, y: 2)
+                                        } else {
+                                            Color(UIColor.secondarySystemGroupedBackground)
+                                                .clipShape(Capsule())
+                                                .overlay(
+                                                    Capsule()
+                                                        .stroke(Color.gray.opacity(0.18), lineWidth: 1)
+                                                )
+                                        }
+                                    }
+                                }
+                                .foregroundColor(isSelected ? .white : .primary)
+                            }
+                            .buttonStyle(.plain)
+                            .id(game.name)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                    .padding(.horizontal, 2)
+                }
+                .onChange(of: selectedDetailGame) { _, newGame in
+                    withAnimation {
+                        proxy.scrollTo(newGame, anchor: .center)
+                    }
+                }
+            }
+        }
+    }
+
+    private func gameHeaderCard(gameName: String, sessionCount: Int, isLowestScoreWins: Bool) -> some View {
+        HStack(spacing: 14) {
+            gameHeroIcon(for: gameName, size: 60)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(gameName)
                         .font(.title2)
                         .fontWeight(.bold)
-                    Text("Juiste balzakken (0 pt) vs Foute balzakken (+25 pt)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    // Win condition badge
+                    HStack(spacing: 3) {
+                        Image(systemName: isLowestScoreWins ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                            .font(.system(size: 11))
+                        Text(isLowestScoreWins ? "Minste wint" : "Meeste wint")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background((isLowestScoreWins ? Color.teal : Color.orange).opacity(0.15))
+                    .foregroundColor(isLowestScoreWins ? .teal : .orange)
+                    .cornerRadius(8)
                 }
+
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gamecontroller.fill")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(sessionCount == 1 ? "1 potje geregistreerd" : "\(sessionCount) potjes geregistreerd")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    private func gameQuickStats(leaderboard: [GameSpecificPlayerStat], bestScore: (playerName: String, score: Int)?, sessionCount: Int) -> some View {
+        let champion = leaderboard.first
+        let recordText = bestScore != nil ? "\(bestScore!.score) pt" : "-"
+        let recordSub = bestScore != nil ? "door \(bestScore!.playerName)" : "Geen scores"
+        let champSub = champion != nil ? "\(champion!.gamesWon)x winst (\(String(format: "%.0f%%", champion!.winRate)))" : "Geen winnaar"
+
+        return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            gameStatCard(
+                title: "Spel Kampioen",
+                value: champion?.playerName ?? "-",
+                subtitle: champSub,
+                icon: "crown.fill",
+                color: .yellow
+            )
+            gameStatCard(
+                title: "Beste Score Ooit",
+                value: recordText,
+                subtitle: recordSub,
+                icon: "star.circle.fill",
+                color: .orange
+            )
+            gameStatCard(
+                title: "Deelnemers",
+                value: "\(leaderboard.count)",
+                subtitle: leaderboard.count == 1 ? "1 actieve speler" : "\(leaderboard.count) actieve spelers",
+                icon: "person.2.fill",
+                color: .purple
+            )
+            gameStatCard(
+                title: "Totaal Gespeeld",
+                value: "\(sessionCount)",
+                subtitle: sessionCount == 1 ? "1 potje voltooid" : "\(sessionCount) potjes voltooid",
+                icon: "chart.line.uptrend.xyaxis",
+                color: .blue
+            )
+        }
+    }
+
+    private func gameStatCard(title: String, value: String, subtitle: String, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .font(.subheadline)
                 Spacer()
             }
-            .padding()
-            .background(Color(UIColor.secondarySystemGroupedBackground))
-            .cornerRadius(16)
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(title)
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+            Text(subtitle)
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+    }
+
+    private func gamePodiumView(leaderboard: [GameSpecificPlayerStat]) -> some View {
+        HStack(alignment: .bottom, spacing: 10) {
+            // #2 Zilver
+            if leaderboard.indices.contains(1) {
+                gamePodiumColumn(rank: 2, stat: leaderboard[1], color: .gray, height: 95)
+            }
+            // #1 Goud
+            if leaderboard.indices.contains(0) {
+                gamePodiumColumn(rank: 1, stat: leaderboard[0], color: .yellow, height: 125)
+            }
+            // #3 Brons
+            if leaderboard.indices.contains(2) {
+                gamePodiumColumn(rank: 3, stat: leaderboard[2], color: .brown, height: 75)
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func gamePodiumColumn(rank: Int, stat: GameSpecificPlayerStat, color: Color, height: CGFloat) -> some View {
+        NavigationLink(destination: PlayerStatsView(playerName: stat.playerName)) {
+            VStack(spacing: 5) {
+                Text(rank == 1 ? "🥇" : (rank == 2 ? "🥈" : "🥉"))
+                    .font(.title)
+
+                Text(stat.playerName)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Text("\(stat.gamesWon)x win (\(String(format: "%.0f%%", stat.winRate)))")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(color.opacity(0.22))
+                    .frame(height: height)
+                    .overlay(
+                        Text("#\(rank)")
+                            .font(.title2)
+                            .fontWeight(.black)
+                            .foregroundColor(color)
+                    )
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func gameLeaderboardCard(leaderboard: [GameSpecificPlayerStat], gameName: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "list.number")
+                    .foregroundColor(.blue)
+                Text("Spelers Ranglijst")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
+                Text("\(leaderboard.count) spelers")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            ForEach(Array(leaderboard.enumerated()), id: \.element.id) { index, stat in
+                NavigationLink(destination: PlayerStatsView(playerName: stat.playerName)) {
+                    HStack(spacing: 12) {
+                        // Medaille of positie
+                        ZStack {
+                            Circle()
+                                .fill(rankColor(for: index).opacity(0.15))
+                                .frame(width: 32, height: 32)
+
+                            if index == 0 {
+                                Text("🥇").font(.subheadline)
+                            } else if index == 1 {
+                                Text("🥈").font(.subheadline)
+                            } else if index == 2 {
+                                Text("🥉").font(.subheadline)
+                            } else {
+                                Text("\(index + 1)")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(stat.playerName)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+
+                            HStack(spacing: 8) {
+                                Text("\(stat.gamesWon)W - \(stat.gamesPlayed - stat.gamesWon)V")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+
+                                if let best = stat.bestScore {
+                                    Text("•")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("Record: \(best) pt")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                if let avg = stat.averageScore {
+                                    Text("•")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("Gem: \(String(format: "%.1f", avg))")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        // Winrate pill
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(String(format: "%.0f%%", stat.winRate))")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(stat.winRate >= 50 ? .green : .secondary)
+
+                            Text("\(stat.gamesWon)/\(stat.gamesPlayed) gewonnen")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                if index < leaderboard.count - 1 {
+                    Divider()
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    private var balzakkenHallOfFameCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "flame.fill")
+                    .foregroundColor(.red)
+                Text("Balzakken Hall of Fame")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
+                Text("Juiste vs Foute Balzakken")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+            }
 
             let leaderboard = scoreManager.balzakkenLeaderboard()
 
             if leaderboard.isEmpty {
-                emptyStateCard(text: "Nog geen Balzakken potjes opgeslagen. Speel een potje Balzakken om deze statistieken te vullen!")
+                Text("Nog geen balzakken geregistreerd.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             } else {
                 // Highlights
                 HStack(spacing: 12) {
@@ -577,14 +989,12 @@ struct StatisticsView: View {
                 }
 
                 // Tabel per speler
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Alle Balzakken Spelers")
-                        .font(.headline)
-
+                VStack(spacing: 8) {
                     ForEach(leaderboard) { stat in
                         HStack(spacing: 12) {
                             Text(stat.playerName)
-                                .font(.headline)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
 
                             Spacer()
 
@@ -592,10 +1002,10 @@ struct StatisticsView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
-                                Text("\(stat.juisteBalzakken)")
+                                Text("\(stat.juisteBalzakken)x")
                                     .fontWeight(.bold)
                             }
-                            .font(.subheadline)
+                            .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.green.opacity(0.12))
@@ -605,27 +1015,281 @@ struct StatisticsView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(.red)
-                                Text("\(stat.fouteBalzakken)")
+                                Text("\(stat.fouteBalzakken)x")
                                     .fontWeight(.bold)
                             }
-                            .font(.subheadline)
+                            .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.red.opacity(0.12))
                             .cornerRadius(8)
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 2)
 
                         if stat.id != leaderboard.last?.id {
                             Divider()
                         }
                     }
                 }
-                .padding()
-                .background(Color(UIColor.secondarySystemGroupedBackground))
-                .cornerRadius(16)
             }
         }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    private func gameRecentSessionsCard(recent: [PlayedGame], gameName: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundColor(.indigo)
+                Text("Recente Potjes")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
+                NavigationLink(destination: SpelsessiesBeheerView()) {
+                    Text("Alles bekijken")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                }
+            }
+
+            if recent.isEmpty {
+                Text("Geen recente potjes gevonden.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(recent) { game in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "calendar")
+                                        .font(.caption2)
+                                    Text(game.date, style: .date)
+                                    Text("om")
+                                    Text(game.date, style: .time)
+                                }
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+
+                                Spacer()
+
+                                if game.isTie {
+                                    Text("Gelijkspel")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(Color.gray.opacity(0.18))
+                                        .foregroundColor(.secondary)
+                                        .cornerRadius(6)
+                                } else {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "crown.fill")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(.yellow)
+                                        Text("\(game.winner)")
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.green.opacity(0.15))
+                                    .foregroundColor(.green)
+                                    .cornerRadius(6)
+                                }
+                            }
+
+                            // Horizontale lijst van scores
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(game.scores) { sc in
+                                        let isWinner = !game.isTie && sc.playerName.caseInsensitiveCompare(game.winner) == .orderedSame
+                                        HStack(spacing: 4) {
+                                            if isWinner {
+                                                Image(systemName: "trophy.fill")
+                                                    .font(.system(size: 9))
+                                                    .foregroundColor(.yellow)
+                                            }
+                                            Text(sc.playerName)
+                                                .fontWeight(isWinner ? .bold : .regular)
+                                            Text("\(sc.score) pt")
+                                                .fontWeight(.bold)
+                                                .foregroundColor(isWinner ? .green : .primary)
+                                        }
+                                        .font(.caption2)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(isWinner ? Color.yellow.opacity(0.18) : Color(UIColor.tertiarySystemGroupedBackground))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(isWinner ? Color.yellow.opacity(0.4) : Color.clear, lineWidth: 1)
+                                        )
+                                        .cornerRadius(6)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(10)
+                        .background(Color(UIColor.tertiarySystemGroupedBackground).opacity(0.6))
+                        .cornerRadius(10)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    private func gameEmptyStateView(gameName: String) -> some View {
+        VStack(spacing: 16) {
+            gameHeroIcon(for: gameName, size: 70)
+                .padding(.top, 8)
+
+            Text("Nog Geen \(gameName) Gespeeld")
+                .font(.title3)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+
+            Text("Speel je eerste potje \(gameName) om de ranglijst, topscores, persoonlijke records en geschiedenis te ontgrendelen!")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            NavigationLink(destination: destinationSetupView(for: gameName)) {
+                HStack(spacing: 8) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.headline)
+                    Text("Start \(gameName)")
+                        .fontWeight(.bold)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(gameColor(for: gameName))
+                .cornerRadius(12)
+                .shadow(color: gameColor(for: gameName).opacity(0.35), radius: 6, x: 0, y: 3)
+            }
+            .padding(.top, 4)
+            .padding(.bottom, 8)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    @ViewBuilder
+    private func gameThumbnail(for gameName: String, size: CGFloat = 20) -> some View {
+        let assetName = allAppGames.first(where: { scoreManager.matchesGameName($0.name, gameName) })?.assetName ?? gameName
+        if let actualName = resolveImageName(for: assetName) {
+            Image(actualName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous))
+        } else {
+            Image(systemName: gameIcon(for: gameName))
+                .font(.system(size: size * 0.65))
+                .foregroundColor(gameColor(for: gameName))
+                .frame(width: size, height: size)
+        }
+    }
+
+    @ViewBuilder
+    private func gameHeroIcon(for gameName: String, size: CGFloat = 64) -> some View {
+        let assetName = allAppGames.first(where: { scoreManager.matchesGameName($0.name, gameName) })?.assetName ?? gameName
+        if let actualName = resolveImageName(for: assetName) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color(UIColor.secondarySystemGroupedBackground))
+                Image(actualName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: size, maxHeight: size)
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
+        } else {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(gameColor(for: gameName).opacity(0.15))
+                    .frame(width: size, height: size)
+                Image(systemName: gameIcon(for: gameName))
+                    .font(.system(size: size * 0.5))
+                    .foregroundColor(gameColor(for: gameName))
+            }
+            .shadow(color: gameColor(for: gameName).opacity(0.2), radius: 6, x: 0, y: 3)
+        }
+    }
+
+    @ViewBuilder
+    private func destinationSetupView(for gameName: String) -> some View {
+        let lower = gameName.lowercased()
+        if lower.contains("nmbr9") {
+            Nmbr9DetailView()
+        } else if lower.contains("beverbende") {
+            BeverbendeSetupView()
+        } else if lower.contains("duizenden") {
+            DuizendenSetupView()
+        } else if lower.contains("crok") {
+            CrockinoleSetupView()
+        } else if lower.contains("regenwormen") {
+            RegenwormenSetupView()
+        } else if lower.contains("jatten") {
+            JattenSetupView()
+        } else if lower.contains("balzakken") {
+            BalzakkenSetupView()
+        } else if lower.contains("love") {
+            LoveLetterSetupView()
+        } else if lower.contains("qwixx") {
+            QwixxSetupView()
+        } else if lower.contains("pig") {
+            PigHoleSetupView()
+        } else if lower.contains("ticket") {
+            TicketToRideSetupView()
+        } else if lower.contains("quick") {
+            QuickstopSetupView()
+        } else if lower.contains("30") || lower.contains("thirty") {
+            ThirtySecondsSetupView()
+        } else if lower.contains("cranium") {
+            CraniumSetupView()
+        } else {
+            ContentView()
+        }
+    }
+
+    private func resolveImageName(for assetName: String) -> String? {
+        if UIImage(named: assetName) != nil { return assetName }
+        let stripped = assetName.replacingOccurrences(of: " ", with: "")
+        if UIImage(named: stripped) != nil { return stripped }
+        if assetName.caseInsensitiveCompare("nmbr9") == .orderedSame {
+            if UIImage(named: "Nmbr9") != nil { return "Nmbr9" }
+        }
+        if assetName.caseInsensitiveCompare("loveletter") == .orderedSame || assetName.caseInsensitiveCompare("love letter") == .orderedSame {
+            if UIImage(named: "LoveLetter") != nil { return "LoveLetter" }
+        }
+        if assetName.caseInsensitiveCompare("qwixx") == .orderedSame {
+            if UIImage(named: "Qwixx") != nil { return "Qwixx" }
+        }
+        if assetName.caseInsensitiveCompare("pighole") == .orderedSame || assetName.caseInsensitiveCompare("pig hole") == .orderedSame {
+            if UIImage(named: "PigHole") != nil { return "PigHole" }
+        }
+        if assetName.caseInsensitiveCompare("tickettoride") == .orderedSame || assetName.caseInsensitiveCompare("ticket to ride") == .orderedSame {
+            if UIImage(named: "TicketToRide") != nil { return "TicketToRide" }
+        }
+        if assetName.caseInsensitiveCompare("quickstop") == .orderedSame || assetName.caseInsensitiveCompare("quick stop") == .orderedSame {
+            if UIImage(named: "Quickstop") != nil { return "Quickstop" }
+        }
+        return nil
     }
 
     // MARK: - 5. TEAMS & DUO'S

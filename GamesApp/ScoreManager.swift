@@ -94,6 +94,10 @@ struct PlayedGame: Identifiable, Codable {
 }
 
 extension PlayedGame {
+    var isTie: Bool {
+        return winner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var playerNamesList: [String] {
         if let teams = teams, !teams.isEmpty {
             return teams.flatMap { $0.playerNames }
@@ -200,6 +204,18 @@ struct BalzakkenPlayerStat: Identifiable {
     let juisteBalzakken: Int
     let fouteBalzakken: Int
     let gamesPlayed: Int
+}
+
+struct GameSpecificPlayerStat: Identifiable {
+    var id: String { playerName }
+    let playerName: String
+    let gamesPlayed: Int
+    let gamesWon: Int
+    var winRate: Double {
+        gamesPlayed > 0 ? (Double(gamesWon) / Double(gamesPlayed)) * 100.0 : 0.0
+    }
+    let bestScore: Int?
+    let averageScore: Double?
 }
 
 class ScoreManager: ObservableObject {
@@ -585,7 +601,8 @@ class ScoreManager: ObservableObject {
 
     /// Geeft aan of bij een spel de laagste score wint
     func isLowestScoreWins(for gameName: String) -> Bool {
-        return gameName == "Beverbende" || gameName == "Balzakken" || gameName == "Pig Hole" || gameName == "Quickstop"
+        let name = gameName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        return name == "beverbende" || name == "balzakken" || name == "pig hole" || name == "pighole" || name == "quickstop" || name == "quick stop"
     }
 
     /// Meest gespeelde spellen met aantal potjes
@@ -784,6 +801,97 @@ class ScoreManager: ObservableObject {
             }
             return $0.fouteBalzakken < $1.fouteBalzakken
         }
+    }
+
+    // MARK: - Statistieken per Spel
+
+    func matchesGameName(_ a: String, _ b: String) -> Bool {
+        let la = a.lowercased().replacingOccurrences(of: " ", with: "")
+        let lb = b.lowercased().replacingOccurrences(of: " ", with: "")
+        if la == lb { return true }
+        if (la.contains("crok") || la.contains("crokinole")) && (lb.contains("crok") || lb.contains("crokinole")) {
+            return true
+        }
+        return false
+    }
+
+    /// Ranglijst van spelers voor één specifiek spel
+    func gameLeaderboard(for gameName: String) -> [GameSpecificPlayerStat] {
+        let isLowestWins = isLowestScoreWins(for: gameName)
+        let matchingGames = playedGames.filter { matchesGameName($0.gameName, gameName) }
+
+        var playerMap: [String: (played: Int, won: Int, scores: [Int])] = [:]
+
+        for game in matchingGames {
+            let isTie = game.isTie
+            let winnerLower = game.winner.lowercased()
+
+            for sc in game.scores {
+                let pName = sc.playerName
+                var current = playerMap[pName] ?? (played: 0, won: 0, scores: [])
+                current.played += 1
+                if !isTie && pName.lowercased() == winnerLower {
+                    current.won += 1
+                }
+                current.scores.append(sc.score)
+                playerMap[pName] = current
+            }
+        }
+
+        return playerMap.map { (name, data) in
+            let best: Int? = isLowestWins ? data.scores.min() : data.scores.max()
+            let avg: Double? = data.scores.isEmpty ? nil : Double(data.scores.reduce(0, +)) / Double(data.scores.count)
+            return GameSpecificPlayerStat(
+                playerName: name,
+                gamesPlayed: data.played,
+                gamesWon: data.won,
+                bestScore: best,
+                averageScore: avg
+            )
+        }.sorted {
+            if $0.gamesWon != $1.gamesWon {
+                return $0.gamesWon > $1.gamesWon
+            }
+            if $0.winRate != $1.winRate {
+                return $0.winRate > $1.winRate
+            }
+            return $0.gamesPlayed > $1.gamesPlayed
+        }
+    }
+
+    /// Beste score ooit voor een specifiek spel
+    func bestScoreEver(for gameName: String) -> (playerName: String, score: Int)? {
+        let isLowestWins = isLowestScoreWins(for: gameName)
+        var allCandidates: [(playerName: String, score: Int)] = []
+
+        for sc in scores where matchesGameName(sc.gameName, gameName) {
+            allCandidates.append((sc.playerName, sc.score))
+        }
+
+        if allCandidates.isEmpty {
+            for g in playedGames where matchesGameName(g.gameName, gameName) {
+                for sc in g.scores {
+                    allCandidates.append((sc.playerName, sc.score))
+                }
+            }
+        }
+
+        guard !allCandidates.isEmpty else { return nil }
+
+        if isLowestWins {
+            return allCandidates.min(by: { $0.score < $1.score })
+        } else {
+            return allCandidates.max(by: { $0.score < $1.score })
+        }
+    }
+
+    /// Recente spelsessies van een specifiek spel
+    func recentSessions(for gameName: String, limit: Int = 10) -> [PlayedGame] {
+        return playedGames
+            .filter { matchesGameName($0.gameName, gameName) }
+            .sorted { $0.date > $1.date }
+            .prefix(limit)
+            .map { $0 }
     }
 
     // MARK: - Team & Partner Statistieken
