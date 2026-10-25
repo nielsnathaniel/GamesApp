@@ -79,6 +79,13 @@ struct JattenSetupView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 12)
 
+                // Opgeslagen Spelers Quick Chips
+                SavedPlayersQuickChipsView(
+                    spelers: $spelers,
+                    aantalSpelers: aantalSpelers,
+                    tintColor: .purple
+                )
+
                 // Invoervelden voor spelersnamen met dropdown voorstellen
                 VStack(spacing: 12) {
                     ForEach(0..<aantalSpelers, id: \.self) { index in

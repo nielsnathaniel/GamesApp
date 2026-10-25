@@ -128,6 +128,13 @@ struct LoveLetterSetupView: View {
                     .padding(.horizontal)
                 }
 
+                // Opgeslagen Spelers Quick Chips
+                SavedPlayersQuickChipsView(
+                    spelers: $spelers,
+                    aantalSpelers: aantalSpelers,
+                    tintColor: .red
+                )
+
                 // Invoervelden voor spelersnamen met dropdown voorstellen
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Spelers")

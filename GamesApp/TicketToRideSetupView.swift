@@ -93,6 +93,13 @@ struct TicketToRideSetupView: View {
                         .padding(.horizontal)
                 }
 
+                // Opgeslagen Spelers Quick Chips
+                SavedPlayersQuickChipsView(
+                    spelers: $spelers,
+                    aantalSpelers: aantalSpelers,
+                    tintColor: .blue
+                )
+
                 // Invoervelden voor spelersnamen
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Spelers")

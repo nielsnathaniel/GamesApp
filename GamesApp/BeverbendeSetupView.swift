@@ -100,6 +100,13 @@ struct BeverbendeSetupView: View {
                     .padding()
                 }
 
+                // Opgeslagen Spelers Quick Chips
+                SavedPlayersQuickChipsView(
+                    spelers: $spelers,
+                    aantalSpelers: aantalSpelers,
+                    tintColor: .green
+                )
+
                 // Invoervelden voor spelersnamen met dropdown voorstellen
                 VStack(spacing: 12) {
                     ForEach(0..<aantalSpelers, id: \.self) { index in

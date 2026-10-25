@@ -150,6 +150,22 @@ struct Nmbr9DetailView: View {
                     .padding(.top, 10)
                 }
 
+                // Opgeslagen Spelers Quick Chips
+                SavedPlayersQuickChipsView(
+                    spelers: Binding(
+                        get: { spelers.map { $0.name } },
+                        set: { newNames in
+                            for i in 0..<spelers.count {
+                                if i < newNames.count {
+                                    spelers[i].name = newNames[i]
+                                }
+                            }
+                        }
+                    ),
+                    aantalSpelers: aantalSpelers,
+                    tintColor: .indigo
+                )
+
                 VStack(spacing: 12) {
                     ForEach(0..<aantalSpelers, id: \.self) { index in
                         PlayerNameInputField(

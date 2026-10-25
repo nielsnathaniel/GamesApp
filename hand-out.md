@@ -90,6 +90,11 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
   - **Puntentelling en `+` invoerknoppen verwijderd:** Jatten kent geen punten per ronde. De overbodige `+` knop en het dropdown-invoerscherm (`-1`, `+1`, `+5`, `+10`) zijn volledig weggehaald.
   - Prominente `🏆 6 dezelfde!` knop op elke spelerskaart voor directe winst en overgang naar `WinnaarView`.
   - Startspeler-indicator ("Wie mag beginnen?") en steelbeurt-indicator ("Aan de beurt") om de steelvolgorde bij te houden.
+* [`SavedPlayersQuickChipsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/SavedPlayersQuickChipsView.swift):
+  - **Universele Opgeslagen Spelers Quick Chips:** Bij álle spellen (Qwixx, Pig Hole, Ticket to Ride, Love Letter, Regenwormen, Jatten, Balzakken, Beverbende, Duizenden, Nmbr9, Crockinole, 30 Seconds, Cranium) kunnen opgeslagen spelers nu direct worden aangeklikt.
+  - Tikken op een chip wijst de speler direct toe aan het eerstvolgende vrije slot (of verwijdert de speler als deze al geselecteerd is).
+  - Via het contextmenu kan een specifieke speler-positie worden gekozen of een bezet slot worden vervangen.
+  - Inclusief direct bereikbare `+ Nieuwe Speler` knop met invoerdialoog op elk instelscherm.
 * [`WinnaarView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/WinnaarView.swift): Eindscherm met animaties, podium en automatische opslag naar `ScoreManager`.
 
 ---

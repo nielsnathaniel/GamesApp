@@ -93,6 +93,13 @@ struct QwixxSetupView: View {
                         .padding(.horizontal)
                 }
 
+                // Opgeslagen Spelers Quick Chips
+                SavedPlayersQuickChipsView(
+                    spelers: $spelers,
+                    aantalSpelers: aantalSpelers,
+                    tintColor: .orange
+                )
+
                 // Invoervelden voor spelersnamen
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Spelers")
