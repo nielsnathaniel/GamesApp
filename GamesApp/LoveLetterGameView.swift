@@ -11,9 +11,11 @@ struct LoveLetterCardInfo: Identifiable, Hashable {
 
 let allLoveLetterCards: [LoveLetterCardInfo] = [
     LoveLetterCardInfo(id: 9, value: 9, name: "Prinses", subtitle: "Verlies als je haar aflegt", icon: "crown.fill", color: .yellow),
+    LoveLetterCardInfo(id: 91, value: 9, name: "Bisschop", subtitle: "Raad kaartwaarde voor bonusfiche", icon: "cross.fill", color: .purple),
     LoveLetterCardInfo(id: 8, value: 8, name: "Gravin", subtitle: "Afleggen bij Koning of Prins", icon: "person.crop.circle.fill", color: .pink),
     LoveLetterCardInfo(id: 7, value: 7, name: "Koning", subtitle: "Ruil hand met een ander", icon: "crown", color: .orange),
     LoveLetterCardInfo(id: 6, value: 6, name: "Kanselier", subtitle: "Trek 2, leg 2 terug onderop", icon: "scroll.fill", color: .indigo),
+    LoveLetterCardInfo(id: 61, value: 6, name: "Kanonnier", subtitle: "Levert bonusfiche op", icon: "scope", color: .brown),
     LoveLetterCardInfo(id: 5, value: 5, name: "Prins", subtitle: "Kies iemand die hand aflegt", icon: "shield.fill", color: .blue),
     LoveLetterCardInfo(id: 4, value: 4, name: "Dienstmeid", subtitle: "Beschermd tot je volgende beurt", icon: "sparkles", color: .teal),
     LoveLetterCardInfo(id: 3, value: 3, name: "Baron", subtitle: "Vergelijk handen, laagste ligt eruit", icon: "scalemass.fill", color: .purple),
@@ -52,9 +54,12 @@ struct LoveLetterRoundRecord: Identifiable, Codable {
     let cardValue: Int
     let cardName: String
     let spyBonusPlayer: String?
+    var kanonnierBonusPlayer: String? = nil
+    var bisschopBonusPlayer: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, roundNumber, starterName, winnerName, reason, cardValue, cardName, spyBonusPlayer
+        case id, roundNumber, starterName, winnerName, reason, cardValue, cardName
+        case spyBonusPlayer, kanonnierBonusPlayer, bisschopBonusPlayer
     }
 
     init(
@@ -65,7 +70,9 @@ struct LoveLetterRoundRecord: Identifiable, Codable {
         reason: String,
         cardValue: Int,
         cardName: String,
-        spyBonusPlayer: String?
+        spyBonusPlayer: String?,
+        kanonnierBonusPlayer: String? = nil,
+        bisschopBonusPlayer: String? = nil
     ) {
         self.id = id
         self.roundNumber = roundNumber
@@ -75,6 +82,8 @@ struct LoveLetterRoundRecord: Identifiable, Codable {
         self.cardValue = cardValue
         self.cardName = cardName
         self.spyBonusPlayer = spyBonusPlayer
+        self.kanonnierBonusPlayer = kanonnierBonusPlayer
+        self.bisschopBonusPlayer = bisschopBonusPlayer
     }
 
     init(from decoder: Decoder) throws {
@@ -87,6 +96,8 @@ struct LoveLetterRoundRecord: Identifiable, Codable {
         self.cardValue = try container.decode(Int.self, forKey: .cardValue)
         self.cardName = try container.decode(String.self, forKey: .cardName)
         self.spyBonusPlayer = try container.decodeIfPresent(String.self, forKey: .spyBonusPlayer)
+        self.kanonnierBonusPlayer = try container.decodeIfPresent(String.self, forKey: .kanonnierBonusPlayer)
+        self.bisschopBonusPlayer = try container.decodeIfPresent(String.self, forKey: .bisschopBonusPlayer)
     }
 }
 
@@ -151,8 +162,15 @@ struct LoveLetterGameView: View {
                 spelers: spelers,
                 roundNumber: huidigeRonde,
                 starterName: spelers[safe: huidigeStarterIndex] ?? "",
-                onSave: { winnerName, reason, card, spyBonus in
-                    applyRoundResult(winnerName: winnerName, reason: reason, card: card, spyBonus: spyBonus)
+                onSave: { winnerName, reason, card, spyBonus, kanonnierBonus, bisschopBonus in
+                    applyRoundResult(
+                        winnerName: winnerName,
+                        reason: reason,
+                        card: card,
+                        spyBonus: spyBonus,
+                        kanonnierBonus: kanonnierBonus,
+                        bisschopBonus: bisschopBonus
+                    )
                 }
             )
         }
@@ -488,6 +506,28 @@ struct LoveLetterGameView: View {
                                         .foregroundColor(.indigo)
                                 }
                             }
+
+                            if let kan = round.kanonnierBonusPlayer, !kan.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "scope")
+                                        .foregroundColor(.brown)
+                                        .font(.caption2)
+                                    Text("Kanonnier-bonus: \(kan) (+1 fiche)")
+                                        .font(.caption2)
+                                        .foregroundColor(.brown)
+                                }
+                            }
+
+                            if let bis = round.bisschopBonusPlayer, !bis.isEmpty {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "cross.fill")
+                                        .foregroundColor(.purple)
+                                        .font(.caption2)
+                                    Text("Bisschop-bonus: \(bis) (+1 fiche)")
+                                        .font(.caption2)
+                                        .foregroundColor(.purple)
+                                }
+                            }
                         }
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
@@ -558,6 +598,12 @@ struct LoveLetterGameView: View {
             if let spy = r.spyBonusPlayer, let sIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(spy) == .orderedSame }) {
                 fichesPerSpeler[sIdx] += 1
             }
+            if let kan = r.kanonnierBonusPlayer, let kIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(kan) == .orderedSame }) {
+                fichesPerSpeler[kIdx] += 1
+            }
+            if let bis = r.bisschopBonusPlayer, let bIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(bis) == .orderedSame }) {
+                fichesPerSpeler[bIdx] += 1
+            }
         }
 
         rondeGeschiedenis = keptRecords
@@ -573,7 +619,14 @@ struct LoveLetterGameView: View {
 
     // MARK: - Ronde Verwerken & Opslaan
 
-    private func applyRoundResult(winnerName: String, reason: LoveLetterWinReason, card: LoveLetterCardInfo, spyBonus: String?) {
+    private func applyRoundResult(
+        winnerName: String,
+        reason: LoveLetterWinReason,
+        card: LoveLetterCardInfo,
+        spyBonus: String?,
+        kanonnierBonus: String?,
+        bisschopBonus: String?
+    ) {
         guard let winnerIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(winnerName) == .orderedSame }) else {
             return
         }
@@ -590,6 +643,18 @@ struct LoveLetterGameView: View {
             fichesPerSpeler[spyIdx] += 1
         }
 
+        // Eventuele Kanonnier bonus
+        if let kanName = kanonnierBonus, !kanName.isEmpty,
+           let kanIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(kanName) == .orderedSame }) {
+            fichesPerSpeler[kanIdx] += 1
+        }
+
+        // Eventuele Bisschop bonus
+        if let bisName = bisschopBonus, !bisName.isEmpty,
+           let bisIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(bisName) == .orderedSame }) {
+            fichesPerSpeler[bisIdx] += 1
+        }
+
         // Bewaar in rondelog
         let record = LoveLetterRoundRecord(
             roundNumber: huidigeRonde,
@@ -598,7 +663,9 @@ struct LoveLetterGameView: View {
             reason: reason.rawValue,
             cardValue: card.value,
             cardName: card.name,
-            spyBonusPlayer: spyBonus
+            spyBonusPlayer: spyBonus,
+            kanonnierBonusPlayer: kanonnierBonus,
+            bisschopBonusPlayer: bisschopBonus
         )
         rondeGeschiedenis.append(record)
 
@@ -606,8 +673,10 @@ struct LoveLetterGameView: View {
         huidigeStarterIndex = winnerIdx
 
         // Check of er een algehele winnaar is!
-        if let overallWinnerIdx = fichesPerSpeler.firstIndex(where: { $0 >= doelFiches }) {
-            finalizeGame(winnerName: spelers[overallWinnerIdx])
+        let maxFiches = fichesPerSpeler.max() ?? 0
+        if maxFiches >= doelFiches {
+            let bestIdx = fichesPerSpeler.firstIndex(of: maxFiches) ?? winnerIdx
+            finalizeGame(winnerName: spelers[bestIdx])
         } else {
             huidigeRonde += 1
         }
@@ -627,6 +696,12 @@ struct LoveLetterGameView: View {
                 }
                 if let spy = toRemove.spyBonusPlayer, let sIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(spy) == .orderedSame }) {
                     fichesPerSpeler[sIdx] = max(0, fichesPerSpeler[sIdx] - 1)
+                }
+                if let kan = toRemove.kanonnierBonusPlayer, let kIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(kan) == .orderedSame }) {
+                    fichesPerSpeler[kIdx] = max(0, fichesPerSpeler[kIdx] - 1)
+                }
+                if let bis = toRemove.bisschopBonusPlayer, let bIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(bis) == .orderedSame }) {
+                    fichesPerSpeler[bIdx] = max(0, fichesPerSpeler[bIdx] - 1)
                 }
             }
         }
@@ -690,7 +765,7 @@ struct LoveLetterRoundInputSheet: View {
     let spelers: [String]
     let roundNumber: Int
     var starterName: String = ""
-    let onSave: (String, LoveLetterWinReason, LoveLetterCardInfo, String?) -> Void
+    let onSave: (String, LoveLetterWinReason, LoveLetterCardInfo, String?, String?, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
@@ -699,6 +774,10 @@ struct LoveLetterRoundInputSheet: View {
     @State private var selectedCard: LoveLetterCardInfo = allLoveLetterCards[0] // default Prinses
     @State private var hasSpyBonus: Bool = false
     @State private var selectedSpyPlayer: String = ""
+    @State private var hasKanonnierBonus: Bool = false
+    @State private var selectedKanonnierPlayer: String = ""
+    @State private var hasBisschopBonus: Bool = false
+    @State private var selectedBisschopPlayer: String = ""
 
     var body: some View {
         NavigationStack {
@@ -813,19 +892,100 @@ struct LoveLetterRoundInputSheet: View {
                     }
                 }
 
-                // 4. Optionele Spion-bonus
-                Section(header: Text("4. Spion Bonus (+1 fiche)")) {
-                    Toggle("Spion-bonus behaald?", isOn: $hasSpyBonus)
-                        .tint(.pink)
-
-                    if hasSpyBonus {
-                        Picker("Speler met Spion-bonus", selection: $selectedSpyPlayer) {
-                            Text("Selecteer speler").tag("")
-                            ForEach(spelers, id: \.self) { p in
-                                Text(p).tag(p)
+                // 4. Bonussen (+1 fiche per behaalde bonus)
+                Section(
+                    header: Text("4. Bonussen (+1 fiche per bonus)"),
+                    footer: Text("💡 Meerdere bonussen kunnen in dezelfde ronde door verschillende spelers behaald worden.")
+                ) {
+                    // Spion Bonus
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $hasSpyBonus) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "eyeglasses")
+                                    .foregroundColor(.gray)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Spion-bonus (+1)")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                    Text("Als enige overlevende een spion gespeeld")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
+                        .tint(.pink)
+
+                        if hasSpyBonus {
+                            Picker("Speler met Spion-bonus", selection: $selectedSpyPlayer) {
+                                Text("Kies speler").tag("")
+                                ForEach(spelers, id: \.self) { p in
+                                    Text(p).tag(p)
+                                }
+                            }
+                            .padding(.leading, 8)
+                        }
                     }
+                    .padding(.vertical, 2)
+
+                    // Kanonnier Bonus
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $hasKanonnierBonus) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "scope")
+                                    .foregroundColor(.brown)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Kanonnier-bonus (+1)")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                    Text("Extra fiche behaald via de Kanonnier")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .tint(.brown)
+
+                        if hasKanonnierBonus {
+                            Picker("Speler met Kanonnier-bonus", selection: $selectedKanonnierPlayer) {
+                                Text("Kies speler").tag("")
+                                ForEach(spelers, id: \.self) { p in
+                                    Text(p).tag(p)
+                                }
+                            }
+                            .padding(.leading, 8)
+                        }
+                    }
+                    .padding(.vertical, 2)
+
+                    // Bisschop Bonus
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $hasBisschopBonus) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "cross.fill")
+                                    .foregroundColor(.purple)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("Bisschop-bonus (+1)")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                    Text("Juiste handkaart geraden met de Bisschop")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        .tint(.purple)
+
+                        if hasBisschopBonus {
+                            Picker("Speler met Bisschop-bonus", selection: $selectedBisschopPlayer) {
+                                Text("Kies speler").tag("")
+                                ForEach(spelers, id: \.self) { p in
+                                    Text(p).tag(p)
+                                }
+                            }
+                            .padding(.leading, 8)
+                        }
+                    }
+                    .padding(.vertical, 2)
                 }
             }
             .navigationTitle("Uitslag Ronde \(roundNumber)")
@@ -836,7 +996,10 @@ struct LoveLetterRoundInputSheet: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Opslaan") {
-                        onSave(selectedWinner, selectedReason, selectedCard, hasSpyBonus ? selectedSpyPlayer : nil)
+                        let spy = hasSpyBonus && !selectedSpyPlayer.isEmpty ? selectedSpyPlayer : nil
+                        let kan = hasKanonnierBonus && !selectedKanonnierPlayer.isEmpty ? selectedKanonnierPlayer : nil
+                        let bis = hasBisschopBonus && !selectedBisschopPlayer.isEmpty ? selectedBisschopPlayer : nil
+                        onSave(selectedWinner, selectedReason, selectedCard, spy, kan, bis)
                         dismiss()
                     }
                     .fontWeight(.bold)
@@ -847,6 +1010,9 @@ struct LoveLetterRoundInputSheet: View {
             .onAppear {
                 if let first = spelers.first {
                     selectedWinner = first
+                    selectedSpyPlayer = first
+                    selectedKanonnierPlayer = first
+                    selectedBisschopPlayer = first
                 }
             }
         }
