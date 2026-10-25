@@ -37,16 +37,16 @@ struct RegenwormenTurnSnapshot: Identifiable {
 }
 
 enum RegenwormenViewTab: String, CaseIterable, Identifiable {
-    case beurtInvoer = "Beurt Invoer"
-    case alleStenen = "Stenen Overzicht"
+    case eindstand = "Eindstand (Stenen)"
+    case beurtInvoer = "Beurt voor beurt"
     case scoreGrafiek = "Scoreverloop"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
+        case .eindstand: return "square.grid.4x4.fill"
         case .beurtInvoer: return "hand.tap.fill"
-        case .alleStenen: return "square.grid.4x4.fill"
         case .scoreGrafiek: return "chart.xyaxis.line"
         }
     }
@@ -58,10 +58,13 @@ struct RegenwormenGameView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
     @ObservedObject private var activeGameManager = ActiveGameManager.shared
 
-    // Huidige geselecteerde tab
-    @State private var geselecteerdeTab: RegenwormenViewTab = .beurtInvoer
+    // Huidige geselecteerde weergave tab
+    @State private var geselecteerdeTab: RegenwormenViewTab
 
-    // Actieve speler en beurt
+    // Geselecteerde speler voor directe eindstand invoer
+    @State private var geselecteerdeSpelerIndexVoorEindstand: Int = 0
+
+    // Actieve speler en beurt (voor beurt-voor-beurt invoer)
     @State private var actieveSpelerIndex: Int = 0
     @State private var beurtNummer: Int = 1
 
@@ -76,17 +79,20 @@ struct RegenwormenGameView: View {
     // Geschiedenis van beurten (voor herstel en grafiek)
     @State private var geschiedenis: [RegenwormenTurnSnapshot] = []
 
-    // Dialogen en schermen
+    // Dialogen en sheets
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var restoreTargetEntry: RegenwormenTurnSnapshot? = nil
     @State private var showRestoreDialog: Bool = false
     @State private var showConfirmMisluktDialog: Bool = false
     @State private var showConfirmFinishDialog: Bool = false
+    @State private var showResetDialog: Bool = false
+    @State private var transferPending: (steen: Int, van: Int, naar: Int)? = nil
+    @State private var showTransferDialog: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaar: Player?
     @State private var laatsteMelding: String? = nil
 
-    // Kleurenpalet voor spelers
+    // Kleurenpalet voor spelers (duidelijk herkenbaar per steen)
     private let spelerKleuren: [Color] = [
         Color(red: 0.18, green: 0.65, blue: 1.00), // Sky Blue
         Color(red: 1.00, green: 0.50, blue: 0.15), // Coral Orange
@@ -97,8 +103,9 @@ struct RegenwormenGameView: View {
         Color(red: 1.00, green: 0.78, blue: 0.15)  // Amber / Sun Yellow
     ]
 
-    init(spelers: [Player]) {
+    init(spelers: [Player], initialTab: RegenwormenViewTab = .eindstand) {
         self.spelers = spelers
+        _geselecteerdeTab = State(initialValue: initialTab)
         _spelerStapels = State(initialValue: Array(repeating: [Int](), count: spelers.count))
     }
 
@@ -146,10 +153,12 @@ struct RegenwormenGameView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Header met actieve spelersstatus
-                headerView
+                // Header (bij beurt-voor-beurt tonen we de live actieve speler)
+                if geselecteerdeTab == .beurtInvoer {
+                    beurtHeaderView
+                }
 
-                // Tab Switcher (Beurt Invoer, Stenen Overzicht, Scoreverloop Grafiek)
+                // Tab Switcher (Eindstand, Beurt Invoer, Scoreverloop Grafiek)
                 Picker("Weergave", selection: $geselecteerdeTab) {
                     ForEach(RegenwormenViewTab.allCases) { tab in
                         Label(tab.rawValue, systemImage: tab.icon).tag(tab)
@@ -158,12 +167,12 @@ struct RegenwormenGameView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
 
-                // Huidige geselecteerde weergave
+                // Huidige weergave
                 switch geselecteerdeTab {
+                case .eindstand:
+                    eindstandStenenView
                 case .beurtInvoer:
                     beurtInvoerView
-                case .alleStenen:
-                    alleStenenOverzichtView
                 case .scoreGrafiek:
                     scoreGrafiekView
                 }
@@ -192,6 +201,36 @@ struct RegenwormenGameView: View {
             geschiedenisSheetView
         }
         .confirmationDialog(
+            "Steen overdragen?",
+            isPresented: $showTransferDialog,
+            titleVisibility: .visible
+        ) {
+            if let p = transferPending {
+                Button("Verplaats naar \(spelers[p.naar].name)") {
+                    bevestigTransfer()
+                }
+            }
+            Button("Annuleren", role: .cancel) {
+                transferPending = nil
+            }
+        } message: {
+            if let p = transferPending {
+                Text("Steen \(p.steen) (\(wormen(voor: p.steen)) 🪱) is momenteel van \(spelers[p.van].name). Wil je deze toewijzen aan \(spelers[p.naar].name)?")
+            }
+        }
+        .confirmationDialog(
+            "Alle stenen wissen?",
+            isPresented: $showResetDialog,
+            titleVisibility: .visible
+        ) {
+            Button("Alles wissen", role: .destructive) {
+                resetGame()
+            }
+            Button("Annuleren", role: .cancel) {}
+        } message: {
+            Text("Alle stenen worden weer vrijgegeven. De wormenstand wordt voor iedereen 0.")
+        }
+        .confirmationDialog(
             "Mislukte worp?",
             isPresented: $showConfirmMisluktDialog,
             titleVisibility: .visible
@@ -217,7 +256,7 @@ struct RegenwormenGameView: View {
             }
             Button("Verder Spelen", role: .cancel) {}
         } message: {
-            Text("De speler met de meeste regenwormen wint het spel!")
+            Text("De speler met de meeste regenwormen wint het spel! Bij een gelijke stand beslist de hoogste steen.")
         }
         .confirmationDialog(
             "Beurt herstellen?",
@@ -252,11 +291,10 @@ struct RegenwormenGameView: View {
         }
     }
 
-    // MARK: - Header View
+    // MARK: - Header voor Beurt-Invoer
 
-    private var headerView: some View {
+    private var beurtHeaderView: some View {
         VStack(spacing: 12) {
-            // Live banner actieve speler
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
@@ -288,7 +326,6 @@ struct RegenwormenGameView: View {
 
                 Spacer()
 
-                // Huidige wormen van de actieve speler
                 VStack(alignment: .trailing, spacing: 2) {
                     HStack(spacing: 4) {
                         Text("\(totaleWormen(voor: actieveSpelerIndex))")
@@ -309,7 +346,6 @@ struct RegenwormenGameView: View {
             }
             .padding(.horizontal)
 
-            // Laatste actie / snackbar
             if let melding = laatsteMelding {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle.fill")
@@ -326,7 +362,314 @@ struct RegenwormenGameView: View {
         }
     }
 
-    // MARK: - Tab 1: Beurt Invoer (Stenen op tafel + Afpakken van medespelers)
+    // MARK: - Modus 1: Eindstand (Stenen invullen per speler)
+
+    private var eindstandStenenView: some View {
+        VStack(spacing: 16) {
+            // Speler Selector Kaarten
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Kies speler om stenen toe te wijzen:")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text("Tik op een steen hieronder")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(spelers.indices, id: \.self) { idx in
+                            let player = spelers[idx]
+                            let isSelected = geselecteerdeSpelerIndexVoorEindstand == idx
+                            let playerColor = kleur(voor: idx)
+                            let worms = totaleWormen(voor: idx)
+                            let count = spelerStapels[idx].count
+
+                            Button(action: {
+                                HapticManager.shared.selection()
+                                geselecteerdeSpelerIndexVoorEindstand = idx
+                            }) {
+                                VStack(spacing: 4) {
+                                    HStack(spacing: 6) {
+                                        Circle()
+                                            .fill(playerColor)
+                                            .frame(width: 10, height: 10)
+                                        Text(player.name)
+                                            .font(.headline)
+                                            .foregroundColor(isSelected ? .white : .primary)
+                                            .lineLimit(1)
+                                    }
+
+                                    HStack(spacing: 4) {
+                                        Text("\(worms)")
+                                            .font(.title3)
+                                            .fontWeight(.black)
+                                        Text("🪱")
+                                            .font(.caption)
+                                        Text("(\(count) st)")
+                                            .font(.caption2)
+                                    }
+                                    .foregroundColor(isSelected ? .white : playerColor)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(isSelected ? playerColor : Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(playerColor, lineWidth: isSelected ? 2.5 : 1)
+                                )
+                                .shadow(color: isSelected ? playerColor.opacity(0.3) : Color.clear, radius: 4, x: 0, y: 2)
+                            }
+                            .buttonStyle(ScaleButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+
+            // Indicatie actieve toewijzing & tip
+            let activePlayer = spelers[geselecteerdeSpelerIndexVoorEindstand]
+            let activeCol = kleur(voor: geselecteerdeSpelerIndexVoorEindstand)
+            HStack(spacing: 6) {
+                Image(systemName: "hand.tap.fill")
+                    .foregroundColor(activeCol)
+                Text("Stenen toewijzen aan ")
+                    .foregroundColor(.secondary)
+                + Text(activePlayer.name)
+                    .bold()
+                    .foregroundColor(activeCol)
+                + Text(" • Kleurt mee!")
+                    .foregroundColor(.secondary)
+            }
+            .font(.caption)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(activeCol.opacity(0.12))
+            .cornerRadius(8)
+            .padding(.horizontal)
+
+            // Laatste actie / feedback snackbar
+            if let melding = laatsteMelding {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text(melding)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .transition(.opacity)
+            }
+
+            // Stenen Raster (21 t/m 36)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Regenwormen Stenen (21 t/m 36)", systemImage: "square.grid.4x4.fill")
+                        .font(.headline)
+                        .foregroundColor(.orange)
+                    Spacer()
+                    Text("Elke steen max 1x!")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal)
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                    ForEach(21...36, id: \.self) { nummer in
+                        let info = eigenaar(van: nummer)
+                        let wCount = wormen(voor: nummer)
+
+                        Button(action: {
+                            toggleSteenVoorEindstand(nummer)
+                        }) {
+                            VStack(spacing: 3) {
+                                Text("\(nummer)")
+                                    .font(.title3)
+                                    .fontWeight(.black)
+                                    .foregroundColor(info != nil ? .primary : Color.primary.opacity(0.85))
+
+                                HStack(spacing: 1.5) {
+                                    ForEach(0..<wCount, id: \.self) { _ in
+                                        Text("🪱")
+                                            .font(.system(size: 9))
+                                    }
+                                }
+
+                                // Eigenaar Capsule of Vrij
+                                if let eig = info {
+                                    let eigKleur = kleur(voor: eig.spelerIndex)
+                                    Text(spelers[eig.spelerIndex].name)
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1.5)
+                                        .background(eigKleur)
+                                        .clipShape(Capsule())
+                                } else {
+                                    Text("Vrij")
+                                        .font(.system(size: 8, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1.5)
+                                        .background(Color(UIColor.tertiarySystemGroupedBackground))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(
+                                Group {
+                                    if let eig = info {
+                                        kleur(voor: eig.spelerIndex).opacity(0.18)
+                                    } else {
+                                        Color(UIColor.secondarySystemBackground)
+                                    }
+                                }
+                            )
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        info != nil ? kleur(voor: info!.spelerIndex) : Color.orange.opacity(0.3),
+                                        lineWidth: info != nil ? 2.5 : 1
+                                    )
+                            )
+                            .shadow(
+                                color: info != nil ? kleur(voor: info!.spelerIndex).opacity(0.2) : Color.black.opacity(0.03),
+                                radius: 3,
+                                x: 0,
+                                y: 1
+                            )
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                    }
+                }
+                .padding(.horizontal)
+            }
+
+            Divider()
+                .padding(.horizontal)
+
+            // Overzicht per speler met bezeten stenen
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Overzicht Stenen per Speler")
+                        .font(.headline)
+                    Spacer()
+                    Button(action: {
+                        showResetDialog = true
+                    }) {
+                        Text("Alles wissen")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(.horizontal)
+
+                VStack(spacing: 8) {
+                    ForEach(spelers.indices, id: \.self) { idx in
+                        let player = spelers[idx]
+                        let pColor = kleur(voor: idx)
+                        let stapel = spelerStapels[idx].sorted()
+                        let totalW = totaleWormen(voor: idx)
+
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(pColor)
+                                .frame(width: 10, height: 10)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(player.name)
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+
+                                if stapel.isEmpty {
+                                    Text("Nog geen stenen gekozen")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    Text("Stenen: " + stapel.map { "\($0)" }.joined(separator: ", "))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            HStack(spacing: 4) {
+                                Text("\(totalW)")
+                                    .font(.headline)
+                                    .fontWeight(.black)
+                                    .foregroundColor(pColor)
+                                Text("🪱")
+                                    .font(.caption)
+                            }
+                        }
+                        .padding(10)
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(10)
+                        .padding(.horizontal)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Steen aanklikken in de eindstand weergave
+    private func toggleSteenVoorEindstand(_ nummer: Int) {
+        if let eig = eigenaar(van: nummer) {
+            if eig.spelerIndex == geselecteerdeSpelerIndexVoorEindstand {
+                // Eigenaar tikt eigen steen aan: ontkoppel steen (maak weer vrij)
+                HapticManager.shared.light()
+                spelerStapels[geselecteerdeSpelerIndexVoorEindstand].removeAll { $0 == nummer }
+                if !tafelStenen.contains(nummer) {
+                    tafelStenen.append(nummer)
+                    tafelStenen.sort()
+                }
+                let spelerNaam = spelers[geselecteerdeSpelerIndexVoorEindstand].name
+                laatsteMelding = "Steen \(nummer) ontkoppeld van \(spelerNaam)"
+                saveDraft()
+            } else {
+                // Steen is van een andere speler: vraag bevestiging voor overdracht
+                HapticManager.shared.warning()
+                transferPending = (steen: nummer, van: eig.spelerIndex, naar: geselecteerdeSpelerIndexVoorEindstand)
+                showTransferDialog = true
+            }
+        } else {
+            // Steen is nog vrij: wijs toe aan huidige speler
+            HapticManager.shared.light()
+            tafelStenen.removeAll { $0 == nummer }
+            omgedraaideStenen.remove(nummer)
+            spelerStapels[geselecteerdeSpelerIndexVoorEindstand].append(nummer)
+            let spelerNaam = spelers[geselecteerdeSpelerIndexVoorEindstand].name
+            laatsteMelding = "\(spelerNaam) krijgt steen \(nummer) (+\(wormen(voor: nummer)) 🪱)"
+            saveDraft()
+        }
+    }
+
+    private func bevestigTransfer() {
+        guard let pending = transferPending else { return }
+        HapticManager.shared.medium()
+        spelerStapels[pending.van].removeAll { $0 == pending.steen }
+        spelerStapels[pending.naar].append(pending.steen)
+        let vanNaam = spelers[pending.van].name
+        let naarNaam = spelers[pending.naar].name
+        laatsteMelding = "Steen \(pending.steen) verplaatst van \(vanNaam) naar \(naarNaam)"
+        transferPending = nil
+        saveDraft()
+    }
+
+    // MARK: - Modus 2: Beurt Invoer (Stenen op tafel + Bovenste steen afpakken)
 
     private var beurtInvoerView: some View {
         VStack(spacing: 20) {
@@ -351,7 +694,7 @@ struct RegenwormenGameView: View {
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundColor(.orange)
-                        Text("Er liggen geen stenen meer op tafel. Het spel is klaar om af te ronden!")
+                        Text("Er liggen geen stenen meer op tafel. Het spel kan worden afgerond!")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -395,7 +738,6 @@ struct RegenwormenGameView: View {
                 }
                 .padding(.horizontal)
 
-                // Lijst van medespelers
                 let medespelers = spelers.indices.filter { $0 != actieveSpelerIndex }
                 if medespelers.isEmpty {
                     Text("Geen medespelers")
@@ -525,168 +867,7 @@ struct RegenwormenGameView: View {
         }
     }
 
-    // MARK: - Tab 2: Alle Stenen Overzicht (Wie heeft welke steen?)
-
-    private var alleStenenOverzichtView: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Alle 16 Regenwormen Stenen")
-                        .font(.headline)
-                    Text("Kleur toont wie de steen bezit • Maximaal 1x in heel het spel!")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-            }
-            .padding(.horizontal)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
-                ForEach(21...36, id: \.self) { nummer in
-                    let info = eigenaar(van: nummer)
-                    let isOmgedraaid = omgedraaideStenen.contains(nummer)
-
-                    VStack(spacing: 2) {
-                        Text("\(nummer)")
-                            .font(.headline)
-                            .fontWeight(.black)
-                            .foregroundColor(isOmgedraaid ? .secondary : .primary)
-
-                        HStack(spacing: 2) {
-                            ForEach(0..<wormen(voor: nummer), id: \.self) { _ in
-                                Text("🪱")
-                                    .font(.system(size: 8))
-                            }
-                        }
-
-                        // Status / Eigenaar label
-                        if let eig = info {
-                            let eigKleur = kleur(voor: eig.spelerIndex)
-                            Text(spelers[eig.spelerIndex].name)
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(eigKleur)
-                                .clipShape(Capsule())
-                        } else if isOmgedraaid {
-                            Text("Omgedraaid")
-                                .font(.system(size: 8))
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("Op tafel")
-                                .font(.system(size: 8, weight: .medium))
-                                .foregroundColor(.orange)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        Group {
-                            if let eig = info {
-                                kleur(voor: eig.spelerIndex).opacity(0.18)
-                            } else if isOmgedraaid {
-                                Color(UIColor.tertiarySystemGroupedBackground)
-                            } else {
-                                Color.orange.opacity(0.1)
-                            }
-                        }
-                    )
-                    .cornerRadius(10)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(
-                                info != nil ? kleur(voor: info!.spelerIndex) : (isOmgedraaid ? Color.gray.opacity(0.3) : Color.orange.opacity(0.4)),
-                                lineWidth: info?.isBovenste == true ? 2 : 1
-                            )
-                    )
-                }
-            }
-            .padding(.horizontal)
-
-            Divider()
-                .padding(.horizontal)
-
-            // Stapels per speler overzicht
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Stapels per Speler")
-                    .font(.headline)
-                    .padding(.horizontal)
-
-                VStack(spacing: 10) {
-                    ForEach(spelers.indices, id: \.self) { idx in
-                        let player = spelers[idx]
-                        let playerKleur = kleur(voor: idx)
-                        let stapel = spelerStapels[idx]
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(playerKleur)
-                                        .frame(width: 10, height: 10)
-                                    Text(player.name)
-                                        .font(.headline)
-                                }
-
-                                Spacer()
-
-                                Text("\(totaleWormen(voor: idx)) wormen")
-                                    .font(.subheadline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(playerKleur)
-                            }
-
-                            if stapel.isEmpty {
-                                Text("Nog geen stenen gepakt")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(stapel.indices, id: \.self) { sIdx in
-                                            let stNum = stapel[sIdx]
-                                            let isTop = sIdx == stapel.count - 1
-                                            VStack(spacing: 1) {
-                                                Text("\(stNum)")
-                                                    .font(.caption)
-                                                    .fontWeight(.bold)
-                                                Text("\(wormen(voor: stNum))🪱")
-                                                    .font(.system(size: 8))
-                                                if isTop {
-                                                    Text("Bovenop")
-                                                        .font(.system(size: 7, weight: .bold))
-                                                        .foregroundColor(.white)
-                                                        .padding(.horizontal, 2)
-                                                        .background(playerKleur)
-                                                        .clipShape(Capsule())
-                                                }
-                                            }
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(playerKleur.opacity(isTop ? 0.25 : 0.12))
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(playerKleur, lineWidth: isTop ? 1.5 : 0.5)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(12)
-                        .background(Color(UIColor.secondarySystemGroupedBackground))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Tab 3: Scoreverloop Grafiek
+    // MARK: - Modus 3: Scoreverloop Grafiek
 
     private var scoreGrafiekView: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -701,11 +882,11 @@ struct RegenwormenGameView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .foregroundColor(.orange)
-                    Text("Live Scoreverloop per beurt")
+                    Text("Scoreverloop per beurt")
                         .font(.caption)
                         .fontWeight(.bold)
                 }
-                Text("Zie precies wanneer stenen zijn gepakt of afgepakt van medespelers!")
+                Text("Toont het verloop van de wormenstand tijdens het spel.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -716,12 +897,12 @@ struct RegenwormenGameView: View {
     private var scoreDataPoints: [RoundScoreDataPoint] {
         var points: [RoundScoreDataPoint] = []
 
-        // Startpunt bij ronde 0 (allemaal 0 wormen)
+        // Startpunt bij ronde 0 (iedereen 0 wormen)
         for p in spelers {
             points.append(RoundScoreDataPoint(round: 0, playerName: p.name, cumulativeScore: 0))
         }
 
-        // Voeg punten toe uit elke geregistreerde beurt
+        // Voeg punten toe uit elke geregistreerde beurt in de geschiedenis
         for snap in geschiedenis {
             for (idx, p) in spelers.enumerated() {
                 let wormScore = snap.scoresNaBeurt[safe: idx] ?? 0
@@ -733,10 +914,11 @@ struct RegenwormenGameView: View {
             }
         }
 
-        // Huidige beurtpunt
+        // Huidig punt
+        let currentRound = max(1, beurtNummer)
         for (idx, p) in spelers.enumerated() {
             points.append(RoundScoreDataPoint(
-                round: beurtNummer,
+                round: currentRound,
                 playerName: p.name,
                 cumulativeScore: totaleWormen(voor: idx)
             ))
@@ -745,7 +927,7 @@ struct RegenwormenGameView: View {
         return points
     }
 
-    // MARK: - Spelacties
+    // MARK: - Spelacties (Beurt-voor-Beurt)
 
     /// Actieve speler pakt een steen van de barbecue
     private func pakSteenVanTafel(_ nummer: Int) {
@@ -834,7 +1016,6 @@ struct RegenwormenGameView: View {
         beurtNummer += 1
         saveDraft()
 
-        // Als er geen open stenen meer op tafel liggen, meld einde spel
         if tafelStenen.isEmpty {
             laatsteMelding = "Alle stenen zijn van tafel! Het spel is afgelopen."
         }
@@ -921,7 +1102,7 @@ struct RegenwormenGameView: View {
 
     private func saveDraft() {
         let scoreSummary = spelers.indices.map { "\(spelers[$0].name):\(totaleWormen(voor: $0))" }.joined(separator: ", ")
-        let summary = "\(spelers.count) spelers • Beurt \(beurtNummer) (\(scoreSummary))"
+        let summary = "\(spelers.count) spelers • Stand: \(scoreSummary)"
 
         var state: [String: String] = [:]
         state["beurtNummer"] = "\(beurtNummer)"
@@ -929,7 +1110,6 @@ struct RegenwormenGameView: View {
         state["tafelStenen"] = tafelStenen.map { "\($0)" }.joined(separator: ",")
         state["omgedraaideStenen"] = Array(omgedraaideStenen).map { "\($0)" }.joined(separator: ",")
 
-        // Stapels serialiseren
         for i in spelers.indices {
             state["stapel_\(i)"] = spelerStapels[i].map { "\($0)" }.joined(separator: ",")
         }
@@ -1096,7 +1276,6 @@ struct RegenwormenGameView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.primary)
 
-                                // Scores stand na die beurt
                                 HStack(spacing: 8) {
                                     ForEach(spelers.indices, id: \.self) { i in
                                         let w = entry.scoresNaBeurt[safe: i] ?? 0
