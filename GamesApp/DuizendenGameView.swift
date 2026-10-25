@@ -273,6 +273,7 @@ struct DuizendenGameView: View {
             )
         )
         huidigeRonde += 1
+        saveActiveDraft()
 
         // Reset ingevoerde tafel- en handkaarten voor de volgende ronde
         tafelScores = Array(repeating: Array(repeating: 0, count: kaartSymbolen.count), count: spelers.count)
@@ -295,6 +296,7 @@ struct DuizendenGameView: View {
                 }
                 scoreManager.saveGame(gameName: "Duizenden", playerScores: detailed, winnerName: w.name)
             }
+            ActiveGameManager.shared.clearActiveGame()
             showWinnaarView = true
         }
     }
@@ -308,6 +310,26 @@ struct DuizendenGameView: View {
                     Text("Er zijn nog geen voltooide rondes.")
                         .foregroundColor(.secondary)
                 } else {
+                    // Swift Charts Scoreverloop per ronde
+                    Section(header: Text("Scoreverloop")) {
+                        let chartData: [RoundScoreDataPoint] = rondeGeschiedenis.flatMap { r in
+                            spelers.indices.map { i in
+                                RoundScoreDataPoint(
+                                    round: r.ronde,
+                                    playerName: spelers[i].name,
+                                    cumulativeScore: r.totalenNaRonde[safe: i] ?? 0
+                                )
+                            }
+                        }
+                        ScoreProgressionChartView(
+                            title: "Scoreverloop per Ronde",
+                            dataPoints: chartData,
+                            playerNames: spelers.map { $0.name }
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .listRowBackground(Color.clear)
+                    }
+
                     Section {
                         HStack(spacing: 8) {
                             Image(systemName: "hand.tap.fill")
@@ -413,6 +435,23 @@ struct DuizendenGameView: View {
         expandedPlayerIndex = nil
         winnaar = nil
         showWinnaarView = false
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    private func saveActiveDraft() {
+        let summary = spelers.indices.map { i in
+            "\(spelers[i].name): \(scores[safe: i] ?? 0) pt"
+        }.joined(separator: " • ")
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Duizenden",
+            playerNames: spelers.map { $0.name },
+            currentRound: huidigeRonde,
+            summary: summary,
+            state: [
+                "scores": scores.map { String($0) }.joined(separator: ",")
+            ]
+        )
     }
 }
 

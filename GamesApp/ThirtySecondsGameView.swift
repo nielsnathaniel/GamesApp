@@ -674,13 +674,14 @@ struct ThirtySecondsGameView: View {
     // MARK: - Spel Logica
 
     private func rolDobbelsteen() {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        HapticManager.shared.medium()
         // 30 Seconds dobbelsteen heeft vlakken: 0, 1, 2
         diceRoll = Int.random(in: 0...2)
         hasRolledDice = true
     }
 
     private func toggleTimer() {
+        HapticManager.shared.light()
         if isTimerActive {
             stopTimer()
         } else {
@@ -700,11 +701,11 @@ struct ThirtySecondsGameView: View {
                 if remainingSeconds > 0 {
                     remainingSeconds -= 1
                     if remainingSeconds <= 3 && remainingSeconds > 0 {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        HapticManager.shared.warning()
                     }
                 } else {
                     stopTimer()
-                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    HapticManager.shared.error()
                 }
             }
     }

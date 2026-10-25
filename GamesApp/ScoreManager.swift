@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct PlayerScore: Identifiable, Codable {
     var id: UUID = UUID()
@@ -174,6 +175,14 @@ struct HeadToHeadRecord: Identifiable {
             return "Gelijke stand (\(winsA)-\(winsB))"
         }
     }
+}
+
+struct PlayerBadge: Identifiable, Hashable {
+    var id: String { title }
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
 }
 
 struct GamePlayerStat: Identifiable {
@@ -686,6 +695,18 @@ class ScoreManager: ObservableObject {
         savedPlayerNames = []
     }
 
+    func saveAllPlayerNames(_ names: [String]) {
+        persistPlayerNames(names)
+    }
+
+    func saveAllGames(_ games: [PlayedGame]) {
+        persistGames(games)
+    }
+
+    func saveAllScores(_ scores: [Score]) {
+        persistScores(scores)
+    }
+
     private func persistScores(_ scores: [Score]) {
         do {
             let encoder = JSONEncoder()
@@ -976,6 +997,124 @@ class ScoreManager: ObservableObject {
 
         // Sorteer op meest gespeelde onderlinge potjes
         return records.sorted { $0.totalGames > $1.totalGames }
+    }
+
+    /// Berekent de huidige en beste win-streak (opeenvolgende overwinningen) voor een speler
+    func playerWinStreak(for playerName: String) -> (current: Int, best: Int) {
+        let nameLower = playerName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !nameLower.isEmpty else { return (0, 0) }
+
+        // Sorteer alle relevante potjes op datum (oplopend)
+        let relevantGames = playedGames.filter { game in
+            game.playerNamesList.contains { $0.lowercased() == nameLower }
+        }.sorted { $0.date < $1.date }
+
+        var currentStreak = 0
+        var bestStreak = 0
+
+        for game in relevantGames {
+            let won: Bool
+            if let teams = game.teams, !teams.isEmpty {
+                won = teams.contains { t in
+                    t.playerNames.contains { $0.lowercased() == nameLower } &&
+                    (t.isWinner || (!game.isTie && !game.winner.isEmpty && (
+                        t.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
+                        t.playerNames.contains(where: { game.winner.localizedCaseInsensitiveContains($0) })
+                    )))
+                }
+            } else {
+                won = !game.isTie && game.winner.lowercased() == nameLower
+            }
+
+            if won {
+                currentStreak += 1
+                bestStreak = max(bestStreak, currentStreak)
+            } else {
+                currentStreak = 0
+            }
+        }
+
+        return (currentStreak, bestStreak)
+    }
+
+    /// Geeft behaalde badges en achievements terug voor een speler
+    func playerBadges(for playerName: String) -> [PlayerBadge] {
+        var badges: [PlayerBadge] = []
+        let stats = detailedStats(for: playerName)
+        let streaks = playerWinStreak(for: playerName)
+
+        // 1. Winstreeks Badges
+        if streaks.current >= 3 {
+            badges.append(PlayerBadge(
+                title: "On Fire! 🔥",
+                subtitle: "\(streaks.current)x op rij gewonnen",
+                icon: "flame.fill",
+                color: .orange
+            ))
+        } else if streaks.best >= 3 {
+            badges.append(PlayerBadge(
+                title: "Streak Master",
+                subtitle: "Record van \(streaks.best)x op rij gewonnen",
+                icon: "bolt.fill",
+                color: .yellow
+            ))
+        }
+
+        // 2. Ervaring / Gespeelde potjes
+        if stats.totalGames >= 25 {
+            badges.append(PlayerBadge(
+                title: "Bordspel Grootmeester",
+                subtitle: "\(stats.totalGames) potjes gespeeld",
+                icon: "crown.fill",
+                color: .purple
+            ))
+        } else if stats.totalGames >= 10 {
+            badges.append(PlayerBadge(
+                title: "Tafel Veteraan",
+                subtitle: "\(stats.totalGames) potjes gespeeld",
+                icon: "shield.fill",
+                color: .blue
+            ))
+        }
+
+        // 3. Winpercentage
+        if stats.totalGames >= 5 && stats.winRate >= 60.0 {
+            badges.append(PlayerBadge(
+                title: "Scherpschutter",
+                subtitle: "\(Int(stats.winRate.rounded()))% winrate (\(stats.totalWins) zeges)",
+                icon: "target",
+                color: .green
+            ))
+        }
+
+        // 4. Specifieke spelprestaties
+        for g in stats.statsPerGame {
+            let gName = g.gameName.lowercased()
+            if gName == "balzakken" && g.won >= 3 {
+                badges.append(PlayerBadge(
+                    title: "Balzakken Koning",
+                    subtitle: "\(g.won)x gewonnen in Balzakken",
+                    icon: "flame.fill",
+                    color: .red
+                ))
+            } else if (gName.contains("ticket to ride")) && g.won >= 2 {
+                badges.append(PlayerBadge(
+                    title: "Spoorweg Tycoon",
+                    subtitle: "\(g.won)x gewonnen in Ticket to Ride",
+                    icon: "tram.fill",
+                    color: .blue
+                ))
+            } else if (gName.contains("30 seconds") || gName.contains("cranium")) && g.won >= 3 {
+                badges.append(PlayerBadge(
+                    title: "Partyspel Pro",
+                    subtitle: "\(g.won) overwinningen in partygames",
+                    icon: "party.popper.fill",
+                    color: .pink
+                ))
+            }
+        }
+
+        return badges
     }
 
     /// Geeft statistieken terug voor Balzakken (juiste en foute balzakken per speler)

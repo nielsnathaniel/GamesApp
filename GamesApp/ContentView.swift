@@ -28,6 +28,10 @@ struct ContentView: View {
     @State private var selectedTab: Int = 0
     @AppStorage("game_sort_option") private var sortOption: GameSortOption = .toegevoegd
     @ObservedObject private var scoreManager = ScoreManager.shared
+    @ObservedObject private var activeGameManager = ActiveGameManager.shared
+
+    @State private var showStartspelerKiezer: Bool = false
+    @State private var showDiscardDraftDialog: Bool = false
 
     let games = [
         ("Nmbr9", "Nmbr9"),
@@ -103,59 +107,171 @@ struct ContentView: View {
     private var gameSelectionView: some View {
         NavigationStack {
             ScrollView {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 20) {
-                    ForEach(sortedGames, id: \.0) { game in
-                        NavigationLink(destination: destinationView(for: game.0)) {
-                            VStack(spacing: 8) {
-                                ZStack(alignment: .topTrailing) {
-                                    gameIcon(for: game.0, assetName: game.1)
-
-                                    if sortOption == .populair {
-                                        let count = playCount(for: game.0)
-                                        HStack(spacing: 2) {
-                                            Image(systemName: "flame.fill")
-                                                .font(.system(size: 8))
-                                            Text("\(count)x")
-                                                .font(.system(size: 10, weight: .bold))
-                                        }
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 3)
-                                        .background(count > 0 ? Color.orange : Color.gray.opacity(0.5))
-                                        .foregroundColor(.white)
-                                        .clipShape(Capsule())
-                                        .offset(x: 10, y: -6)
-                                    }
+                VStack(spacing: 16) {
+                    // Lopend spel hervatten card
+                    if let session = activeGameManager.activeSession {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "pause.circle.fill")
+                                        .foregroundColor(.orange)
+                                    Text("Lopend spel")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.orange)
                                 }
-
-                                VStack(spacing: 2) {
-                                    Text(game.0)
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
-
-                                    if sortOption == .populair {
-                                        let count = playCount(for: game.0)
-                                        Text(count == 1 ? "1x gespeeld" : "\(count)x gespeeld")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .padding(.top, 2)
+                                Spacer()
+                                Text("Ronde \(session.currentRound)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                             }
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(14)
-                            .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 4)
+
+                            HStack(alignment: .center) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(session.gameName)
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.primary)
+                                    Text(session.summary)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(2)
+                                }
+
+                                Spacer()
+
+                                HStack(spacing: 8) {
+                                    NavigationLink(destination: destinationView(for: session.gameName)) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "play.fill")
+                                            Text("Hervatten")
+                                        }
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(Color.green)
+                                        .clipShape(Capsule())
+                                    }
+
+                                    Button(action: {
+                                        HapticManager.shared.light()
+                                        showDiscardDraftDialog = true
+                                    }) {
+                                        Image(systemName: "trash")
+                                            .font(.caption)
+                                            .foregroundColor(.red)
+                                            .padding(8)
+                                            .background(Color.red.opacity(0.12))
+                                            .clipShape(Circle())
+                                    }
+                                }
+                            }
+                        }
+                        .padding(14)
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.orange.opacity(0.4), lineWidth: 1.5)
+                        )
+                        .padding(.horizontal)
+                        .padding(.top, 4)
+                    }
+
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 20) {
+                        ForEach(sortedGames, id: \.0) { game in
+                            NavigationLink(destination: destinationView(for: game.0)) {
+                                VStack(spacing: 8) {
+                                    ZStack(alignment: .topTrailing) {
+                                        gameIcon(for: game.0, assetName: game.1)
+
+                                        if sortOption == .populair {
+                                            let count = playCount(for: game.0)
+                                            HStack(spacing: 2) {
+                                                Image(systemName: "flame.fill")
+                                                    .font(.system(size: 8))
+                                                Text("\(count)x")
+                                                    .font(.system(size: 10, weight: .bold))
+                                            }
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 3)
+                                            .background(count > 0 ? Color.orange : Color.gray.opacity(0.5))
+                                            .foregroundColor(.white)
+                                            .clipShape(Capsule())
+                                            .offset(x: 10, y: -6)
+                                        }
+                                    }
+
+                                    VStack(spacing: 2) {
+                                        Text(game.0)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+
+                                        if sortOption == .populair {
+                                            let count = playCount(for: game.0)
+                                            Text(count == 1 ? "1x gespeeld" : "\(count)x gespeeld")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.top, 2)
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(14)
+                                .shadow(color: .black.opacity(0.08), radius: 5, x: 0, y: 4)
+                            }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding()
+                .padding(.vertical, 4)
             }
             .navigationTitle("Spellen")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        HapticManager.shared.light()
+                        showStartspelerKiezer = true
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "hand.tap.fill")
+                                .foregroundColor(.yellow)
+                            Text("Wie begint?")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.yellow.opacity(0.18))
+                        .clipShape(Capsule())
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     filterSortMenu
                 }
+            }
+            .fullScreenCover(isPresented: $showStartspelerKiezer) {
+                StartspelerKiezerView()
+            }
+            .confirmationDialog(
+                "Weet je zeker dat je het lopende spel wilt verwijderen?",
+                isPresented: $showDiscardDraftDialog,
+                titleVisibility: .visible
+            ) {
+                Button("Verwijderen", role: .destructive) {
+                    withAnimation {
+                        activeGameManager.clearActiveGame()
+                    }
+                }
+                Button("Annuleren", role: .cancel) {}
+            } message: {
+                Text("De voortgang van dit spel gaat verloren.")
             }
             .onAppear {
                 scoreManager.refresh()

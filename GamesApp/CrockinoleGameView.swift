@@ -44,7 +44,8 @@ struct CrockinoleGameView: View {
     @State private var showWinnaarView: Bool = false
     @State private var winnaarTeam: String?
 
-    // Schietvolgorde (Wit 1 -> Zwart 1 -> Wit 2 -> Zwart 2)
+    // Schietvolgorde & Startspeler (Wit 1 -> Zwart 1 -> Wit 2 -> Zwart 2)
+    @State private var startSpelerIndex: Int = 0
     @State private var huidigeSchutterIndex: Int = 0
 
     // Selecties voor de score-invoer (0 = Wit, 1 = Zwart)
@@ -91,17 +92,25 @@ struct CrockinoleGameView: View {
         _puntenMethode = State(initialValue: puntenMethode)
     }
 
-    // Volgorde van schutters in een 2v2 potje
-    private var schuttersVolgorde: [String] {
+    struct CrokinoleShooterItem: Identifiable {
+        let id: Int
+        let name: String
+        let isWit: Bool
+    }
+
+    private var alleSchutters: [CrokinoleShooterItem] {
         if isTeamMode {
-            var list: [String] = []
-            if let w1 = teamWitSpelers[safe: 0] { list.append("\(w1) (⚪ Wit)") }
-            if let z1 = teamZwartSpelers[safe: 0] { list.append("\(z1) (⚫ Zwart)") }
-            if let w2 = teamWitSpelers[safe: 1] { list.append("\(w2) (⚪ Wit)") }
-            if let z2 = teamZwartSpelers[safe: 1] { list.append("\(z2) (⚫ Zwart)") }
+            var list: [CrokinoleShooterItem] = []
+            if let w1 = teamWitSpelers[safe: 0] { list.append(CrokinoleShooterItem(id: 0, name: w1, isWit: true)) }
+            if let z1 = teamZwartSpelers[safe: 0] { list.append(CrokinoleShooterItem(id: 1, name: z1, isWit: false)) }
+            if let w2 = teamWitSpelers[safe: 1] { list.append(CrokinoleShooterItem(id: 2, name: w2, isWit: true)) }
+            if let z2 = teamZwartSpelers[safe: 1] { list.append(CrokinoleShooterItem(id: 3, name: z2, isWit: false)) }
             return list
         } else {
-            return ["\(teamWitNaam) (⚪ Wit)", "\(teamZwartNaam) (⚫ Zwart)"]
+            return [
+                CrokinoleShooterItem(id: 0, name: teamWitNaam, isWit: true),
+                CrokinoleShooterItem(id: 1, name: teamZwartNaam, isWit: false)
+            ]
         }
     }
 
@@ -123,44 +132,8 @@ struct CrockinoleGameView: View {
                 }
                 .padding(.top, 4)
 
-                // Schietvolgorde Banner (als teammodus actief is)
-                if isTeamMode {
-                    HStack(spacing: 10) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .foregroundColor(.blue)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Aan de beurt om te schieten:")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Text(schuttersVolgorde[safe: huidigeSchutterIndex % max(1, schuttersVolgorde.count)] ?? "")
-                                .font(.subheadline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                        }
-
-                        Spacer()
-
-                        Button(action: {
-                            withAnimation {
-                                huidigeSchutterIndex = (huidigeSchutterIndex + 1) % max(1, schuttersVolgorde.count)
-                            }
-                        }) {
-                            Text("Volgende")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.blue.opacity(0.12))
-                                .foregroundColor(.blue)
-                                .cornerRadius(8)
-                        }
-                    }
-                    .padding()
-                    .background(Color(UIColor.secondarySystemBackground))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                }
+                // Beurt & Startspeler Banner (voor 1v1 én 2v2)
+                beurtEnStartspelerBanner
 
                 // 1. Team/Speler Tegels (Wit & Zwart)
                 HStack(spacing: 14) {
@@ -613,6 +586,153 @@ struct CrockinoleGameView: View {
         }
     }
 
+    // MARK: - Beurt & Startspeler Banner
+    private var beurtEnStartspelerBanner: some View {
+        let total = max(1, alleSchutters.count)
+        let activeShooter = alleSchutters[safe: huidigeSchutterIndex % total] ?? alleSchutters[0]
+        let starterShooter = alleSchutters[safe: startSpelerIndex % total] ?? alleSchutters[0]
+
+        return VStack(spacing: 12) {
+            // Bovenste balk met actieve schutter en opties
+            HStack(alignment: .center, spacing: 12) {
+                // Indicatie van actieve schutter
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(activeShooter.isWit ? Color.white : Color.black)
+                        .frame(width: 22, height: 22)
+                        .overlay(Circle().stroke(Color.gray, lineWidth: 1.5))
+                        .shadow(color: .black.opacity(0.15), radius: 3)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text("Aan de beurt:")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text("🎯 Starter: \(starterShooter.name)")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                        }
+
+                        Text(activeShooter.name)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                    }
+                }
+
+                Spacer()
+
+                // Knoppen: Willekeurig & Volgende
+                HStack(spacing: 6) {
+                    // Willekeurige startspeler
+                    Button(action: {
+                        HapticManager.shared.medium()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                            let randomIdx = Int.random(in: 0..<alleSchutters.count)
+                            startSpelerIndex = randomIdx
+                            huidigeSchutterIndex = randomIdx
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "dice.fill")
+                                .font(.caption)
+                            Text("Willekeurig")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(Color.purple.opacity(0.12))
+                        .foregroundColor(.purple)
+                        .cornerRadius(8)
+                    }
+
+                    // Volgende schutter
+                    Button(action: {
+                        HapticManager.shared.light()
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            huidigeSchutterIndex = (huidigeSchutterIndex + 1) % total
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Text("Volgende")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                }
+            }
+
+            // Chips van alle schutters (aantikken = aan de beurt, contextmenu = startspeler)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(alleSchutters.enumerated()), id: \.element.id) { index, shooter in
+                        let isCurrent = (huidigeSchutterIndex % total) == index
+                        let isStarter = (startSpelerIndex % total) == index
+
+                        Button(action: {
+                            HapticManager.shared.selection()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                huidigeSchutterIndex = index
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(shooter.isWit ? Color.white : Color.black)
+                                    .frame(width: 14, height: 14)
+                                    .overlay(Circle().stroke(Color.gray, lineWidth: 1))
+
+                                Text(shooter.name)
+                                    .font(.caption)
+                                    .fontWeight(isCurrent ? .bold : .medium)
+
+                                if isStarter {
+                                    Text("🎯")
+                                        .font(.system(size: 10))
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                isCurrent ?
+                                    Color.blue.opacity(0.18) :
+                                    Color(UIColor.tertiarySystemBackground)
+                            )
+                            .foregroundColor(isCurrent ? .blue : .primary)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(isCurrent ? Color.blue : Color.clear, lineWidth: 1.5)
+                            )
+                            .clipShape(Capsule())
+                        }
+                        .contextMenu {
+                            Button("Zet als actieve schutter") {
+                                HapticManager.shared.selection()
+                                huidigeSchutterIndex = index
+                            }
+                            Button("Zet als startspeler (🎯)") {
+                                HapticManager.shared.medium()
+                                startSpelerIndex = index
+                                huidigeSchutterIndex = index
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(14)
+        .padding(.horizontal)
+    }
+
     // Team / Speler Tegel
     private func teamTile(index: Int, isWit: Bool) -> some View {
         let isSelected = selectedTeamIndex == index
@@ -768,9 +888,10 @@ struct CrockinoleGameView: View {
         resetRonde()
         huidigeRonde += 1
 
-        if isTeamMode {
-            huidigeSchutterIndex = (huidigeSchutterIndex + 1) % max(1, schuttersVolgorde.count)
-        }
+        // Roteer de startspeler automatisch voor de volgende ronde (officiële regel)
+        let total = max(1, alleSchutters.count)
+        startSpelerIndex = (startSpelerIndex + 1) % total
+        huidigeSchutterIndex = startSpelerIndex
     }
 
     // MARK: - Rondegeschiedenis & Herstel
@@ -901,6 +1022,7 @@ struct CrockinoleGameView: View {
         setScores = [0, 0]
         totaleScores = [0, 0]
         huidigeRonde = 1
+        startSpelerIndex = 0
         huidigeSchutterIndex = 0
         rondeGeschiedenis = []
         resetSchijven()

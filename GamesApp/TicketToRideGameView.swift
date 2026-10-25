@@ -1253,6 +1253,7 @@ struct TicketToRideGameView: View {
             (name: spelers[i], score: effectiveScore(for: i))
         }
         scoreManager.saveGame(gameName: "Ticket to Ride", playerScores: detailed, winnerName: highest.name)
+        ActiveGameManager.shared.clearActiveGame()
         showWinnaarView = true
     }
 
@@ -1279,6 +1280,16 @@ struct TicketToRideGameView: View {
                     Text("Er zijn nog geen beurten geregistreerd.")
                         .foregroundColor(.secondary)
                 } else {
+                    Section(header: Text("Scoreverloop")) {
+                        ScoreProgressionChartView(
+                            title: "Scoreverloop Ticket to Ride",
+                            dataPoints: ttrChartData,
+                            playerNames: spelers
+                        )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        .listRowBackground(Color.clear)
+                    }
+
                     Section {
                         HStack(spacing: 8) {
                             Image(systemName: "hand.tap.fill")
@@ -1401,6 +1412,43 @@ struct TicketToRideGameView: View {
         selectedPlayerIndex = 0
         winnaarPlayer = Player(name: "")
         showWinnaarView = false
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    private func saveActiveDraft() {
+        let summary = spelers.indices.map { i in
+            "\(spelers[i]): \(effectiveScore(for: i)) pt"
+        }.joined(separator: " • ")
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Ticket to Ride",
+            playerNames: spelers,
+            currentRound: currentRound,
+            summary: summary
+        )
+    }
+
+    private var ttrChartData: [RoundScoreDataPoint] {
+        let rounds = Array(Set(turnHistory.map { $0.round })).sorted()
+        var runningScores = Array(repeating: 0, count: spelers.count)
+        var points: [RoundScoreDataPoint] = []
+
+        for r in rounds {
+            let turnsInR = turnHistory.filter { $0.round == r }
+            for turn in turnsInR {
+                if turn.playerIndex < runningScores.count {
+                    runningScores[turn.playerIndex] += turn.points
+                }
+            }
+            for (idx, name) in spelers.enumerated() {
+                points.append(RoundScoreDataPoint(
+                    round: r,
+                    playerName: name,
+                    cumulativeScore: runningScores[safe: idx] ?? 0
+                ))
+            }
+        }
+        return points
     }
 }
 

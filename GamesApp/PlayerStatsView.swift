@@ -7,6 +7,8 @@ struct PlayerStatsView: View {
     var body: some View {
         let stats = scoreManager.detailedStats(for: playerName)
         let opponents = scoreManager.fetchPlayerNames().filter { $0.caseInsensitiveCompare(playerName) != .orderedSame }
+        let streaks = scoreManager.playerWinStreak(for: playerName)
+        let badges = scoreManager.playerBadges(for: playerName)
 
         List {
             // Header kaart
@@ -20,39 +22,58 @@ struct PlayerStatsView: View {
                         .font(.title)
                         .fontWeight(.bold)
 
-                    HStack(spacing: 24) {
+                    HStack(spacing: 16) {
                         VStack(spacing: 2) {
                             Text("\(stats.totalGames)")
-                                .font(.title2)
+                                .font(.title3)
                                 .fontWeight(.bold)
                             Text("Gespeeld")
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
 
                         Divider()
-                            .frame(height: 30)
+                            .frame(height: 26)
 
                         VStack(spacing: 2) {
                             Text("\(stats.totalWins)")
-                                .font(.title2)
+                                .font(.title3)
                                 .fontWeight(.bold)
                                 .foregroundColor(.green)
                             Text("Gewonnen")
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
 
                         Divider()
-                            .frame(height: 30)
+                            .frame(height: 26)
 
                         VStack(spacing: 2) {
                             Text(String(format: "%.0f%%", stats.winRate))
-                                .font(.title2)
+                                .font(.title3)
                                 .fontWeight(.bold)
                                 .foregroundColor(.blue)
                             Text("Winstkans")
-                                .font(.caption)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Divider()
+                            .frame(height: 26)
+
+                        VStack(spacing: 2) {
+                            HStack(spacing: 2) {
+                                Text("\(streaks.current)")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(streaks.current > 0 ? .orange : .secondary)
+                                if streaks.current > 0 {
+                                    Text("🔥")
+                                        .font(.caption2)
+                                }
+                            }
+                            Text(streaks.best > streaks.current ? "Reeks (Max \(streaks.best))" : "Reeks")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -60,6 +81,34 @@ struct PlayerStatsView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
+            }
+
+            // Badges & Prestaties
+            if !badges.isEmpty {
+                Section(header: Text("Badges & Prestaties")) {
+                    ForEach(badges) { badge in
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(badge.color.opacity(0.15))
+                                    .frame(width: 38, height: 38)
+                                Image(systemName: badge.icon)
+                                    .foregroundColor(badge.color)
+                                    .font(.system(size: 18))
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(badge.title)
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Text(badge.subtitle)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
             }
 
             // Prestaties per spel

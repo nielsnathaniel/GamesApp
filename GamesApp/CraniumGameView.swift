@@ -803,11 +803,11 @@ struct CraniumGameView: View {
                 if remainingSeconds > 0 {
                     remainingSeconds -= 1
                     if remainingSeconds <= 3 && remainingSeconds > 0 {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        HapticManager.shared.warning()
                     }
                 } else {
                     stopTimer()
-                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    HapticManager.shared.error()
                 }
             }
     }

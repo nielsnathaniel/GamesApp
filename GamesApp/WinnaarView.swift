@@ -272,6 +272,7 @@ struct WinnaarView: View {
         .padding()
         .onAppear {
             autoSaveScore()
+            HapticManager.shared.celebration()
         }
     }
 

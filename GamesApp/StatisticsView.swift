@@ -6,6 +6,8 @@ struct StatisticsView: View {
     @State private var selectedGameFilter: String = "Alle Spellen"
     @State private var selectedPartnerPlayer: String = ""
     @State private var selectedDetailGame: String = "Balzakken"
+    @State private var selectedH2HPlayerA: String = ""
+    @State private var selectedH2HPlayerB: String = ""
     @Namespace private var categoryAnimation
 
     struct AppGameInfo: Identifiable {
@@ -494,65 +496,241 @@ struct StatisticsView: View {
                 gameFilterBar
             }
 
+            // Dedicated 1-tegen-1 Vergelijker Card
+            headToHeadSelectorCard
+
             let rivalries = scoreManager.allRivalries(gameFilter: selectedGameFilter)
             if rivalries.isEmpty {
                 emptyStateCard(text: "Geen onderlinge wedstrijden gevonden voor \(selectedGameFilter).")
             } else {
-                ForEach(rivalries) { h2h in
-                    VStack(spacing: 10) {
-                        HStack {
-                            Text(h2h.playerA)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Text("\(h2h.winsA) - \(h2h.winsB)")
-                                .font(.title2)
-                                .fontWeight(.black)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Color.blue.opacity(0.12))
-                                .cornerRadius(8)
-
-                            Text(h2h.playerB)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-
-                        // Vergelijkingsbalk
-                        let total = max(1, h2h.winsA + h2h.winsB)
-                        GeometryReader { geo in
-                            HStack(spacing: 2) {
-                                Rectangle()
-                                    .fill(Color.blue)
-                                    .frame(width: geo.size.width * CGFloat(h2h.winsA) / CGFloat(total))
-                                Rectangle()
-                                    .fill(Color.purple)
-                                    .frame(width: geo.size.width * CGFloat(h2h.winsB) / CGFloat(total))
-                            }
-                            .cornerRadius(4)
-                        }
-                        .frame(height: 6)
-
-                        HStack {
-                            Text("\(h2h.totalGames) potjes samen")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(h2h.leaderSummary)
-                                .font(.caption2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.primary)
-                        }
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "flame.fill")
+                            .foregroundColor(.orange)
+                        Text("Alle Onderlinge Duels")
+                            .font(.headline)
+                        Spacer()
+                        Text("\(rivalries.count) ontmoetingen")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
-                    .padding()
-                    .background(Color(UIColor.secondarySystemGroupedBackground))
-                    .cornerRadius(14)
-                    .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+                    .padding(.horizontal, 4)
+
+                    ForEach(rivalries) { h2h in
+                        VStack(spacing: 10) {
+                            HStack {
+                                Text(h2h.playerA)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Text("\(h2h.winsA) - \(h2h.winsB)")
+                                    .font(.title2)
+                                    .fontWeight(.black)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(Color.blue.opacity(0.12))
+                                    .cornerRadius(8)
+
+                                Text(h2h.playerB)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+
+                            // Vergelijkingsbalk
+                            let total = max(1, h2h.winsA + h2h.winsB)
+                            GeometryReader { geo in
+                                HStack(spacing: 2) {
+                                    Rectangle()
+                                        .fill(Color.blue)
+                                        .frame(width: geo.size.width * CGFloat(h2h.winsA) / CGFloat(total))
+                                    Rectangle()
+                                        .fill(Color.purple)
+                                        .frame(width: geo.size.width * CGFloat(h2h.winsB) / CGFloat(total))
+                                }
+                                .cornerRadius(4)
+                            }
+                            .frame(height: 6)
+
+                            HStack {
+                                Text("\(h2h.totalGames) potjes samen")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text(h2h.leaderSummary)
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                        .padding()
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(14)
+                        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+                    }
                 }
             }
         }
+    }
+
+    private var headToHeadSelectorCard: some View {
+        let allPlayers = scoreManager.fetchPlayerNames()
+        let playerA = selectedH2HPlayerA.isEmpty ? (allPlayers.first ?? "") : selectedH2HPlayerA
+        let playerB = selectedH2HPlayerB.isEmpty ? (allPlayers.indices.contains(1) ? allPlayers[1] : (allPlayers.last ?? "")) : selectedH2HPlayerB
+
+        let h2h = scoreManager.headToHead(playerA: playerA, playerB: playerB, gameFilter: selectedGameFilter)
+
+        return VStack(spacing: 14) {
+            HStack {
+                Image(systemName: "bolt.shield.fill")
+                    .foregroundColor(.orange)
+                Text("1-op-1 Directe Strijd")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+                Text("Kies 2 spelers")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            if allPlayers.count < 2 {
+                Text("Voeg minimaal 2 spelers toe om een directe 1-op-1 vergelijking te maken.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                // Twee selectieknoppen
+                HStack(spacing: 12) {
+                    Menu {
+                        Picker("Speler 1", selection: $selectedH2HPlayerA) {
+                            ForEach(allPlayers, id: \.self) { p in
+                                Text(p).tag(p)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Circle().fill(Color.blue).frame(width: 8, height: 8)
+                            Text(playerA.isEmpty ? "Speler 1" : playerA)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(10)
+                    }
+
+                    Text("VS")
+                        .font(.caption)
+                        .fontWeight(.black)
+                        .foregroundColor(.orange)
+                        .padding(6)
+                        .background(Color.orange.opacity(0.15))
+                        .clipShape(Circle())
+
+                    Menu {
+                        Picker("Speler 2", selection: $selectedH2HPlayerB) {
+                            ForEach(allPlayers, id: \.self) { p in
+                                Text(p).tag(p)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Circle().fill(Color.purple).frame(width: 8, height: 8)
+                            Text(playerB.isEmpty ? "Speler 2" : playerB)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color.purple.opacity(0.1))
+                        .cornerRadius(10)
+                    }
+                }
+
+                // Battle Card Scorebord
+                VStack(spacing: 10) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(playerA)
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                            Text("\(h2h.winsA) winst")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        VStack(spacing: 2) {
+                            Text("\(h2h.winsA) - \(h2h.winsB)")
+                                .font(.system(size: 26, weight: .black, design: .rounded))
+                                .foregroundColor(.primary)
+                            if h2h.ties > 0 {
+                                Text("\(h2h.ties)x gelijk")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(playerB)
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.purple)
+                            Text("\(h2h.winsB) winst")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+
+                    // Progress balk
+                    let totalWins = max(1, h2h.winsA + h2h.winsB)
+                    GeometryReader { geo in
+                        HStack(spacing: 2) {
+                            Rectangle()
+                                .fill(Color.blue)
+                                .frame(width: geo.size.width * CGFloat(h2h.winsA) / CGFloat(totalWins))
+                            Rectangle()
+                                .fill(Color.purple)
+                                .frame(width: geo.size.width * CGFloat(h2h.winsB) / CGFloat(totalWins))
+                        }
+                        .cornerRadius(4)
+                    }
+                    .frame(height: 8)
+
+                    HStack {
+                        Text("\(h2h.totalGames) potjes samen gespeeld")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(h2h.leaderSummary)
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(h2h.winsA > h2h.winsB ? .blue : (h2h.winsB > h2h.winsA ? .purple : .orange))
+                    }
+                }
+                .padding(12)
+                .background(Color(UIColor.tertiarySystemGroupedBackground))
+                .cornerRadius(12)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
     }
 
     // MARK: - 3. STATISTIEKEN PER SPEL
