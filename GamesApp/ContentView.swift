@@ -39,6 +39,9 @@ struct ContentView: View {
         ("Jatten", "Jatten"),
         ("Balzakken", "Balzakken"),
         ("Love Letter", "LoveLetter"),
+        ("Qwixx", "Qwixx"),
+        ("Pig Hole", "PigHole"),
+        ("Ticket to Ride", "TicketToRide"),
         ("30 Seconds", "ThirtySeconds"),
         ("Cranium", "Cranium")
     ]
@@ -213,6 +216,15 @@ struct ContentView: View {
         if assetName.caseInsensitiveCompare("loveletter") == .orderedSame || assetName.caseInsensitiveCompare("love letter") == .orderedSame {
             if UIImage(named: "LoveLetter") != nil { return "LoveLetter" }
         }
+        if assetName.caseInsensitiveCompare("qwixx") == .orderedSame {
+            if UIImage(named: "Qwixx") != nil { return "Qwixx" }
+        }
+        if assetName.caseInsensitiveCompare("pighole") == .orderedSame || assetName.caseInsensitiveCompare("pig hole") == .orderedSame {
+            if UIImage(named: "PigHole") != nil { return "PigHole" }
+        }
+        if assetName.caseInsensitiveCompare("tickettoride") == .orderedSame || assetName.caseInsensitiveCompare("ticket to ride") == .orderedSame {
+            if UIImage(named: "TicketToRide") != nil { return "TicketToRide" }
+        }
         return nil
     }
 
@@ -252,6 +264,9 @@ struct ContentView: View {
         case "Jatten": return "hand.raised.fill"
         case "Balzakken": return "flame.fill"
         case "Love Letter": return "heart.fill"
+        case "Qwixx": return "dice.fill"
+        case "Pig Hole": return "circle.circle.fill"
+        case "Ticket to Ride": return "tram.fill"
         case "30 Seconds": return "timer"
         case "Cranium": return "brain.head.profile"
         default: return "gamecontroller.fill"
@@ -265,6 +280,9 @@ struct ContentView: View {
         case "Jatten": return .purple
         case "Balzakken": return .red
         case "Love Letter": return .pink
+        case "Qwixx": return .orange
+        case "Pig Hole": return .pink
+        case "Ticket to Ride": return .blue
         case "30 Seconds": return .orange
         case "Cranium": return .purple
         default: return .green
@@ -290,6 +308,12 @@ struct ContentView: View {
             BalzakkenSetupView()
         case "Love Letter":
             LoveLetterSetupView()
+        case "Qwixx":
+            QwixxSetupView()
+        case "Pig Hole":
+            PigHoleSetupView()
+        case "Ticket to Ride":
+            TicketToRideSetupView()
         case "30 Seconds":
             ThirtySecondsSetupView()
         case "Cranium":

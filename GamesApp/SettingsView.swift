@@ -156,6 +156,51 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                         .padding(.vertical, 4)
                     }
+
+                    DisclosureGroup("Qwixx Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Rijen: Rood & Geel lopen op (2 ➔ 12), Groen & Blauw lopen af (12 ➔ 2)")
+                            Text("• Aankruisen: Altijd van links naar rechts; overgeslagen getallen mag je niet meer aankruisen")
+                            Text("• Rij sluiten: Minstens 5 kruisjes in die rij + het laatste getal (12 of 2) aankruisen")
+                            Text("• Misworp: -5 punten als je tijdens je beurt als actieve speler niets kunt of wilt aankruisen")
+                            Text("• Puntentelling per rij: 1x=1pt, 2x=3pt, 3x=6pt, 4x=10pt, ..., 12x=78pt (n*(n+1)/2)")
+                            Text("• Einde: Zodra 2 rijen gesloten zijn of iemand 4 misworpen heeft")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+
+                    DisclosureGroup("Pig Hole Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Doel: Als eerste al je varkentjes kwijtraken!")
+                            Text("• Ronde 1: Iedereen gooit maximaal 1x met de dobbelsteen")
+                            Text("• Ronde 2: Iedereen gooit maximaal 2x met de dobbelsteen")
+                            Text("• Ronde 3+: Gooi zovaak door als je durft!")
+                            Text("• Gooi 1 t/m 5: Zet 1 varkentje in het bijbehorende vakje")
+                            Text("• Vakje bezet? Pech! Pak alle varkentjes op dat vakje op, beurt voorbij!")
+                            Text("• Gooi een 6 (Varkensgat): Gooi 1 varkentje door het gat, permanent kwijt!")
+                            Text("• Winnaar: Degene die als eerste al zijn varkentjes kwijt is (0 varkentjes) wint")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
+
+                    DisclosureGroup("Ticket to Ride Regels") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Doel: Meeste punten scoren met treinroutes en bestemmingskaarten")
+                            Text("• Routepunten: 1 wagon=1pt, 2=2pt, 3=4pt, 4=7pt, 5=10pt, 6=15pt, 8=21pt")
+                            Text("• Voltooide tickets: Leveren de aangegeven punten op")
+                            Text("• Mislukte tickets: Punten worden als strafpunten afgetrokken")
+                            Text("• Langste aaneengesloten route: +10 bonuspunten")
+                            Text("• Globetrotter (meeste voltooide tickets): +10 bonuspunten")
+                            Text("• Ongebruikte stations: 4 punten per station (max 12 pt)")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 // 3. Over GamesApp
@@ -169,7 +214,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Ondersteunde Spellen")
                         Spacer()
-                        Text("10 spellen")
+                        Text("13 spellen")
                             .foregroundColor(.secondary)
                     }
                 }
