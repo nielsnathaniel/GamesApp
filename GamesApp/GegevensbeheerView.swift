@@ -15,7 +15,6 @@ struct GegevensbeheerView: View {
     @State private var showImportMergeDialog: Bool = false
     @State private var importStatusMessage: String = ""
     @State private var showStatusAlert: Bool = false
-    @State private var isSyncingCloud: Bool = false
 
     var body: some View {
         List {
@@ -210,15 +209,44 @@ struct GegevensbeheerView: View {
                     .padding(.vertical, 4)
                 }
 
-                // iCloud synchronisatie knop
+                // Automatische iCloud sync toggle
+                Toggle(isOn: $backupManager.isAutoSyncEnabled) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.cyan.opacity(0.15))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
+                                .foregroundColor(.cyan)
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Automatische iCloud Sync")
+                                .font(.body)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+
+                            Text("Synchroniseert automatisch na elk potje")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+
+                // Handmatige iCloud synchronisatie knop
                 Button(action: {
                     HapticManager.shared.medium()
-                    isSyncingCloud = true
-                    backupManager.syncPlayersToiCloud()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        isSyncingCloud = false
-                        importStatusMessage = "Spelersnamen succesvol gesynchroniseerd met iCloud!"
-                        showStatusAlert = true
+                    backupManager.syncAllDataToiCloud(force: true) { result in
+                        switch result {
+                        case .success(let summary):
+                            importStatusMessage = "iCloud synchronisatie geslaagd!\n\(summary)"
+                            showStatusAlert = true
+                        case .failure(let error):
+                            importStatusMessage = "Fout bij iCloud synchronisatie: \(error.localizedDescription)"
+                            showStatusAlert = true
+                        }
                     }
                 }) {
                     HStack(spacing: 14) {
@@ -226,23 +254,30 @@ struct GegevensbeheerView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.blue.opacity(0.15))
                                 .frame(width: 36, height: 36)
-                            Image(systemName: isSyncingCloud ? "arrow.triangle.2.circlepath" : "icloud.and.arrow.up.fill")
-                                .foregroundColor(.blue)
-                                .font(.system(size: 16, weight: .semibold))
+                            if backupManager.isSyncing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                                    .scaleEffect(0.9)
+                            } else {
+                                Image(systemName: "icloud.and.arrow.up.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("iCloud Synchronisatie")
+                            Text("Synchroniseer alle data nu")
                                 .font(.body)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.primary)
 
                             if let syncDate = backupManager.lastSyncDate {
-                                Text("Laatst bijgewerkt: \(syncDate.formatted(date: .numeric, time: .shortened))")
+                                let info = backupManager.lastSyncSummary.isEmpty ? "" : " • \(backupManager.lastSyncSummary)"
+                                Text("Laatste sync: \(syncDate.formatted(date: .numeric, time: .shortened))\(info)")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             } else {
-                                Text("Tik om spelers te synchroniseren")
+                                Text("Tik om alle spellen, scores en spelers te synchroniseren")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }

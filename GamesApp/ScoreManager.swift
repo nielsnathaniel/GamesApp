@@ -361,6 +361,7 @@ class ScoreManager: ObservableObject {
         let sorted = sortPlayersByPopularity(names)
         UserDefaults.standard.set(sorted, forKey: playersKey)
         self.savedPlayerNames = sorted
+        DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 
     // MARK: - Scores & Gespeelde Potjes ophalen
@@ -612,6 +613,7 @@ class ScoreManager: ObservableObject {
             deleteScoresForGame(toDelete)
         }
         games.removeAll { $0.id == id }
+        DataBackupManager.shared.recordDeletedGameIds([id])
         persistGames(games)
         refresh()
     }
@@ -647,6 +649,7 @@ class ScoreManager: ObservableObject {
         }
 
         games.removeAll { ids.contains($0.id) }
+        DataBackupManager.shared.recordDeletedGameIds(ids)
         persistGames(games)
         persistScores(existingScores)
         refresh()
@@ -680,6 +683,7 @@ class ScoreManager: ObservableObject {
     func clearAllPlayers() {
         UserDefaults.standard.set([String](), forKey: playersKey)
         self.savedPlayerNames = []
+        DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 
     func clearAllScores() {
@@ -687,12 +691,15 @@ class ScoreManager: ObservableObject {
     }
 
     func clearHistory() {
+        let allIds = playedGames.map { $0.id }
+        DataBackupManager.shared.recordDeletedGameIds(allIds)
         UserDefaults.standard.removeObject(forKey: scoresKey)
         UserDefaults.standard.removeObject(forKey: gamesKey)
         UserDefaults.standard.removeObject(forKey: playersKey)
         scores = []
         playedGames = []
         savedPlayerNames = []
+        DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 
     func saveAllPlayerNames(_ names: [String]) {
@@ -713,6 +720,7 @@ class ScoreManager: ObservableObject {
             let data = try encoder.encode(scores)
             UserDefaults.standard.set(data, forKey: scoresKey)
             self.scores = scores
+            DataBackupManager.shared.scheduleAutoSyncToiCloud()
         } catch {
             print("Fout bij opslaan van scores: \(error)")
         }
@@ -725,6 +733,7 @@ class ScoreManager: ObservableObject {
             UserDefaults.standard.set(data, forKey: gamesKey)
             self.playedGames = games
             self.savedPlayerNames = fetchPlayerNames()
+            DataBackupManager.shared.scheduleAutoSyncToiCloud()
         } catch {
             print("Fout bij opslaan van gespeelde potjes: \(error)")
         }
