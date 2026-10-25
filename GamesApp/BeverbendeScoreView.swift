@@ -197,7 +197,10 @@ struct BeverbendeScoreView: View {
                         winnaar: winnaar,
                         sortedSpelers: spelers,
                         sortedScores: totaleScores,
-                        isLowestScoreWins: true
+                        isLowestScoreWins: true,
+                        onReset: {
+                            resetGame()
+                        }
                     )
                 }
             }
@@ -382,6 +385,19 @@ struct BeverbendeScoreView: View {
     private func bepaalWinnaar() {
         if let winnaarIndex = totaleScores.enumerated().min(by: { $0.element < $1.element })?.offset {
             winnaar = spelers[winnaarIndex]
+        }
+    }
+
+    private func resetGame() {
+        scores = Array(repeating: Array(repeating: 0, count: 4), count: spelers.count)
+        totaleScores = Array(repeating: 0, count: spelers.count)
+        isExpanded = Array(repeating: false, count: spelers.count)
+        huidigeRonde = 1
+        rondeGeschiedenis = []
+        winnaar = nil
+        showWinnaarView = false
+        if !spelers.isEmpty {
+            startSpelerIndex = Int.random(in: 0..<spelers.count)
         }
     }
 }

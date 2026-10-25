@@ -212,7 +212,10 @@ struct CurrentGameView: View {
                         winnaar: winnaar,
                         sortedSpelers: spelers,
                         sortedScores: totaleScores,
-                        isLowestScoreWins: false
+                        isLowestScoreWins: false,
+                        onReset: {
+                            resetGame()
+                        }
                     )
                 }
             }
@@ -443,6 +446,18 @@ struct CurrentGameView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis = kept
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        scores = Array(repeating: 0, count: spelers.count)
+        laagScores = Array(repeating: Array(repeating: 0, count: 5), count: spelers.count)
+        totaleScores = Array(repeating: 0, count: spelers.count)
+        isExpanded = Array(repeating: false, count: spelers.count)
+        huidigeRonde = 1
+        rondeGeschiedenis = []
+        resetRandomNumbers()
+        winnaar = nil
+        showWinnaarView = false
     }
 }
 

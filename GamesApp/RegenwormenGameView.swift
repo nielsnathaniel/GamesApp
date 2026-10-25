@@ -267,7 +267,10 @@ struct RegenwormenGameView: View {
                     winnaar: winnaar,
                     sortedSpelers: spelers,
                     sortedScores: scores,
-                    isLowestScoreWins: false
+                    isLowestScoreWins: false,
+                    onReset: {
+                        resetGame()
+                    }
                 )
             }
         }
@@ -390,6 +393,14 @@ struct RegenwormenGameView: View {
         }
         geschiedenis = kept
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        scores = Array(repeating: 0, count: spelers.count)
+        selectedPlayerIndex = 0
+        geschiedenis = []
+        winnaar = nil
+        showWinnaarView = false
     }
 }
 

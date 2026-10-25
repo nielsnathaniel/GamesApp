@@ -143,7 +143,10 @@ struct ThirtySecondsGameView: View {
                     gameName: "30 Seconds",
                     winningTeamName: winner.name,
                     teams: teamEntries,
-                    isLowestScoreWins: false
+                    isLowestScoreWins: false,
+                    onReset: {
+                        resetGame()
+                    }
                 )
             }
         }
@@ -765,6 +768,19 @@ struct ThirtySecondsGameView: View {
         let teamData = sortedTeams.map { (teamName: $0.name, playerNames: $0.playerNames, score: $0.score, isWinner: $0.id == winner.id) }
         scoreManager.saveTeamGame(gameName: "30 Seconds", teams: teamData)
         showWinnaarView = true
+    }
+
+    private func resetGame() {
+        for i in teams.indices {
+            teams[i].score = 0
+            teams[i].beurtenGespeeld = 0
+        }
+        huidigeRonde = 1
+        activeTeamIndex = 0
+        geschiedenis = []
+        winningTeam = nil
+        showWinnaarView = false
+        resetTimer()
     }
 }
 

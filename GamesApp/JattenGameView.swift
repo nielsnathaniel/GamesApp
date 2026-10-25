@@ -277,7 +277,10 @@ struct JattenGameView: View {
                     winnaar: winnaar,
                     sortedSpelers: spelers,
                     sortedScores: scores,
-                    isLowestScoreWins: false
+                    isLowestScoreWins: false,
+                    onReset: {
+                        resetGame()
+                    }
                 )
             }
         }
@@ -368,6 +371,14 @@ struct JattenGameView: View {
         huidigeRonde = entry.ronde
         rondeGeschiedenis = Array(rondeGeschiedenis.prefix(idx))
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        huidigeRonde = 1
+        startSpelerIndex = 0
+        rondeGeschiedenis = []
+        winnaar = nil
+        showWinnaarView = false
     }
 }
 

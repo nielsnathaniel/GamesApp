@@ -79,7 +79,10 @@ struct PigHoleGameView: View {
                 winnaar: winnaarPlayer,
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
-                isLowestScoreWins: true
+                isLowestScoreWins: true,
+                onReset: {
+                    resetGame()
+                }
             )
         }
         .confirmationDialog("Spel beëindigen?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
@@ -535,6 +538,15 @@ struct PigHoleGameView: View {
         }
         geschiedenis = kept
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        varkens = Array(repeating: startVarkens, count: spelers.count)
+        huidigeRonde = 1
+        beurtIndex = 0
+        geschiedenis = []
+        winnaarPlayer = Player(name: "")
+        showWinnaarView = false
     }
 }
 

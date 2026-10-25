@@ -295,7 +295,10 @@ struct CrockinoleGameView: View {
                     gameName: "Crockinole",
                     winningTeamName: winnerName,
                     teams: entries,
-                    isLowestScoreWins: false
+                    isLowestScoreWins: false,
+                    onReset: {
+                        resetGame()
+                    }
                 )
             } else {
                 let winnerName = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
@@ -304,7 +307,10 @@ struct CrockinoleGameView: View {
                     winnaarNaam: winnerName,
                     spelersNamen: [teamWitNaam, teamZwartNaam],
                     scores: setScores,
-                    isLowestScoreWins: false
+                    isLowestScoreWins: false,
+                    onReset: {
+                        resetGame()
+                    }
                 )
             }
         }
@@ -888,6 +894,18 @@ struct CrockinoleGameView: View {
         resetRonde()
         rondeGeschiedenis = kept
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        scores = [0, 0]
+        setScores = [0, 0]
+        totaleScores = [0, 0]
+        huidigeRonde = 1
+        huidigeSchutterIndex = 0
+        rondeGeschiedenis = []
+        resetSchijven()
+        winnaarTeam = nil
+        showWinnaarView = false
     }
 }
 

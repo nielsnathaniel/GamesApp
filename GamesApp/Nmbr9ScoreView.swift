@@ -151,7 +151,10 @@ struct Nmbr9ScoreView: View {
                             winnaar: winnaar,
                             sortedSpelers: spelers,
                             sortedScores: totaleScores,
-                            isLowestScoreWins: false
+                            isLowestScoreWins: false,
+                            onReset: {
+                                resetGame()
+                            }
                         )
                     }
                 }
@@ -372,6 +375,16 @@ struct Nmbr9ScoreView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis = kept
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        scores = Array(repeating: Array(repeating: 0, count: 4), count: spelers.count)
+        totaleScores = Array(repeating: 0, count: spelers.count)
+        huidigeRonde = 1
+        rondeGeschiedenis = []
+        resetRandomNumbers()
+        winnaar = nil
+        showWinnaarView = false
     }
 }
 

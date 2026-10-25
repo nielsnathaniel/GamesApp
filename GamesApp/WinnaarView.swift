@@ -17,6 +17,7 @@ struct WinnaarView: View {
     var juisteBalzakken: [Int]? = nil
     var fouteBalzakken: [Int]? = nil
     var teamEntries: [WinnaarTeamEntry]? = nil
+    var onReset: (() -> Void)? = nil
 
     @State private var isScoreOpgeslagen = false
     @Environment(\.dismiss) private var dismiss
@@ -27,13 +28,15 @@ struct WinnaarView: View {
         sortedSpelers: [Player],
         sortedScores: [Int],
         gameName: String = "Nmbr9",
-        isLowestScoreWins: Bool = false
+        isLowestScoreWins: Bool = false,
+        onReset: (() -> Void)? = nil
     ) {
         self.winnaar = winnaar
         self.sortedSpelers = sortedSpelers
         self.sortedScores = sortedScores
         self.gameName = gameName
         self.isLowestScoreWins = isLowestScoreWins
+        self.onReset = onReset
     }
 
     init(
@@ -43,7 +46,8 @@ struct WinnaarView: View {
         sortedScores: [Int],
         isLowestScoreWins: Bool = false,
         juisteBalzakken: [Int]? = nil,
-        fouteBalzakken: [Int]? = nil
+        fouteBalzakken: [Int]? = nil,
+        onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
         self.winnaar = winnaar
@@ -52,6 +56,7 @@ struct WinnaarView: View {
         self.isLowestScoreWins = isLowestScoreWins
         self.juisteBalzakken = juisteBalzakken
         self.fouteBalzakken = fouteBalzakken
+        self.onReset = onReset
     }
 
     init(
@@ -59,20 +64,23 @@ struct WinnaarView: View {
         winnaarNaam: String,
         spelersNamen: [String],
         scores: [Int],
-        isLowestScoreWins: Bool = false
+        isLowestScoreWins: Bool = false,
+        onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
         self.winnaar = Player(name: winnaarNaam)
         self.sortedSpelers = spelersNamen.map { Player(name: $0) }
         self.sortedScores = scores
         self.isLowestScoreWins = isLowestScoreWins
+        self.onReset = onReset
     }
 
     init(
         gameName: String,
         winningTeamName: String,
         teams: [WinnaarTeamEntry],
-        isLowestScoreWins: Bool = false
+        isLowestScoreWins: Bool = false,
+        onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
         self.winnaar = Player(name: winningTeamName)
@@ -80,6 +88,7 @@ struct WinnaarView: View {
         self.sortedScores = teams.map { $0.score }
         self.isLowestScoreWins = isLowestScoreWins
         self.teamEntries = teams
+        self.onReset = onReset
     }
 
     private var rankedIndices: [Int] {
@@ -206,40 +215,51 @@ struct WinnaarView: View {
             VStack(spacing: 12) {
                 Button(action: {
                     autoSaveScore()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onReset?()
+                    dismiss()
                 }) {
                     HStack(spacing: 8) {
-                        if isScoreOpgeslagen {
-                            Image(systemName: "checkmark.circle.fill")
-                        }
-                        Text(isScoreOpgeslagen ? "Score succesvol opgeslagen!" : "Score opslaan")
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Score opslaan & Reset")
                     }
                     .font(.title3)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(isScoreOpgeslagen ? Color.gray : Color.green)
+                    .background(Color.green)
                     .cornerRadius(10)
                 }
-                .disabled(isScoreOpgeslagen)
 
                 Button(action: {
+                    autoSaveScore()
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onReset?()
                     dismiss()
                 }) {
-                    Text("Opnieuw")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .cornerRadius(10)
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                        Text("Opnieuw spelen")
+                    }
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue)
+                    .cornerRadius(10)
                 }
 
                 Button(action: {
+                    autoSaveScore()
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onReset?()
                     dismiss()
                 }) {
                     Text("Klaar")
-                        .font(.title2)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                         .foregroundColor(.white)
                         .padding()
                         .frame(maxWidth: .infinity)

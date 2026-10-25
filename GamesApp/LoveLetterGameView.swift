@@ -165,7 +165,10 @@ struct LoveLetterGameView: View {
                 winnaar: winnaarPlayer,
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
-                isLowestScoreWins: false
+                isLowestScoreWins: false,
+                onReset: {
+                    resetGame()
+                }
             )
         }
     }
@@ -669,6 +672,15 @@ struct LoveLetterGameView: View {
             return String(first).uppercased()
         }
         return "?"
+    }
+
+    private func resetGame() {
+        fichesPerSpeler = Array(repeating: 0, count: spelers.count)
+        huidigeRonde = 1
+        huidigeStarterIndex = 0
+        rondeGeschiedenis = []
+        winnaarPlayer = Player(name: "")
+        showWinnaarView = false
     }
 }
 

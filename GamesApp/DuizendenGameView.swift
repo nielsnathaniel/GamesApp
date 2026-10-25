@@ -124,7 +124,10 @@ struct DuizendenGameView: View {
                         winnaar: winnaar,
                         sortedSpelers: spelers,
                         sortedScores: scores,
-                        isLowestScoreWins: false
+                        isLowestScoreWins: false,
+                        onReset: {
+                            resetGame()
+                        }
                     )
                 }
             }
@@ -399,6 +402,17 @@ struct DuizendenGameView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        scores = Array(repeating: 0, count: spelers.count)
+        tafelScores = Array(repeating: Array(repeating: 0, count: kaartSymbolen.count), count: spelers.count)
+        handScores = Array(repeating: Array(repeating: 0, count: kaartSymbolen.count), count: spelers.count)
+        huidigeRonde = 1
+        rondeGeschiedenis = []
+        expandedPlayerIndex = nil
+        winnaar = nil
+        showWinnaarView = false
     }
 }
 

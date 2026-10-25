@@ -97,7 +97,10 @@ struct QwixxGameView: View {
                 winnaar: winnaarPlayer,
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
-                isLowestScoreWins: false
+                isLowestScoreWins: false,
+                onReset: {
+                    resetGame()
+                }
             )
         }
         .toolbar {
@@ -128,7 +131,7 @@ struct QwixxGameView: View {
             }
         } message: {
             if let entry = restoreTargetEntry {
-                Text("Wil je het spel terugzetten naar deze stand?")
+                Text("Wil je het spel terugzetten naar: \(entry.beschrijving)?")
             }
         }
     }
@@ -651,6 +654,14 @@ struct QwixxGameView: View {
         }
         geschiedenis = kept
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        playerScores = Array(repeating: QwixxPlayerScore(), count: spelers.count)
+        selectedPlayerIndex = 0
+        geschiedenis = []
+        winnaarPlayer = Player(name: "")
+        showWinnaarView = false
     }
 }
 

@@ -180,7 +180,10 @@ struct TicketToRideGameView: View {
                 winnaar: winnaarPlayer,
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
-                isLowestScoreWins: false
+                isLowestScoreWins: false,
+                onReset: {
+                    resetGame()
+                }
             )
         }
         .alert("Aangepaste Routepunten", isPresented: $showCustomPointsAlert) {
@@ -1388,6 +1391,16 @@ struct TicketToRideGameView: View {
             selectedPlayerIndex = 0
         }
         showRondesSheet = false
+    }
+
+    private func resetGame() {
+        playerScores = Array(repeating: TTRPlayerScore(), count: spelers.count)
+        currentRound = 1
+        turnIndexInRound = 0
+        turnHistory = []
+        selectedPlayerIndex = 0
+        winnaarPlayer = Player(name: "")
+        showWinnaarView = false
     }
 }
 

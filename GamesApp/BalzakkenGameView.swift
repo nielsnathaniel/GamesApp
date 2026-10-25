@@ -438,7 +438,10 @@ struct BalzakkenGameView: View {
                     sortedScores: totaleScores,
                     isLowestScoreWins: true,
                     juisteBalzakken: juisteBalzakken,
-                    fouteBalzakken: fouteBalzakken
+                    fouteBalzakken: fouteBalzakken,
+                    onReset: {
+                        resetGame()
+                    }
                 )
             }
         }
@@ -668,6 +671,18 @@ struct BalzakkenGameView: View {
         } else {
             winnaar = spelers.first
         }
+    }
+
+    private func resetGame() {
+        totaleScores = Array(repeating: 0, count: spelers.count)
+        rondeScores = Array(repeating: 0, count: spelers.count)
+        juisteBalzakken = Array(repeating: 0, count: spelers.count)
+        fouteBalzakken = Array(repeating: 0, count: spelers.count)
+        rondeStatus = Array(repeating: .geen, count: spelers.count)
+        huidigeRonde = 1
+        rondeGeschiedenis = []
+        winnaar = nil
+        showWinnaarView = false
     }
 }
 

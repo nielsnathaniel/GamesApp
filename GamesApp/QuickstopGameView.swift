@@ -123,7 +123,10 @@ struct QuickstopGameView: View {
                 winnaar: winnaarPlayer,
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
-                isLowestScoreWins: true
+                isLowestScoreWins: true,
+                onReset: {
+                    resetGame()
+                }
             )
         }
         .confirmationDialog("Spel beëindigen?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
@@ -674,6 +677,16 @@ struct QuickstopGameView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
         toonGeschiedenisSheet = false
+    }
+
+    private func resetGame() {
+        totaleScores = Array(repeating: 0, count: spelers.count)
+        rondeScores = Array(repeating: 0, count: spelers.count)
+        huidigeRonde = 1
+        rondeGeschiedenis = []
+        startSpelerIndex = 0
+        winnaarPlayer = Player(name: "")
+        showWinnaarView = false
     }
 }
 
