@@ -368,11 +368,23 @@ struct SpelsessiesBeheerView: View {
                             .foregroundColor(.secondary)
 
                         if !game.winner.isEmpty {
+                            let displayWinner: String = {
+                                if let teams = game.teams, let winTeam = teams.first(where: { $0.isWinner }) {
+                                    let players = winTeam.playerNames.joined(separator: " & ")
+                                    if winTeam.teamName.isEmpty || ScoreManager.isDefaultTeamName(winTeam.teamName) {
+                                        return players.isEmpty ? game.winner : players
+                                    } else {
+                                        return "\(winTeam.teamName) (\(players))"
+                                    }
+                                }
+                                return game.winner
+                            }()
+
                             HStack(spacing: 3) {
                                 Image(systemName: "crown.fill")
                                     .font(.system(size: 9))
                                     .foregroundColor(.yellow)
-                                Text(game.winner)
+                                Text(displayWinner)
                                     .font(.caption2)
                                     .fontWeight(.bold)
                                     .foregroundColor(.primary)

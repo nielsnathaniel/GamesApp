@@ -432,6 +432,29 @@ class ScoreManager: ObservableObject {
         saveGame(gameName: gameName, playerDetailedScores: detailed, winnerName: winnerName)
     }
 
+    // MARK: - Team Helpers
+
+    static func isDefaultTeamName(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if trimmed.isEmpty { return true }
+        if trimmed.hasPrefix("team ") { return true }
+        let defaults: Set<String> = [
+            "de breinen", "de bollebozen", "de genieën", "de creatievelingen",
+            "team 1", "team 2", "team 3", "team 4",
+            "team wit", "team zwart", "team oranje", "team blauw", "team groen", "team paars", "team rood"
+        ]
+        return defaults.contains(trimmed)
+    }
+
+    static func effectiveTeamDisplayName(teamName: String, playerNames: [String]) -> String {
+        let trimmed = teamName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let playersStr = playerNames.joined(separator: " & ")
+        if trimmed.isEmpty || isDefaultTeamName(trimmed) {
+            return playersStr.isEmpty ? trimmed : playersStr
+        }
+        return trimmed
+    }
+
     func saveGame(
         gameName: String,
         playerDetailedScores: [(name: String, score: Int, juiste: Int, foute: Int)],
@@ -440,6 +463,17 @@ class ScoreManager: ObservableObject {
         let now = Date()
         var existingGames = fetchGames()
         var existingScores = fetchScores()
+
+        // Voorkom dubbele opslag binnen 5 seconden (bijv. auto-save + knop indrukken)
+        if let last = existingGames.last,
+           last.gameName.caseInsensitiveCompare(gameName) == .orderedSame,
+           abs(now.timeIntervalSince(last.date)) < 5.0 {
+            let lastSummary = last.scores.map { "\($0.playerName):\($0.score)" }.sorted()
+            let newSummary = playerDetailedScores.map { "\($0.name.trimmingCharacters(in: .whitespacesAndNewlines)):\($0.score)" }.sorted()
+            if lastSummary == newSummary {
+                return
+            }
+        }
 
         let trimmedWinner = winnerName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedWinner.isEmpty {
@@ -489,17 +523,29 @@ class ScoreManager: ObservableObject {
         var existingGames = fetchGames()
         var existingScores = fetchScores()
 
+        // Voorkom dubbele opslag binnen 5 seconden
+        if let last = existingGames.last,
+           last.gameName.caseInsensitiveCompare(gameName) == .orderedSame,
+           abs(now.timeIntervalSince(last.date)) < 5.0 {
+            let lastSummary = last.scores.map { "\($0.playerName):\($0.score)" }.sorted()
+            let newSummary = teams.flatMap { t in t.playerNames.map { "\($0.trimmingCharacters(in: .whitespacesAndNewlines)):\(t.score)" } }.sorted()
+            if lastSummary == newSummary {
+                return
+            }
+        }
+
         let winningTeam = teams.first(where: { $0.isWinner })
-        let winnerTitle = winningTeam?.teamName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let cleanWinningPlayers = winningTeam?.playerNames.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } ?? []
+        let cleanTeamName = winningTeam?.teamName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
         var gameTeams: [GameTeam] = []
         var playerScores: [PlayerScore] = []
 
         for t in teams {
-            let cleanTeamName = t.teamName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleanCurrentTeamName = t.teamName.trimmingCharacters(in: .whitespacesAndNewlines)
             let cleanPlayers = t.playerNames.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
 
-            let effectiveName = cleanTeamName.isEmpty ? cleanPlayers.joined(separator: " & ") : cleanTeamName
+            let effectiveName = cleanCurrentTeamName.isEmpty ? cleanPlayers.joined(separator: " & ") : cleanCurrentTeamName
             let teamEntry = GameTeam(
                 teamName: effectiveName,
                 playerNames: cleanPlayers,
@@ -529,12 +575,21 @@ class ScoreManager: ObservableObject {
             }
         }
 
+        // Bepaal een duidelijke winnaartitel
+        let effectiveWinnerName: String
+        let playersJoined = cleanWinningPlayers.joined(separator: " & ")
+        if cleanTeamName.isEmpty || ScoreManager.isDefaultTeamName(cleanTeamName) {
+            effectiveWinnerName = playersJoined.isEmpty ? cleanTeamName : playersJoined
+        } else {
+            effectiveWinnerName = playersJoined.isEmpty ? cleanTeamName : "\(cleanTeamName) (\(playersJoined))"
+        }
+
         let defaultWinner = gameTeams.first(where: { $0.isWinner })?.teamName ?? ""
         let game = PlayedGame(
             date: now,
             gameName: gameName,
             scores: playerScores,
-            winner: winnerTitle.isEmpty ? defaultWinner : winnerTitle,
+            winner: effectiveWinnerName.isEmpty ? defaultWinner : effectiveWinnerName,
             teams: gameTeams
         )
         existingGames.append(game)
@@ -669,18 +724,83 @@ class ScoreManager: ObservableObject {
             .sorted { $0.count > $1.count }
     }
 
+    // MARK: - Winnaar Bepaling
+
+    /// Bepaalt betrouwbaar of een speler een potje heeft gewonnen (werkt voor individuele en teamspellen)
+    func didPlayerWin(game: PlayedGame, playerName: String) -> Bool {
+        let cleanName = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanName.isEmpty else { return false }
+
+        // 1. Directe controle op de isWinner vlag in de individuele score
+        if let ps = game.scores.first(where: { $0.playerName.caseInsensitiveCompare(cleanName) == .orderedSame }) {
+            if ps.isWinner { return true }
+        }
+
+        // 2. Controle in de teamstructuur (voor 30 Seconds, Cranium, Crokinole)
+        if let teams = game.teams, !teams.isEmpty {
+            for team in teams {
+                let hasPlayer = team.playerNames.contains(where: { $0.caseInsensitiveCompare(cleanName) == .orderedSame })
+                if !hasPlayer { continue }
+
+                if team.isWinner {
+                    return true
+                }
+
+                // Fallback: Als team.isWinner niet gezet was, maar game.winner matcht de teamnaam of spelersnaam
+                if !game.isTie && !game.winner.isEmpty {
+                    if team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
+                       game.winner.localizedCaseInsensitiveContains(team.teamName) ||
+                       game.winner.localizedCaseInsensitiveContains(cleanName) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        // 3. Controle op game.winner string (voor individuele spellen of samengestelde titels)
+        if !game.isTie && !game.winner.isEmpty {
+            let w = game.winner.trimmingCharacters(in: .whitespacesAndNewlines)
+            if w.caseInsensitiveCompare(cleanName) == .orderedSame {
+                return true
+            }
+
+            // Controleer of de spelernaam voorkomt in een duo-titel zoals "Jan & Piet" of "Team Oranje (Jan & Piet)"
+            let separators = CharacterSet(charactersIn: "&+,/()")
+            let parts = w.components(separatedBy: separators).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            if parts.contains(where: { $0.caseInsensitiveCompare(cleanName) == .orderedSame }) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     /// Wie heeft wat het vaakst gewonnen per spel
     func mostWinsPerGame() -> [(gameName: String, winnerName: String, wins: Int)] {
         let groupedByGame = Dictionary(grouping: playedGames, by: { $0.gameName })
         var results: [(gameName: String, winnerName: String, wins: Int)] = []
 
         for (game, games) in groupedByGame {
-            let validWinners = games.map { $0.winner }.filter { !$0.isEmpty }
-            guard !validWinners.isEmpty else { continue }
-            let winnerCounts = Dictionary(grouping: validWinners, by: { $0 }).mapValues { $0.count }
-            if let top = winnerCounts.max(by: { $0.value < $1.value }) {
-                results.append((gameName: game, winnerName: top.key, wins: top.value))
+            let leaderboard = gameLeaderboard(for: game)
+            guard let top = leaderboard.first, top.gamesWon > 0 else {
+                let validWinners = games.map { $0.winner }.filter { !$0.isEmpty }
+                if let topWinner = Dictionary(grouping: validWinners, by: { $0 }).mapValues({ $0.count }).max(by: { $0.value < $1.value }) {
+                    results.append((gameName: game, winnerName: topWinner.key, wins: topWinner.value))
+                }
+                continue
             }
+
+            let topWinners = leaderboard.filter { $0.gamesWon == top.gamesWon }
+            let winnerTitle: String
+            if topWinners.count == 2 {
+                winnerTitle = "\(topWinners[0].playerName) & \(topWinners[1].playerName)"
+            } else if topWinners.count == 1 {
+                winnerTitle = topWinners[0].playerName
+            } else {
+                winnerTitle = topWinners.map { $0.playerName }.joined(separator: ", ")
+            }
+
+            results.append((gameName: game, winnerName: winnerTitle, wins: top.gamesWon))
         }
 
         return results.sorted { $0.gameName < $1.gameName }
@@ -698,7 +818,7 @@ class ScoreManager: ObservableObject {
             for game in playedGames {
                 if game.scores.contains(where: { $0.playerName.caseInsensitiveCompare(player) == .orderedSame }) {
                     totalGames += 1
-                    if game.winner.caseInsensitiveCompare(player) == .orderedSame {
+                    if didPlayerWin(game: game, playerName: player) {
                         wins += 1
                     }
                 }
@@ -726,7 +846,7 @@ class ScoreManager: ObservableObject {
         }
 
         let totalGames = playerGames.count
-        let totalWins = playerGames.filter { $0.winner.caseInsensitiveCompare(playerName) == .orderedSame }.count
+        let totalWins = playerGames.filter { didPlayerWin(game: $0, playerName: playerName) }.count
 
         // Uitsplitsing per spel
         let grouped = Dictionary(grouping: playerGames, by: { $0.gameName })
@@ -734,7 +854,7 @@ class ScoreManager: ObservableObject {
 
         for (gameName, gList) in grouped {
             let played = gList.count
-            let won = gList.filter { $0.winner.caseInsensitiveCompare(playerName) == .orderedSame }.count
+            let won = gList.filter { didPlayerWin(game: $0, playerName: playerName) }.count
 
             // Beste score bepalen
             let playerScoresInGame = gList.compactMap { g in
@@ -775,7 +895,7 @@ class ScoreManager: ObservableObject {
         }
 
         if let filter = gameFilter, !filter.isEmpty, filter != "Alle Spellen" {
-            relevantGames = relevantGames.filter { $0.gameName == filter }
+            relevantGames = relevantGames.filter { matchesGameName($0.gameName, filter) }
         }
 
         var winsA = 0
@@ -783,12 +903,41 @@ class ScoreManager: ObservableObject {
         var ties = 0
 
         for game in relevantGames {
+            let lowestWins = isLowestScoreWins(for: game.gameName)
+
+            // Als het een teamspel is, controleer of ze in hetzelfde team zaten of tegen elkaar speelden
+            if let teams = game.teams, !teams.isEmpty {
+                let teamA = teams.first { $0.playerNames.contains { $0.caseInsensitiveCompare(playerA) == .orderedSame } }
+                let teamB = teams.first { $0.playerNames.contains { $0.caseInsensitiveCompare(playerB) == .orderedSame } }
+
+                if let tA = teamA, let tB = teamB {
+                    if tA.teamName == tB.teamName && tA.playerNames == tB.playerNames {
+                        // Ze waren teamgenoten in hetzelfde team; tellen niet als rivalen tegen elkaar
+                        continue
+                    }
+
+                    let aWon = didPlayerWin(game: game, playerName: playerA)
+                    let bWon = didPlayerWin(game: game, playerName: playerB)
+
+                    if aWon && !bWon {
+                        winsA += 1
+                    } else if bWon && !aWon {
+                        winsB += 1
+                    } else if tA.score == tB.score {
+                        ties += 1
+                    } else if lowestWins {
+                        if tA.score < tB.score { winsA += 1 } else { winsB += 1 }
+                    } else {
+                        if tA.score > tB.score { winsA += 1 } else { winsB += 1 }
+                    }
+                    continue
+                }
+            }
+
             guard let scoreA = game.scores.first(where: { $0.playerName.caseInsensitiveCompare(playerA) == .orderedSame })?.score,
                   let scoreB = game.scores.first(where: { $0.playerName.caseInsensitiveCompare(playerB) == .orderedSame })?.score else {
                 continue
             }
-
-            let lowestWins = isLowestScoreWins(for: game.gameName)
 
             if scoreA == scoreB {
                 ties += 1
@@ -880,14 +1029,11 @@ class ScoreManager: ObservableObject {
         var playerMap: [String: (played: Int, won: Int, scores: [Int])] = [:]
 
         for game in matchingGames {
-            let isTie = game.isTie
-            let winnerLower = game.winner.lowercased()
-
             for sc in game.scores {
                 let pName = sc.playerName
                 var current = playerMap[pName] ?? (played: 0, won: 0, scores: [])
                 current.played += 1
-                if !isTie && pName.lowercased() == winnerLower {
+                if didPlayerWin(game: game, playerName: pName) {
                     current.won += 1
                 }
                 current.scores.append(sc.score)
@@ -958,7 +1104,7 @@ class ScoreManager: ObservableObject {
 
         var relevantGames = playedGames.filter { $0.teams != nil && !($0.teams!.isEmpty) }
         if let filter = gameFilter, !filter.isEmpty, filter != "Alle Spellen" {
-            relevantGames = relevantGames.filter { $0.gameName.caseInsensitiveCompare(filter) == .orderedSame }
+            relevantGames = relevantGames.filter { matchesGameName($0.gameName, filter) }
         }
 
         for game in relevantGames {
@@ -967,8 +1113,15 @@ class ScoreManager: ObservableObject {
                 let sortedPlayers = team.playerNames.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
                 guard sortedPlayers.count >= 2 else { continue }
                 let teamKey = sortedPlayers.joined(separator: " & ")
+                let effectiveName = ScoreManager.effectiveTeamDisplayName(teamName: team.teamName, playerNames: sortedPlayers)
+
+                let teamWon = team.isWinner || (!game.isTie && !game.winner.isEmpty && (
+                    team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
+                    team.playerNames.contains(where: { game.winner.localizedCaseInsensitiveContains($0) })
+                ))
+
                 let current = teamMap[teamKey] ?? (
-                    displayName: team.teamName.isEmpty ? teamKey : team.teamName,
+                    displayName: effectiveName,
                     playerNames: sortedPlayers,
                     played: 0,
                     won: 0,
@@ -978,7 +1131,7 @@ class ScoreManager: ObservableObject {
                     displayName: current.displayName,
                     playerNames: sortedPlayers,
                     played: current.played + 1,
-                    won: current.won + (team.isWinner ? 1 : 0),
+                    won: current.won + (teamWon ? 1 : 0),
                     totalScore: current.totalScore + team.score
                 )
             }
@@ -1013,13 +1166,18 @@ class ScoreManager: ObservableObject {
                 let hasPlayer = team.playerNames.contains { $0.caseInsensitiveCompare(playerName) == .orderedSame }
                 guard hasPlayer && team.playerNames.count >= 2 else { continue }
 
+                let teamWon = team.isWinner || (!game.isTie && !game.winner.isEmpty && (
+                    team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
+                    team.playerNames.contains(where: { game.winner.localizedCaseInsensitiveContains($0) })
+                ))
+
                 for partner in team.playerNames {
                     guard partner.caseInsensitiveCompare(playerName) != .orderedSame else { continue }
                     let cur = partnerMap[partner] ?? (games: 0, wins: 0, losses: 0)
                     partnerMap[partner] = (
                         games: cur.games + 1,
-                        wins: cur.wins + (team.isWinner ? 1 : 0),
-                        losses: cur.losses + (team.isWinner ? 0 : 1)
+                        wins: cur.wins + (teamWon ? 1 : 0),
+                        losses: cur.losses + (teamWon ? 0 : 1)
                     )
                 }
             }

@@ -86,6 +86,8 @@ struct CraniumRoundEntry: Identifiable {
 }
 
 struct CraniumGameView: View {
+    private let scoreManager = ScoreManager.shared
+
     let doelScore: Int
     let timerDuur: Int
     let vereisAlleCategorieen: Bool
@@ -776,6 +778,9 @@ struct CraniumGameView: View {
 
     private func finalizeGame(withWinner winner: CraniumTeam) {
         winningTeam = winner
+        let sortedTeams = teams.sorted { $0.score > $1.score }
+        let teamData = sortedTeams.map { (teamName: $0.name, playerNames: $0.playerNames, score: $0.score, isWinner: $0.id == winner.id) }
+        scoreManager.saveTeamGame(gameName: "Cranium", teams: teamData)
         showWinnaarView = true
     }
 }

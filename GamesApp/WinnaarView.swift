@@ -160,7 +160,8 @@ struct WinnaarView: View {
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
-                            Text("\(team.score) sets")
+                            let unit = gameName.localizedCaseInsensitiveContains("crok") ? "sets" : "pt"
+                            Text("\(team.score) \(unit)")
                                 .fontWeight(.bold)
                                 .foregroundColor(.primary)
                         }
@@ -204,30 +205,21 @@ struct WinnaarView: View {
 
             VStack(spacing: 12) {
                 Button(action: {
-                    isScoreOpgeslagen = true
-                    if let teams = teamEntries {
-                        scoreManager.saveTeamGame(
-                            gameName: gameName,
-                            teams: teams.map { ($0.teamName, $0.playerNames, $0.score, $0.isWinner) }
-                        )
-                    } else {
-                        scoreManager.saveGame(
-                            gameName: gameName,
-                            players: sortedSpelers,
-                            scores: sortedScores,
-                            winner: winnaar,
-                            juisteBalzakken: juisteBalzakken,
-                            fouteBalzakken: fouteBalzakken
-                        )
-                    }
+                    autoSaveScore()
                 }) {
-                    Text(isScoreOpgeslagen ? "Score succesvol opgeslagen!" : "Score opslaan")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(isScoreOpgeslagen ? Color.gray : Color.green)
-                        .cornerRadius(10)
+                    HStack(spacing: 8) {
+                        if isScoreOpgeslagen {
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                        Text(isScoreOpgeslagen ? "Score succesvol opgeslagen!" : "Score opslaan")
+                    }
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(isScoreOpgeslagen ? Color.gray : Color.green)
+                    .cornerRadius(10)
                 }
                 .disabled(isScoreOpgeslagen)
 
@@ -258,6 +250,29 @@ struct WinnaarView: View {
             .padding(.horizontal)
         }
         .padding()
+        .onAppear {
+            autoSaveScore()
+        }
+    }
+
+    private func autoSaveScore() {
+        guard !isScoreOpgeslagen else { return }
+        isScoreOpgeslagen = true
+        if let teams = teamEntries {
+            scoreManager.saveTeamGame(
+                gameName: gameName,
+                teams: teams.map { ($0.teamName, $0.playerNames, $0.score, $0.isWinner) }
+            )
+        } else {
+            scoreManager.saveGame(
+                gameName: gameName,
+                players: sortedSpelers,
+                scores: sortedScores,
+                winner: winnaar,
+                juisteBalzakken: juisteBalzakken,
+                fouteBalzakken: fouteBalzakken
+            )
+        }
     }
 }
 

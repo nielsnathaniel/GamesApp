@@ -1087,11 +1087,23 @@ struct StatisticsView: View {
                                         .foregroundColor(.secondary)
                                         .cornerRadius(6)
                                 } else {
+                                    let displayWinner: String = {
+                                        if let teams = game.teams, let winTeam = teams.first(where: { $0.isWinner }) {
+                                            let players = winTeam.playerNames.joined(separator: " & ")
+                                            if winTeam.teamName.isEmpty || ScoreManager.isDefaultTeamName(winTeam.teamName) {
+                                                return players.isEmpty ? game.winner : players
+                                            } else {
+                                                return "\(winTeam.teamName) (\(players))"
+                                            }
+                                        }
+                                        return game.winner
+                                    }()
+
                                     HStack(spacing: 3) {
                                         Image(systemName: "crown.fill")
                                             .font(.system(size: 9))
                                             .foregroundColor(.yellow)
-                                        Text("\(game.winner)")
+                                        Text(displayWinner)
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                     }
@@ -1107,7 +1119,7 @@ struct StatisticsView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
                                     ForEach(game.scores) { sc in
-                                        let isWinner = !game.isTie && sc.playerName.caseInsensitiveCompare(game.winner) == .orderedSame
+                                        let isWinner = sc.isWinner || (!game.isTie && sc.playerName.caseInsensitiveCompare(game.winner) == .orderedSame)
                                         HStack(spacing: 4) {
                                             if isWinner {
                                                 Image(systemName: "trophy.fill")
@@ -1296,7 +1308,7 @@ struct StatisticsView: View {
 
     private var teamsSection: some View {
         VStack(spacing: 20) {
-            let teamStats = scoreManager.teamLeaderboard()
+            let teamStats = scoreManager.teamLeaderboard(gameFilter: selectedGameFilter)
             let teamPlayers = scoreManager.allPlayersWithTeamHistory()
 
             if teamStats.isEmpty {
@@ -1310,22 +1322,53 @@ struct StatisticsView: View {
                         .font(.title2)
                         .fontWeight(.bold)
 
-                    Text("Speel een 2 tegen 2 wedstrijd bij Crokinole om duo-statistieken, partnerchemie en de teamranglijst te ontgrendelen!")
+                    Text(selectedGameFilter == "Alle Spellen"
+                         ? "Speel een teamwedstrijd bij 30 Seconds, Cranium of Crokinole om duo-statistieken, partnerchemie en de teamranglijst te ontgrendelen!"
+                         : "Nog geen gespeelde potjes voor \(selectedGameFilter) gevonden.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
 
-                    NavigationLink(destination: CrockinoleSetupView()) {
-                        HStack {
-                            Image(systemName: "circle.circle.fill")
-                            Text("Start Crokinole Teamwedstrijd")
+                    VStack(spacing: 10) {
+                        NavigationLink(destination: ThirtySecondsSetupView()) {
+                            HStack {
+                                Image(systemName: "timer")
+                                Text("Start 30 Seconds")
+                            }
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(12)
                         }
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
+
+                        NavigationLink(destination: CraniumSetupView()) {
+                            HStack {
+                                Image(systemName: "brain.head.profile")
+                                Text("Start Cranium")
+                            }
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.purple)
+                            .cornerRadius(12)
+                        }
+
+                        NavigationLink(destination: CrockinoleSetupView()) {
+                            HStack {
+                                Image(systemName: "circle.circle.fill")
+                                Text("Start Crokinole")
+                            }
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                        }
                     }
                     .padding(.top, 8)
                     .padding(.bottom, 12)
