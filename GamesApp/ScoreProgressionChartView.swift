@@ -2,11 +2,15 @@ import SwiftUI
 import Charts
 
 /// Datapunt voor één speler in een specifieke ronde
-struct RoundScoreDataPoint: Identifiable {
+struct RoundScoreDataPoint: Identifiable, Codable {
     var id: String { "\(playerName)_\(round)" }
     let round: Int
     let playerName: String
     let cumulativeScore: Int
+
+    enum CodingKeys: String, CodingKey {
+        case round, playerName, cumulativeScore
+    }
 }
 
 /// Grafiek die het verloop van de scores over alle rondes weergeeft (Swift Charts)
@@ -100,10 +104,11 @@ struct ScoreProgressionChartView: View {
     }
 
     private var minRound: Int {
-        dataPoints.map { $0.round }.min() ?? 1
+        dataPoints.map { $0.round }.min() ?? 0
     }
 
     private var maxRound: Int {
-        max(1, dataPoints.map { $0.round }.max() ?? 1)
+        let mx = dataPoints.map { $0.round }.max() ?? 1
+        return max(minRound + 1, mx)
     }
 }

@@ -1252,7 +1252,12 @@ struct TicketToRideGameView: View {
         let detailed = spelers.indices.map { i in
             (name: spelers[i], score: effectiveScore(for: i))
         }
-        scoreManager.saveGame(gameName: "Ticket to Ride", playerScores: detailed, winnerName: highest.name)
+        scoreManager.saveGame(
+            gameName: "Ticket to Ride",
+            playerScores: detailed,
+            winnerName: highest.name,
+            scoreProgression: ttrChartData
+        )
         ActiveGameManager.shared.clearActiveGame()
         showWinnaarView = true
     }

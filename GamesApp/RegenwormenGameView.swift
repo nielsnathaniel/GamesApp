@@ -84,7 +84,6 @@ struct RegenwormenGameView: View {
     @State private var restoreTargetEntry: RegenwormenTurnSnapshot? = nil
     @State private var showRestoreDialog: Bool = false
     @State private var showConfirmMisluktDialog: Bool = false
-    @State private var showConfirmFinishDialog: Bool = false
     @State private var showResetDialog: Bool = false
     @State private var transferPending: (steen: Int, van: Int, naar: Int)? = nil
     @State private var showTransferDialog: Bool = false
@@ -247,18 +246,6 @@ struct RegenwormenGameView: View {
             }
         }
         .confirmationDialog(
-            "Spel Nu Afronden?",
-            isPresented: $showConfirmFinishDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Afronden en Winnaar Bekijken") {
-                finishGame()
-            }
-            Button("Verder Spelen", role: .cancel) {}
-        } message: {
-            Text("De speler met de meeste regenwormen wint het spel! Bij een gelijke stand beslist de hoogste steen.")
-        }
-        .confirmationDialog(
             "Beurt herstellen?",
             isPresented: $showRestoreDialog,
             titleVisibility: .visible
@@ -282,6 +269,7 @@ struct RegenwormenGameView: View {
                     sortedSpelers: sortedSpelersResultaat,
                     sortedScores: sortedScoresResultaat,
                     isLowestScoreWins: false,
+                    scoreProgression: scoreDataPoints,
                     onReset: resetGame
                 )
             }
@@ -1018,6 +1006,8 @@ struct RegenwormenGameView: View {
 
         if tafelStenen.isEmpty {
             laatsteMelding = "Alle stenen zijn van tafel! Het spel is afgelopen."
+            finishGame()
+            return
         }
     }
 
@@ -1062,14 +1052,15 @@ struct RegenwormenGameView: View {
 
         winnaar = spelers[winnaarIdx]
 
-        // Opslaan in ScoreManager
+        // Automatisch opslaan in ScoreManager INCLUSIEF scoreverloop!
         let playerScoresDetailed = spelers.indices.map { i in
             (player: spelers[i], score: scoresNu[i])
         }
         scoreManager.saveGame(
             gameName: "Regenwormen",
             playerScores: playerScoresDetailed,
-            winner: winnaar
+            winner: winnaar,
+            scoreProgression: scoreDataPoints
         )
 
         activeGameManager.clearActiveGame()
@@ -1220,8 +1211,8 @@ struct RegenwormenGameView: View {
 
     private var finishButton: some View {
         Button(action: {
-            HapticManager.shared.medium()
-            showConfirmFinishDialog = true
+            HapticManager.shared.celebration()
+            finishGame()
         }) {
             HStack(spacing: 8) {
                 Image(systemName: "flag.checkered")

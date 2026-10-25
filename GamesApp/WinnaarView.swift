@@ -17,6 +17,7 @@ struct WinnaarView: View {
     var juisteBalzakken: [Int]? = nil
     var fouteBalzakken: [Int]? = nil
     var teamEntries: [WinnaarTeamEntry]? = nil
+    var scoreProgression: [RoundScoreDataPoint]? = nil
     var onReset: (() -> Void)? = nil
 
     @State private var isScoreOpgeslagen = false
@@ -29,6 +30,7 @@ struct WinnaarView: View {
         sortedScores: [Int],
         gameName: String = "Nmbr9",
         isLowestScoreWins: Bool = false,
+        scoreProgression: [RoundScoreDataPoint]? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.winnaar = winnaar
@@ -36,6 +38,7 @@ struct WinnaarView: View {
         self.sortedScores = sortedScores
         self.gameName = gameName
         self.isLowestScoreWins = isLowestScoreWins
+        self.scoreProgression = scoreProgression
         self.onReset = onReset
     }
 
@@ -47,6 +50,7 @@ struct WinnaarView: View {
         isLowestScoreWins: Bool = false,
         juisteBalzakken: [Int]? = nil,
         fouteBalzakken: [Int]? = nil,
+        scoreProgression: [RoundScoreDataPoint]? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
@@ -56,6 +60,7 @@ struct WinnaarView: View {
         self.isLowestScoreWins = isLowestScoreWins
         self.juisteBalzakken = juisteBalzakken
         self.fouteBalzakken = fouteBalzakken
+        self.scoreProgression = scoreProgression
         self.onReset = onReset
     }
 
@@ -65,6 +70,7 @@ struct WinnaarView: View {
         spelersNamen: [String],
         scores: [Int],
         isLowestScoreWins: Bool = false,
+        scoreProgression: [RoundScoreDataPoint]? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
@@ -72,6 +78,7 @@ struct WinnaarView: View {
         self.sortedSpelers = spelersNamen.map { Player(name: $0) }
         self.sortedScores = scores
         self.isLowestScoreWins = isLowestScoreWins
+        self.scoreProgression = scoreProgression
         self.onReset = onReset
     }
 
@@ -80,6 +87,7 @@ struct WinnaarView: View {
         winningTeamName: String,
         teams: [WinnaarTeamEntry],
         isLowestScoreWins: Bool = false,
+        scoreProgression: [RoundScoreDataPoint]? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
@@ -88,6 +96,7 @@ struct WinnaarView: View {
         self.sortedScores = teams.flatMap { t in t.playerNames.map { _ in t.score } }
         self.isLowestScoreWins = isLowestScoreWins
         self.teamEntries = teams
+        self.scoreProgression = scoreProgression
         self.onReset = onReset
     }
 
@@ -210,6 +219,18 @@ struct WinnaarView: View {
                         }
                     }
                 }
+
+                // Scoreverloop grafiek in de uitslag (indien beschikbaar)
+                if let points = scoreProgression, !points.isEmpty {
+                    Section(header: Text("Scoreverloop")) {
+                        ScoreProgressionChartView(
+                            title: "\(gameName) Scoreverloop",
+                            dataPoints: points,
+                            playerNames: sortedSpelers.map { $0.name }
+                        )
+                        .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 8, trailing: 4))
+                    }
+                }
             }
             .padding(.top, 16)
 
@@ -224,7 +245,7 @@ struct WinnaarView: View {
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
-                        Text("Score opslaan & Reset")
+                        Text("Score opgeslagen & Terug")
                     }
                     .font(.title3)
                     .fontWeight(.semibold)
@@ -294,7 +315,8 @@ struct WinnaarView: View {
                 scores: sortedScores,
                 winner: winnaar,
                 juisteBalzakken: juisteBalzakken,
-                fouteBalzakken: fouteBalzakken
+                fouteBalzakken: fouteBalzakken,
+                scoreProgression: scoreProgression
             )
         }
     }

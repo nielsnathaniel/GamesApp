@@ -3,6 +3,7 @@ import SwiftUI
 struct SpelsessiesBeheerView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
     @State private var selectedGameFilter: String = "Alle Spellen"
+    @State private var expandedSessionIds: Set<UUID> = []
 
     // Alerts voor bevestiging
     @State private var gameToDelete: PlayedGame?
@@ -444,6 +445,38 @@ struct SpelsessiesBeheerView: View {
                         }
                     }
                 }
+            }
+
+            // Scoreverloop toggle & weergave
+            HStack {
+                Spacer()
+                Button(action: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        if expandedSessionIds.contains(game.id) {
+                            expandedSessionIds.remove(game.id)
+                        } else {
+                            expandedSessionIds.insert(game.id)
+                        }
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.xyaxis.line")
+                        Text(expandedSessionIds.contains(game.id) ? "Verberg verloop" : "Toon scoreverloop")
+                    }
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if expandedSessionIds.contains(game.id) {
+                ScoreProgressionChartView(
+                    title: "\(game.sessionTitle)",
+                    dataPoints: game.effectiveScoreProgression,
+                    playerNames: game.playerNamesList
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding()

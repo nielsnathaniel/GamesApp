@@ -9,6 +9,8 @@ struct StatisticsView: View {
     @State private var selectedDetailGame: String = "Balzakken"
     @State private var selectedH2HPlayerA: String = ""
     @State private var selectedH2HPlayerB: String = ""
+    @State private var selectedScoreProgressionSessionId: UUID? = nil
+    @State private var expandedSessionIds: Set<UUID> = []
     @Namespace private var categoryAnimation
 
     struct AppGameInfo: Identifiable {
@@ -871,6 +873,9 @@ struct StatisticsView: View {
                     gamePodiumView(leaderboard: leaderboard)
                 }
 
+                // Scoreverloop Grafiek voor dit spel (Regenwormen en andere spellen)
+                gameScoreProgressionCard(recent: recent, gameName: activeGame)
+
                 // Volledige ranglijst voor dit spel
                 if !leaderboard.isEmpty {
                     gameLeaderboardCard(leaderboard: leaderboard, gameName: activeGame)
@@ -1431,6 +1436,39 @@ struct StatisticsView: View {
                                     }
                                 }
                             }
+
+                            // Uitklapknop voor scoreverloop
+                            HStack {
+                                Spacer()
+                                Button(action: {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                        if expandedSessionIds.contains(game.id) {
+                                            expandedSessionIds.remove(game.id)
+                                        } else {
+                                            expandedSessionIds.insert(game.id)
+                                        }
+                                    }
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "chart.xyaxis.line")
+                                        Text(expandedSessionIds.contains(game.id) ? "Verberg verloop" : "Toon scoreverloop")
+                                    }
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.blue)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if expandedSessionIds.contains(game.id) {
+                                ScoreProgressionChartView(
+                                    title: "\(game.sessionTitle)",
+                                    dataPoints: game.effectiveScoreProgression,
+                                    playerNames: game.playerNamesList
+                                )
+                                .padding(.top, 4)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
                         }
                         .padding(10)
                         .background(Color(UIColor.tertiarySystemGroupedBackground).opacity(0.6))
@@ -1443,6 +1481,98 @@ struct StatisticsView: View {
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    private func gameScoreProgressionCard(recent: [PlayedGame], gameName: String) -> some View {
+        let sessionsWithData = recent.filter { $0.scoreProgression != nil && !$0.scoreProgression!.isEmpty }
+        let displaySessions = !sessionsWithData.isEmpty ? sessionsWithData : recent
+
+        guard let firstSession = displaySessions.first else {
+            return AnyView(EmptyView())
+        }
+
+        let activeSession = displaySessions.first(where: { $0.id == selectedScoreProgressionSessionId }) ?? firstSession
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "chart.xyaxis.line")
+                        .foregroundColor(gameColor(for: gameName))
+                    Text("Scoreverloop \(gameName)")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Text("\(displaySessions.count) potje\(displaySessions.count == 1 ? "" : "s")")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                // Sessie selector chips als er meer dan 1 potje is
+                if displaySessions.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Array(displaySessions.prefix(5).enumerated()), id: \.element.id) { idx, session in
+                                let isSel = session.id == activeSession.id
+                                Button(action: {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    selectedScoreProgressionSessionId = session.id
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Text(idx == 0 ? "Laatste potje" : "Potje \(idx + 1)")
+                                            .font(.caption)
+                                            .fontWeight(isSel ? .bold : .medium)
+                                        Text("• \(session.winner.isEmpty ? "Gelijkspel" : session.winner)")
+                                            .font(.caption2)
+                                            .foregroundColor(isSel ? .white.opacity(0.9) : .secondary)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(isSel ? gameColor(for: gameName) : Color(UIColor.tertiarySystemGroupedBackground))
+                                    .foregroundColor(isSel ? .white : .primary)
+                                    .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                // Scoreverloop grafiek
+                ScoreProgressionChartView(
+                    title: "\(activeSession.sessionTitle)",
+                    dataPoints: activeSession.effectiveScoreProgression,
+                    playerNames: activeSession.playerNamesList
+                )
+
+                // Eindstand overzicht van deze geselecteerde sessie
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(activeSession.scores) { sc in
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(sc.isWinner ? Color.green : gameColor(for: gameName))
+                                    .frame(width: 8, height: 8)
+                                Text(sc.playerName)
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                Text("\(sc.score) \(gameName.localizedCaseInsensitiveContains("regenworm") ? "🪱" : "pt")")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(sc.isWinner ? .green : .secondary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(UIColor.tertiarySystemGroupedBackground))
+                            .cornerRadius(6)
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+        )
     }
 
     private func gameEmptyStateView(gameName: String) -> some View {

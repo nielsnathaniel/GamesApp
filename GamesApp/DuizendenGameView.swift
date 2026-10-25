@@ -294,7 +294,21 @@ struct DuizendenGameView: View {
                 let detailed = spelers.indices.map { i in
                     (name: spelers[i].name, score: scores[i])
                 }
-                scoreManager.saveGame(gameName: "Duizenden", playerScores: detailed, winnerName: w.name)
+                let chartData: [RoundScoreDataPoint] = rondeGeschiedenis.flatMap { r in
+                    spelers.indices.map { i in
+                        RoundScoreDataPoint(
+                            round: r.ronde,
+                            playerName: spelers[i].name,
+                            cumulativeScore: r.totalenNaRonde[safe: i] ?? 0
+                        )
+                    }
+                }
+                scoreManager.saveGame(
+                    gameName: "Duizenden",
+                    playerScores: detailed,
+                    winnerName: w.name,
+                    scoreProgression: chartData
+                )
             }
             ActiveGameManager.shared.clearActiveGame()
             showWinnaarView = true

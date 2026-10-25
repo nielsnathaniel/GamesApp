@@ -69,18 +69,28 @@ struct PlayedGame: Identifiable, Codable {
     let scores: [PlayerScore]
     let winner: String
     var teams: [GameTeam]? = nil
+    var scoreProgression: [RoundScoreDataPoint]? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, date, gameName, scores, winner, teams
+        case id, date, gameName, scores, winner, teams, scoreProgression
     }
 
-    init(id: UUID = UUID(), date: Date, gameName: String, scores: [PlayerScore], winner: String, teams: [GameTeam]? = nil) {
+    init(
+        id: UUID = UUID(),
+        date: Date,
+        gameName: String,
+        scores: [PlayerScore],
+        winner: String,
+        teams: [GameTeam]? = nil,
+        scoreProgression: [RoundScoreDataPoint]? = nil
+    ) {
         self.id = id
         self.date = date
         self.gameName = gameName
         self.scores = scores
         self.winner = winner
         self.teams = teams
+        self.scoreProgression = scoreProgression
     }
 
     init(from decoder: Decoder) throws {
@@ -91,6 +101,7 @@ struct PlayedGame: Identifiable, Codable {
         self.scores = try container.decode([PlayerScore].self, forKey: .scores)
         self.winner = try container.decode(String.self, forKey: .winner)
         self.teams = try container.decodeIfPresent([GameTeam].self, forKey: .teams)
+        self.scoreProgression = try container.decodeIfPresent([RoundScoreDataPoint].self, forKey: .scoreProgression)
     }
 }
 
@@ -121,6 +132,19 @@ extension PlayedGame {
             return "Spelsessie \(gameName)"
         }
         return "Spelsessie \(gameName) met \(players)"
+    }
+
+    /// Scoreverloop data voor grafieken (gebruikt opgeslagen rondes of genereert een zuivere 2-punts verloop van 0 naar eindstand)
+    var effectiveScoreProgression: [RoundScoreDataPoint] {
+        if let saved = scoreProgression, !saved.isEmpty {
+            return saved
+        }
+        var points: [RoundScoreDataPoint] = []
+        for s in scores {
+            points.append(RoundScoreDataPoint(round: 0, playerName: s.playerName, cumulativeScore: 0))
+            points.append(RoundScoreDataPoint(round: 1, playerName: s.playerName, cumulativeScore: s.score))
+        }
+        return points
     }
 }
 
@@ -420,7 +444,8 @@ class ScoreManager: ObservableObject {
         scores: [Int],
         winner: Player?,
         juisteBalzakken: [Int]? = nil,
-        fouteBalzakken: [Int]? = nil
+        fouteBalzakken: [Int]? = nil,
+        scoreProgression: [RoundScoreDataPoint]? = nil
     ) {
         let paired: [(name: String, score: Int, juiste: Int, foute: Int)] = players.indices.map { i in
             let name = players[i].name
@@ -429,17 +454,42 @@ class ScoreManager: ObservableObject {
             let f = fouteBalzakken?[safe: i] ?? 0
             return (name, sc, j, f)
         }
-        saveGame(gameName: gameName, playerDetailedScores: paired, winnerName: winner?.name ?? "")
+        saveGame(
+            gameName: gameName,
+            playerDetailedScores: paired,
+            winnerName: winner?.name ?? "",
+            scoreProgression: scoreProgression
+        )
     }
 
-    func saveGame(gameName: String, playerScores: [(player: Player, score: Int)], winner: Player?) {
+    func saveGame(
+        gameName: String,
+        playerScores: [(player: Player, score: Int)],
+        winner: Player?,
+        scoreProgression: [RoundScoreDataPoint]? = nil
+    ) {
         let paired = playerScores.map { ($0.player.name, $0.score, 0, 0) }
-        saveGame(gameName: gameName, playerDetailedScores: paired, winnerName: winner?.name ?? "")
+        saveGame(
+            gameName: gameName,
+            playerDetailedScores: paired,
+            winnerName: winner?.name ?? "",
+            scoreProgression: scoreProgression
+        )
     }
 
-    func saveGame(gameName: String, playerScores: [(name: String, score: Int)], winnerName: String) {
+    func saveGame(
+        gameName: String,
+        playerScores: [(name: String, score: Int)],
+        winnerName: String,
+        scoreProgression: [RoundScoreDataPoint]? = nil
+    ) {
         let detailed = playerScores.map { ($0.name, $0.score, 0, 0) }
-        saveGame(gameName: gameName, playerDetailedScores: detailed, winnerName: winnerName)
+        saveGame(
+            gameName: gameName,
+            playerDetailedScores: detailed,
+            winnerName: winnerName,
+            scoreProgression: scoreProgression
+        )
     }
 
     // MARK: - Team Helpers
@@ -468,7 +518,8 @@ class ScoreManager: ObservableObject {
     func saveGame(
         gameName: String,
         playerDetailedScores: [(name: String, score: Int, juiste: Int, foute: Int)],
-        winnerName: String
+        winnerName: String,
+        scoreProgression: [RoundScoreDataPoint]? = nil
     ) {
         let now = Date()
         var existingGames = fetchGames()
@@ -507,7 +558,8 @@ class ScoreManager: ObservableObject {
             date: now,
             gameName: gameName,
             scores: entries,
-            winner: trimmedWinner
+            winner: trimmedWinner,
+            scoreProgression: scoreProgression
         )
         existingGames.append(game)
         persistGames(existingGames)
