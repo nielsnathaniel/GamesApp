@@ -26,7 +26,11 @@ struct StartspelerKiezerView: View {
         Color(red: 1.00, green: 0.80, blue: 0.10), // Sun Yellow
         Color(red: 0.10, green: 0.90, blue: 0.90), // Cyan
         Color(red: 1.00, green: 0.25, blue: 0.55), // Hot Pink
-        Color(red: 0.55, green: 0.90, blue: 0.25)  // Lime
+        Color(red: 0.55, green: 0.90, blue: 0.25), // Lime
+        Color(red: 0.35, green: 0.40, blue: 1.00), // Indigo
+        Color(red: 1.00, green: 0.60, blue: 0.00), // Amber
+        Color(red: 0.20, green: 0.85, blue: 0.70), // Mint
+        Color(red: 0.85, green: 0.15, blue: 0.85)  // Magenta
     ]
 
     var body: some View {
@@ -112,16 +116,16 @@ struct StartspelerKiezerView: View {
                         .transition(.scale.combined(with: .opacity))
                     } else if isCountingDown {
                         VStack(spacing: 4) {
-                            Text("Vingers stilhouden...")
+                            Text("\(touchPoints.count) vingers gedetecteerd")
                                 .font(.headline)
                                 .foregroundColor(.white)
-                            Text("De startspeler wordt gekozen")
+                            Text("Vingers stilhouden...")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(.yellow)
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Color.black.opacity(0.45))
+                        .background(Color.black.opacity(0.55))
                         .cornerRadius(14)
                     } else if touchPoints.isEmpty {
                         VStack(spacing: 6) {
@@ -131,7 +135,7 @@ struct StartspelerKiezerView: View {
                             Text("Plaats allemaal een vinger op het scherm")
                                 .font(.headline)
                                 .foregroundColor(.white)
-                            Text("Minimaal 2 vingers nodig")
+                            Text("Geschikt voor 2 t/m 6+ vingers")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.6))
                         }
@@ -140,7 +144,7 @@ struct StartspelerKiezerView: View {
                         .background(Color.black.opacity(0.35))
                         .cornerRadius(16)
                     } else if touchPoints.count == 1 {
-                        Text("Nog minimaal 1 vinger erbij...")
+                        Text("1 vinger • Nog minimaal 1 vinger erbij...")
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundColor(.white.opacity(0.85))
@@ -154,6 +158,11 @@ struct StartspelerKiezerView: View {
             }
         }
         .statusBarHidden(true)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        .defersSystemGestures(on: .all)
+        .persistentSystemOverlays(.hidden)
     }
 
     // MARK: - Touch Management & Countdown
@@ -300,22 +309,20 @@ struct TouchIndicatorView: View {
 }
 
 // MARK: - MultiTouch Surface Representable (UIKit)
-struct MultiTouchSurfaceRepresentable: UIViewRepresentable {
+struct MultiTouchSurfaceRepresentable: UIViewControllerRepresentable {
     @Binding var touchPoints: [ActiveTouchPoint]
     var winningTouchId: ObjectIdentifier?
     var isFinished: Bool
     let palette: [Color]
     var onTouchesChanged: () -> Void
 
-    func makeUIView(context: Context) -> MultiTouchTrackingView {
-        let view = MultiTouchTrackingView()
-        view.isMultipleTouchEnabled = true
-        view.backgroundColor = .clear
-        view.delegate = context.coordinator
-        return view
+    func makeUIViewController(context: Context) -> MultiTouchTrackingViewController {
+        let vc = MultiTouchTrackingViewController()
+        vc.trackingView.delegate = context.coordinator
+        return vc
     }
 
-    func updateUIView(_ uiView: MultiTouchTrackingView, context: Context) {
+    func updateUIViewController(_ uiViewController: MultiTouchTrackingViewController, context: Context) {
         context.coordinator.palette = palette
         context.coordinator.isFinished = isFinished
     }
@@ -381,35 +388,93 @@ struct MultiTouchSurfaceRepresentable: UIViewRepresentable {
     }
 }
 
-// MARK: - MultiTouch Tracking UIView
+// MARK: - MultiTouch Tracking UIViewController & UIView
 protocol MultiTouchTrackingDelegate: AnyObject {
     func touchesUpdated(activeTouches: Set<UITouch>, in view: UIView)
+}
+
+final class MultiTouchTrackingViewController: UIViewController {
+    let trackingView = MultiTouchTrackingView()
+
+    override func loadView() {
+        view = trackingView
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        trackingView.isMultipleTouchEnabled = true
+        trackingView.backgroundColor = .clear
+    }
+
+    // Cruciaal voor 6+ vingers: defer system gestures zodat iOS multi-finger gebaren de touches niet afpakken
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+        return .all
+    }
+
+    override var prefersStatusBarHidden: Bool {
+        return true
+    }
+
+    override var prefersHomeIndicatorAutoHidden: Bool {
+        return true
+    }
 }
 
 final class MultiTouchTrackingView: UIView {
     weak var delegate: MultiTouchTrackingDelegate?
     private var activeTouches: Set<UITouch> = []
 
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isMultipleTouchEnabled = true
+        backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        isMultipleTouchEnabled = true
+        backgroundColor = .clear
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        // Zorg dat window-level gesture recognizers (zoals pinch/multitasking) de vingerbewegingen niet annuleren
+        if let window = window {
+            for recognizer in window.gestureRecognizers ?? [] {
+                recognizer.delaysTouchesBegan = false
+                recognizer.delaysTouchesEnded = false
+                recognizer.cancelsTouchesInView = false
+            }
+        }
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
-        activeTouches.formUnion(touches)
-        delegate?.touchesUpdated(activeTouches: activeTouches, in: self)
+        syncTouches(from: event, withFallbackAdded: touches)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesMoved(touches, with: event)
-        delegate?.touchesUpdated(activeTouches: activeTouches, in: self)
+        syncTouches(from: event, withFallbackAdded: touches)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesEnded(touches, with: event)
-        activeTouches.subtract(touches)
-        delegate?.touchesUpdated(activeTouches: activeTouches, in: self)
+        syncTouches(from: event, withFallbackRemoved: touches)
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesCancelled(touches, with: event)
-        activeTouches.subtract(touches)
+        syncTouches(from: event, withFallbackRemoved: touches)
+    }
+
+    private func syncTouches(from event: UIEvent?, withFallbackAdded added: Set<UITouch> = [], withFallbackRemoved removed: Set<UITouch> = []) {
+        if let all = event?.allTouches {
+            activeTouches = all.filter { $0.phase == .began || $0.phase == .moved || $0.phase == .stationary }
+        } else {
+            activeTouches.formUnion(added)
+            activeTouches.subtract(removed)
+        }
         delegate?.touchesUpdated(activeTouches: activeTouches, in: self)
     }
 }

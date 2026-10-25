@@ -30,7 +30,6 @@ struct ContentView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
     @ObservedObject private var activeGameManager = ActiveGameManager.shared
 
-    @State private var showStartspelerKiezer: Bool = false
     @State private var showDiscardDraftDialog: Bool = false
 
     let games = [
@@ -47,11 +46,13 @@ struct ContentView: View {
         ("Ticket to Ride", "TicketToRide"),
         ("Quickstop", "Quickstop"),
         ("30 Seconds", "ThirtySeconds"),
-        ("Cranium", "Cranium")
+        ("Cranium", "Cranium"),
+        ("Wie begint?", "WieBegint")
     ]
 
     private func playCount(for gameName: String) -> Int {
-        scoreManager.playedGames.filter { played in
+        if gameName == "Wie begint?" { return 0 }
+        return scoreManager.playedGames.filter { played in
             let n1 = played.gameName.lowercased()
             let n2 = gameName.lowercased()
             if n1 == n2 { return true }
@@ -187,7 +188,20 @@ struct ContentView: View {
                                     ZStack(alignment: .topTrailing) {
                                         gameIcon(for: game.0, assetName: game.1)
 
-                                        if sortOption == .populair {
+                                        if game.0 == "Wie begint?" {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "sparkles")
+                                                    .font(.system(size: 8))
+                                                Text("TOOL")
+                                                    .font(.system(size: 9, weight: .black))
+                                            }
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 3)
+                                            .background(Color.yellow)
+                                            .foregroundColor(.black)
+                                            .clipShape(Capsule())
+                                            .offset(x: 10, y: -6)
+                                        } else if sortOption == .populair {
                                             let count = playCount(for: game.0)
                                             HStack(spacing: 2) {
                                                 Image(systemName: "flame.fill")
@@ -209,7 +223,11 @@ struct ContentView: View {
                                             .font(.headline)
                                             .foregroundColor(.primary)
 
-                                        if sortOption == .populair {
+                                        if game.0 == "Wie begint?" {
+                                            Text("Startspeler")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        } else if sortOption == .populair {
                                             let count = playCount(for: game.0)
                                             Text(count == 1 ? "1x gespeeld" : "\(count)x gespeeld")
                                                 .font(.caption2)
@@ -232,32 +250,9 @@ struct ContentView: View {
             }
             .navigationTitle("Spellen")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        HapticManager.shared.light()
-                        showStartspelerKiezer = true
-                    }) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "hand.tap.fill")
-                                .foregroundColor(.yellow)
-                            Text("Wie begint?")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.yellow.opacity(0.18))
-                        .clipShape(Capsule())
-                    }
-                }
-
                 ToolbarItem(placement: .navigationBarTrailing) {
                     filterSortMenu
                 }
-            }
-            .fullScreenCover(isPresented: $showStartspelerKiezer) {
-                StartspelerKiezerView()
             }
             .confirmationDialog(
                 "Weet je zeker dat je het lopende spel wilt verwijderen?",
@@ -327,7 +322,26 @@ struct ContentView: View {
 
     @ViewBuilder
     private func gameIcon(for gameName: String, assetName: String) -> some View {
-        if let actualName = resolveImageName(for: assetName) {
+        if gameName == "Wie begint?" {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.yellow.opacity(0.25), Color.orange.opacity(0.25)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 80, height: 80)
+
+                Image(systemName: "hand.tap.fill")
+                    .font(.system(size: 38))
+                    .foregroundColor(.yellow)
+            }
+            .frame(width: 80, height: 80)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+        } else if let actualName = resolveImageName(for: assetName) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color(UIColor.secondarySystemGroupedBackground))
@@ -367,6 +381,7 @@ struct ContentView: View {
         case "Quickstop": return "bolt.fill"
         case "30 Seconds": return "timer"
         case "Cranium": return "brain.head.profile"
+        case "Wie begint?": return "hand.tap.fill"
         default: return "gamecontroller.fill"
         }
     }
@@ -384,6 +399,7 @@ struct ContentView: View {
         case "Quickstop": return .yellow
         case "30 Seconds": return .orange
         case "Cranium": return .purple
+        case "Wie begint?": return .yellow
         default: return .green
         }
     }
@@ -419,6 +435,8 @@ struct ContentView: View {
             ThirtySecondsSetupView()
         case "Cranium":
             CraniumSetupView()
+        case "Wie begint?":
+            StartspelerKiezerView()
         default:
             Text("Onbekend Spel")
         }
