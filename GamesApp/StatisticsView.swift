@@ -4,6 +4,7 @@ struct StatisticsView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
     @State private var selectedSegment: StatSegment = .overzicht
     @State private var selectedGameFilter: String = "Alle Spellen"
+    @State private var selectedTeamGameFilter: String = "Alle Spellen"
     @State private var selectedPartnerPlayer: String = ""
     @State private var selectedDetailGame: String = "Balzakken"
     @State private var selectedH2HPlayerA: String = ""
@@ -340,31 +341,139 @@ struct StatisticsView: View {
         let favoriteGame = scoreManager.mostPlayedGames().first?.gameName ?? "-"
 
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            statCard(title: "Gespeeld", value: "\(totalGames)", icon: "gamecontroller.fill", color: .blue)
-            statCard(title: "Spelers", value: "\(totalPlayers)", icon: "person.2.fill", color: .purple)
-            statCard(title: "Populairst", value: favoriteGame, icon: "chart.line.uptrend.xyaxis", color: .orange)
-            statCard(title: "Koploper", value: topWinner, icon: "crown.fill", color: .yellow)
+            // 1. Gespeeld -> Ga direct naar Opgeslagen Spelsessies
+            NavigationLink(destination: SpelsessiesBeheerView()) {
+                statCard(
+                    title: "Gespeeld",
+                    value: "\(totalGames)",
+                    subtitle: "Sessies",
+                    icon: "gamecontroller.fill",
+                    color: .blue
+                )
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                HapticManager.shared.light()
+            })
+
+            // 2. Spelers -> Schakel direct naar tabblad Spelers
+            Button(action: {
+                HapticManager.shared.light()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    selectedSegment = .spelers
+                }
+            }) {
+                statCard(
+                    title: "Spelers",
+                    value: "\(totalPlayers)",
+                    subtitle: "Ranglijst",
+                    icon: "person.2.fill",
+                    color: .purple
+                )
+            }
+            .buttonStyle(.plain)
+
+            // 3. Populairst -> Schakel naar tabblad Per Spel met het populairste spel geopend
+            Button(action: {
+                HapticManager.shared.light()
+                if favoriteGame != "-" {
+                    selectedDetailGame = favoriteGame
+                }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    selectedSegment = .perSpel
+                }
+            }) {
+                statCard(
+                    title: "Populairst",
+                    value: favoriteGame,
+                    subtitle: "Details",
+                    icon: "chart.line.uptrend.xyaxis",
+                    color: .orange
+                )
+            }
+            .buttonStyle(.plain)
+
+            // 4. Koploper -> Open spelersprofiel van koploper
+            if topWinner != "-" && !topWinner.isEmpty {
+                NavigationLink(destination: PlayerStatsView(playerName: topWinner)) {
+                    statCard(
+                        title: "Koploper",
+                        value: topWinner,
+                        subtitle: "Profiel",
+                        icon: "crown.fill",
+                        color: .yellow
+                    )
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded {
+                    HapticManager.shared.light()
+                })
+            } else {
+                Button(action: {
+                    HapticManager.shared.light()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        selectedSegment = .spelers
+                    }
+                }) {
+                    statCard(
+                        title: "Koploper",
+                        value: "-",
+                        subtitle: "Nog geen",
+                        icon: "crown.fill",
+                        color: .yellow
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
-    private func statCard(title: String, value: String, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func statCard(title: String, value: String, subtitle: String? = nil, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Image(systemName: icon)
-                    .foregroundColor(color)
-                    .font(.subheadline)
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.18))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: icon)
+                        .foregroundColor(color)
+                        .font(.system(size: 13, weight: .bold))
+                }
+
                 Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary.opacity(0.5))
             }
+
             Text(value)
                 .font(.title2)
                 .fontWeight(.bold)
+                .foregroundColor(.primary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .minimumScaleFactor(0.7)
+
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+
+                if let sub = subtitle {
+                    Text("•")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.4))
+                    Text(sub)
+                        .font(.caption2)
+                        .foregroundColor(color)
+                        .lineLimit(1)
+                }
+            }
         }
-        .padding()
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(14)
         .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
@@ -1484,9 +1593,59 @@ struct StatisticsView: View {
 
     // MARK: - 5. TEAMS & DUO'S
 
+    private var teamGameFilterBar: some View {
+        let teamGames = ["Alle Spellen", "30 Seconds", "Cranium", "Crockinole"]
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(teamGames, id: \.self) { g in
+                    let isSelected = selectedTeamGameFilter == g
+                    let color = g == "Alle Spellen" ? Color.indigo : gameColor(for: g)
+                    Button(action: {
+                        HapticManager.shared.light()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                            selectedTeamGameFilter = g
+                        }
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: gameIcon(for: g))
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(isSelected ? .white : color)
+                            Text(g)
+                                .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background {
+                            ZStack {
+                                if isSelected {
+                                    color
+                                        .clipShape(Capsule())
+                                        .shadow(color: color.opacity(0.35), radius: 5, x: 0, y: 2)
+                                } else {
+                                    Color(UIColor.secondarySystemGroupedBackground)
+                                        .clipShape(Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Color.gray.opacity(0.18), lineWidth: 1)
+                                        )
+                                }
+                            }
+                        }
+                        .foregroundColor(isSelected ? .white : .primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
+            .padding(.horizontal, 2)
+        }
+    }
+
     private var teamsSection: some View {
         VStack(spacing: 20) {
-            let teamStats = scoreManager.teamLeaderboard(gameFilter: selectedGameFilter)
+            teamGameFilterBar
+
+            let teamStats = scoreManager.teamLeaderboard(gameFilter: selectedTeamGameFilter)
             let teamPlayers = scoreManager.allPlayersWithTeamHistory()
 
             if teamStats.isEmpty {
@@ -1500,9 +1659,9 @@ struct StatisticsView: View {
                         .font(.title2)
                         .fontWeight(.bold)
 
-                    Text(selectedGameFilter == "Alle Spellen"
+                    Text(selectedTeamGameFilter == "Alle Spellen"
                          ? "Speel een teamwedstrijd bij 30 Seconds, Cranium of Crokinole om duo-statistieken, partnerchemie en de teamranglijst te ontgrendelen!"
-                         : "Nog geen gespeelde potjes voor \(selectedGameFilter) gevonden.")
+                         : "Nog geen gespeelde potjes voor \(selectedTeamGameFilter) gevonden.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)

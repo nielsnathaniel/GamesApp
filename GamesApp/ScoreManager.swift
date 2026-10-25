@@ -767,11 +767,18 @@ class ScoreManager: ObservableObject {
                     return true
                 }
 
-                // Fallback: Als team.isWinner niet gezet was, maar game.winner matcht de teamnaam of spelersnaam
+                // Fallback: Als team.isWinner niet gezet was, maar game.winner matcht de teamnaam of alle teamleden
                 if !game.isTie && !game.winner.isEmpty {
                     if team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
-                       game.winner.localizedCaseInsensitiveContains(team.teamName) ||
-                       game.winner.localizedCaseInsensitiveContains(cleanName) {
+                       game.winner.localizedCaseInsensitiveContains(team.teamName) {
+                        return true
+                    }
+                    let cleanWinner = game.winner.lowercased()
+                    let allTeamPlayersInWinner = !team.playerNames.isEmpty && team.playerNames.allSatisfy { p in
+                        let tr = p.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                        return !tr.isEmpty && cleanWinner.contains(tr)
+                    }
+                    if allTeamPlayersInWinner {
                         return true
                     }
                 }
@@ -837,7 +844,7 @@ class ScoreManager: ObservableObject {
             var wins = 0
 
             for game in playedGames {
-                if game.scores.contains(where: { $0.playerName.caseInsensitiveCompare(player) == .orderedSame }) {
+                if game.playerNamesList.contains(where: { $0.caseInsensitiveCompare(player) == .orderedSame }) {
                     totalGames += 1
                     if didPlayerWin(game: game, playerName: player) {
                         wins += 1
@@ -863,7 +870,7 @@ class ScoreManager: ObservableObject {
     /// Gedetailleerde statistieken voor een individuele speler
     func detailedStats(for playerName: String) -> DetailedPlayerStats {
         let playerGames = playedGames.filter { game in
-            game.scores.contains { $0.playerName.caseInsensitiveCompare(playerName) == .orderedSame }
+            game.playerNamesList.contains { $0.caseInsensitiveCompare(playerName) == .orderedSame }
         }
 
         let totalGames = playerGames.count
@@ -878,8 +885,14 @@ class ScoreManager: ObservableObject {
             let won = gList.filter { didPlayerWin(game: $0, playerName: playerName) }.count
 
             // Beste score bepalen
-            let playerScoresInGame = gList.compactMap { g in
-                g.scores.first { $0.playerName.caseInsensitiveCompare(playerName) == .orderedSame }?.score
+            let playerScoresInGame = gList.compactMap { g -> Int? in
+                if let sc = g.scores.first(where: { $0.playerName.caseInsensitiveCompare(playerName) == .orderedSame })?.score {
+                    return sc
+                }
+                if let t = g.teams?.first(where: { $0.playerNames.contains(where: { $0.caseInsensitiveCompare(playerName) == .orderedSame }) }) {
+                    return t.score
+                }
+                return nil
             }
 
             let bestScore: Int?
@@ -1013,18 +1026,7 @@ class ScoreManager: ObservableObject {
         var bestStreak = 0
 
         for game in relevantGames {
-            let won: Bool
-            if let teams = game.teams, !teams.isEmpty {
-                won = teams.contains { t in
-                    t.playerNames.contains { $0.lowercased() == nameLower } &&
-                    (t.isWinner || (!game.isTie && !game.winner.isEmpty && (
-                        t.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
-                        t.playerNames.contains(where: { game.winner.localizedCaseInsensitiveContains($0) })
-                    )))
-                }
-            } else {
-                won = !game.isTie && game.winner.lowercased() == nameLower
-            }
+            let won = didPlayerWin(game: game, playerName: playerName)
 
             if won {
                 currentStreak += 1
@@ -1168,14 +1170,28 @@ class ScoreManager: ObservableObject {
         var playerMap: [String: (played: Int, won: Int, scores: [Int])] = [:]
 
         for game in matchingGames {
-            for sc in game.scores {
-                let pName = sc.playerName
+            var playerEntries: [(name: String, score: Int)] = []
+            if !game.scores.isEmpty {
+                for sc in game.scores {
+                    playerEntries.append((sc.playerName, sc.score))
+                }
+            } else if let teams = game.teams {
+                for t in teams {
+                    for p in t.playerNames {
+                        playerEntries.append((p, t.score))
+                    }
+                }
+            }
+
+            for entry in playerEntries {
+                let pName = entry.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !pName.isEmpty else { continue }
                 var current = playerMap[pName] ?? (played: 0, won: 0, scores: [])
                 current.played += 1
                 if didPlayerWin(game: game, playerName: pName) {
                     current.won += 1
                 }
-                current.scores.append(sc.score)
+                current.scores.append(entry.score)
                 playerMap[pName] = current
             }
         }
@@ -1254,10 +1270,18 @@ class ScoreManager: ObservableObject {
                 let teamKey = sortedPlayers.joined(separator: " & ")
                 let effectiveName = ScoreManager.effectiveTeamDisplayName(teamName: team.teamName, playerNames: sortedPlayers)
 
-                let teamWon = team.isWinner || (!game.isTie && !game.winner.isEmpty && (
-                    team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
-                    team.playerNames.contains(where: { game.winner.localizedCaseInsensitiveContains($0) })
-                ))
+                let teamWon: Bool = {
+                    if team.isWinner { return true }
+                    if game.isTie || game.winner.isEmpty { return false }
+                    if team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame { return true }
+                    let cleanWinner = game.winner.lowercased()
+                    let allTeamPlayersInWinner = !team.playerNames.isEmpty && team.playerNames.allSatisfy { p in
+                        let tr = p.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                        return !tr.isEmpty && cleanWinner.contains(tr)
+                    }
+                    if allTeamPlayersInWinner { return true }
+                    return false
+                }()
 
                 let current = teamMap[teamKey] ?? (
                     displayName: effectiveName,
@@ -1305,10 +1329,18 @@ class ScoreManager: ObservableObject {
                 let hasPlayer = team.playerNames.contains { $0.caseInsensitiveCompare(playerName) == .orderedSame }
                 guard hasPlayer && team.playerNames.count >= 2 else { continue }
 
-                let teamWon = team.isWinner || (!game.isTie && !game.winner.isEmpty && (
-                    team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame ||
-                    team.playerNames.contains(where: { game.winner.localizedCaseInsensitiveContains($0) })
-                ))
+                let teamWon: Bool = {
+                    if team.isWinner { return true }
+                    if game.isTie || game.winner.isEmpty { return false }
+                    if team.teamName.caseInsensitiveCompare(game.winner) == .orderedSame { return true }
+                    let cleanWinner = game.winner.lowercased()
+                    let allTeamPlayersInWinner = !team.playerNames.isEmpty && team.playerNames.allSatisfy { p in
+                        let tr = p.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                        return !tr.isEmpty && cleanWinner.contains(tr)
+                    }
+                    if allTeamPlayersInWinner { return true }
+                    return false
+                }()
 
                 for partner in team.playerNames {
                     guard partner.caseInsensitiveCompare(playerName) != .orderedSame else { continue }

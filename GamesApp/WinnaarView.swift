@@ -85,7 +85,7 @@ struct WinnaarView: View {
         self.gameName = gameName
         self.winnaar = Player(name: winningTeamName)
         self.sortedSpelers = teams.flatMap { $0.playerNames.map { Player(name: $0) } }
-        self.sortedScores = teams.map { $0.score }
+        self.sortedScores = teams.flatMap { t in t.playerNames.map { _ in t.score } }
         self.isLowestScoreWins = isLowestScoreWins
         self.teamEntries = teams
         self.onReset = onReset
@@ -106,6 +106,9 @@ struct WinnaarView: View {
     private var rankedTeams: [WinnaarTeamEntry] {
         guard let teams = teamEntries else { return [] }
         return teams.sorted { t1, t2 in
+            if t1.isWinner != t2.isWinner {
+                return t1.isWinner
+            }
             if isLowestScoreWins {
                 return t1.score < t2.score
             } else {

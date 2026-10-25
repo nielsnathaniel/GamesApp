@@ -170,7 +170,11 @@ struct CraniumGameView: View {
         }
         .navigationDestination(isPresented: $showWinnaarView) {
             if let winner = winningTeam {
-                let sortedTeams = teams.sorted { $0.score > $1.score }
+                let sortedTeams = teams.sorted {
+                    if $0.id == winner.id { return true }
+                    if $1.id == winner.id { return false }
+                    return $0.score > $1.score
+                }
                 let teamEntries = sortedTeams.map { t in
                     WinnaarTeamEntry(
                         teamName: t.name,
@@ -885,9 +889,6 @@ struct CraniumGameView: View {
 
     private func finalizeGame(withWinner winner: CraniumTeam) {
         winningTeam = winner
-        let sortedTeams = teams.sorted { $0.score > $1.score }
-        let teamData = sortedTeams.map { (teamName: $0.name, playerNames: $0.playerNames, score: $0.score, isWinner: $0.id == winner.id) }
-        scoreManager.saveTeamGame(gameName: "Cranium", teams: teamData)
         showWinnaarView = true
     }
 
