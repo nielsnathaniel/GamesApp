@@ -906,6 +906,11 @@ struct StatisticsView: View {
                     balzakkenHallOfFameCard
                 }
 
+                // Crokinole Uitgebreide Statistieken & Records
+                if scoreManager.matchesGameName(activeGame, "Crockinole") {
+                    crokinoleStatisticsCard
+                }
+
                 // Recente potjes voor dit spel
                 gameRecentSessionsCard(recent: recent, gameName: activeGame)
             }
@@ -1351,6 +1356,338 @@ struct StatisticsView: View {
         .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
     }
 
+    private var crokinoleStatisticsCard: some View {
+        let stats = scoreManager.crokinoleOverallStats()
+
+        return VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: "circle.circle.fill")
+                    .foregroundColor(.blue)
+                    .font(.title2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Crokinole Records & Statistieken")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Text("Hoogste scores per ronde & per set")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+
+            // Top Records Cards (Groot & opvallend)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                // 1. Hoogste score in 1 ronde
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "target")
+                            .foregroundColor(.orange)
+                        Text("IN 1 RONDE")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.orange)
+                    }
+
+                    if let highRound = stats.allTimeHighestRound, highRound.score > 0 {
+                        Text("\(highRound.score) pt")
+                            .font(.system(size: 26, weight: .heavy, design: .rounded))
+                            .foregroundColor(.primary)
+                        Text("\(highRound.player) • R\(highRound.round)")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text("-")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                        Text("Nog geen rondes")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.25), lineWidth: 1))
+
+                // 2. Hoogste score in 1 set
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "trophy.fill")
+                            .foregroundColor(.yellow)
+                        Text("IN 1 SET")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.yellow.opacity(0.95))
+                    }
+
+                    if let highSet = stats.allTimeHighestSet, highSet.score > 0 {
+                        Text("\(highSet.score) pt")
+                            .font(.system(size: 26, weight: .heavy, design: .rounded))
+                            .foregroundColor(.primary)
+                        Text("\(highSet.player)")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text("-")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                        Text("Nog geen sets")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.yellow.opacity(0.12))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.yellow.opacity(0.3), lineWidth: 1))
+
+                // 3. Grootste verschil in 1 ronde
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "bolt.fill")
+                            .foregroundColor(.blue)
+                        Text("GROOTSTE VERSCHIL")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundColor(.blue)
+                    }
+
+                    if let diff = stats.allTimeHighestDifferential, diff.diff > 0 {
+                        Text("+\(diff.diff) pt")
+                            .font(.system(size: 22, weight: .heavy, design: .rounded))
+                            .foregroundColor(.primary)
+                        Text("\(diff.player)")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text("-")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                        Text("Nog geen verschil")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.blue.opacity(0.08))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blue.opacity(0.2), lineWidth: 1))
+
+                // 4. Gemiddelde rondes per set
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Image(systemName: "timer")
+                            .foregroundColor(.purple)
+                        Text("RONDES PER SET")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundColor(.purple)
+                    }
+
+                    if stats.averageRoundsPerSet > 0 {
+                        Text(String(format: "%.1f", stats.averageRoundsPerSet))
+                            .font(.system(size: 22, weight: .heavy, design: .rounded))
+                            .foregroundColor(.primary)
+                        Text("gemiddeld")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("-")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                        Text("Nog geen data")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.purple.opacity(0.08))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.purple.opacity(0.2), lineWidth: 1))
+            }
+
+            // Top 5 Hoogste Scores in 1 Ronde
+            if !stats.topRoundScores.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("🎯 Top Hoogste Scores in 1 Ronde")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+
+                    VStack(spacing: 6) {
+                        ForEach(Array(stats.topRoundScores.prefix(5).enumerated()), id: \.offset) { idx, entry in
+                            HStack {
+                                Text("\(idx + 1).")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 20, alignment: .leading)
+
+                                Text(entry.player)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+
+                                Text("• R\(entry.round)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+
+                                Spacer()
+
+                                Text("\(entry.score) pt")
+                                    .font(.subheadline)
+                                    .fontWeight(.heavy)
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 10)
+                            .background(Color(UIColor.tertiarySystemGroupedBackground).opacity(0.6))
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+            }
+
+            // Top 5 Hoogste Scores in 1 Set
+            if !stats.topSetScores.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("🏆 Top Hoogste Scores in 1 Set")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+
+                    VStack(spacing: 6) {
+                        ForEach(Array(stats.topSetScores.prefix(5).enumerated()), id: \.offset) { idx, entry in
+                            HStack {
+                                Text("\(idx + 1).")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 20, alignment: .leading)
+
+                                Text(entry.player)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+
+                                Spacer()
+
+                                Text("\(entry.score) pt")
+                                    .font(.subheadline)
+                                    .fontWeight(.heavy)
+                                    .foregroundColor(.yellow)
+                            }
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 10)
+                            .background(Color(UIColor.tertiarySystemGroupedBackground).opacity(0.6))
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+            }
+
+            // Set Uitslag Verdeling (Clean sweeps, 3-1, 3-2)
+            if stats.cleanSweepsCount > 0 || stats.regularWinsCount > 0 || stats.thrillerWinsCount > 0 {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("📊 Wedstrijd-uitslagen (Setverdeling)")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+
+                    HStack(spacing: 8) {
+                        crokinolePill(title: "3-0 Sweep", count: stats.cleanSweepsCount, emoji: "🧹", color: .green)
+                        crokinolePill(title: "3-1 Winst", count: stats.regularWinsCount, emoji: "🎯", color: .blue)
+                        crokinolePill(title: "3-2 Thriller", count: stats.thrillerWinsCount, emoji: "🔥", color: .red)
+                    }
+                }
+            }
+
+            // Spelers PR Tabel
+            if !stats.playerLeaderboard.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("🥇 Persoonlijke Records per Speler")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+
+                    VStack(spacing: 8) {
+                        ForEach(stats.playerLeaderboard) { player in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(player.playerName)
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                    Text("\(player.gamesWon)/\(player.gamesPlayed) gewonnen")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                HStack(spacing: 12) {
+                                    VStack(alignment: .trailing, spacing: 1) {
+                                        Text("Max ronde")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(.secondary)
+                                        Text(player.highestRoundScore > 0 ? "\(player.highestRoundScore) pt" : "-")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.orange)
+                                    }
+
+                                    VStack(alignment: .trailing, spacing: 1) {
+                                        Text("Max set")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(.secondary)
+                                        Text(player.highestSetScore > 0 ? "\(player.highestSetScore) pt" : "-")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.yellow)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(Color(UIColor.tertiarySystemGroupedBackground).opacity(0.5))
+                            .cornerRadius(10)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+    }
+
+    private func crokinolePill(title: String, count: Int, emoji: String, color: Color) -> some View {
+        VStack(spacing: 3) {
+            Text(emoji)
+                .font(.caption)
+            Text("\(count)x")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .background(color.opacity(0.1))
+        .cornerRadius(10)
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(color.opacity(0.2), lineWidth: 1))
+    }
+
     private func gameRecentSessionsCard(recent: [PlayedGame], gameName: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -1440,7 +1777,8 @@ struct StatisticsView: View {
                                             }
                                             Text(sc.playerName)
                                                 .fontWeight(isWinner ? .bold : .regular)
-                                            Text("\(sc.score) pt")
+                                            let unit = scoreManager.matchesGameName(game.gameName, "Crockinole") ? "sets" : "pt"
+                                            Text("\(sc.score) \(unit)")
                                                 .fontWeight(.bold)
                                                 .foregroundColor(isWinner ? .green : .primary)
                                         }
@@ -1455,6 +1793,35 @@ struct StatisticsView: View {
                                         .cornerRadius(6)
                                     }
                                 }
+                            }
+
+                            if let crok = game.crokinoleStats {
+                                HStack(spacing: 8) {
+                                    if crok.maxRoundScore > 0 {
+                                        HStack(spacing: 3) {
+                                            Text("🎯 Max ronde:")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                            Text("\(crok.maxRoundScore) pt")
+                                                .font(.caption2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.orange)
+                                        }
+                                    }
+                                    if crok.maxSetScore > 0 {
+                                        HStack(spacing: 3) {
+                                            Text("🏆 Max set:")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                            Text("\(crok.maxSetScore) pt")
+                                                .font(.caption2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.yellow)
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 2)
                             }
 
                             // Uitklapknop voor scoreverloop

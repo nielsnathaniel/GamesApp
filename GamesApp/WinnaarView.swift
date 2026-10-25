@@ -18,6 +18,7 @@ struct WinnaarView: View {
     var fouteBalzakken: [Int]? = nil
     var teamEntries: [WinnaarTeamEntry]? = nil
     var scoreProgression: [RoundScoreDataPoint]? = nil
+    var crokinoleStats: CrokinoleGameStats? = nil
     var onReset: (() -> Void)? = nil
 
     @State private var isScoreOpgeslagen = false
@@ -32,6 +33,7 @@ struct WinnaarView: View {
         gameName: String = "Nmbr9",
         isLowestScoreWins: Bool = false,
         scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.winnaar = winnaar
@@ -40,6 +42,7 @@ struct WinnaarView: View {
         self.gameName = gameName
         self.isLowestScoreWins = isLowestScoreWins
         self.scoreProgression = scoreProgression
+        self.crokinoleStats = crokinoleStats
         self.onReset = onReset
     }
 
@@ -52,6 +55,7 @@ struct WinnaarView: View {
         juisteBalzakken: [Int]? = nil,
         fouteBalzakken: [Int]? = nil,
         scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
@@ -62,6 +66,7 @@ struct WinnaarView: View {
         self.juisteBalzakken = juisteBalzakken
         self.fouteBalzakken = fouteBalzakken
         self.scoreProgression = scoreProgression
+        self.crokinoleStats = crokinoleStats
         self.onReset = onReset
     }
 
@@ -72,6 +77,7 @@ struct WinnaarView: View {
         scores: [Int],
         isLowestScoreWins: Bool = false,
         scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
@@ -80,6 +86,7 @@ struct WinnaarView: View {
         self.sortedScores = scores
         self.isLowestScoreWins = isLowestScoreWins
         self.scoreProgression = scoreProgression
+        self.crokinoleStats = crokinoleStats
         self.onReset = onReset
     }
 
@@ -89,6 +96,7 @@ struct WinnaarView: View {
         teams: [WinnaarTeamEntry],
         isLowestScoreWins: Bool = false,
         scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil,
         onReset: (() -> Void)? = nil
     ) {
         self.gameName = gameName
@@ -98,6 +106,7 @@ struct WinnaarView: View {
         self.isLowestScoreWins = isLowestScoreWins
         self.teamEntries = teams
         self.scoreProgression = scoreProgression
+        self.crokinoleStats = crokinoleStats
         self.onReset = onReset
     }
 
@@ -183,6 +192,11 @@ struct WinnaarView: View {
 
                 // Eindstand uitslagenlijst
                 rankingsSection
+
+                // Crokinole Highlights (indien beschikbaar)
+                if let crok = crokinoleStats {
+                    crokinoleHighlightsView(crok)
+                }
 
                 // Scoreverloop grafiek (PROMINENT & DUIDELIJK)
                 scoreProgressionSection
@@ -468,13 +482,69 @@ struct WinnaarView: View {
         .padding(.bottom, 20)
     }
 
+    private func crokinoleHighlightsView(_ crok: CrokinoleGameStats) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "circle.circle.fill")
+                    .foregroundColor(.blue)
+                Text("Crokinole Wedstrijd-Highlights")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("HOOGSTE IN 1 RONDE")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(.orange)
+                    Text("\(crok.maxRoundScore) pt")
+                        .font(.title2)
+                        .fontWeight(.heavy)
+                        .foregroundColor(.primary)
+                    Text("\(crok.maxRoundScorePlayer) • R\(crok.maxRoundScoreRound)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.12))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.3), lineWidth: 1))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("HOOGSTE IN 1 SET")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundColor(.yellow.opacity(0.95))
+                    Text("\(crok.maxSetScore) pt")
+                        .font(.title2)
+                        .fontWeight(.heavy)
+                        .foregroundColor(.primary)
+                    Text("\(crok.maxSetScorePlayer)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.yellow.opacity(0.12))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.yellow.opacity(0.3), lineWidth: 1))
+            }
+        }
+        .padding(.horizontal)
+    }
+
     private func autoSaveScore() {
         guard !isScoreOpgeslagen else { return }
         isScoreOpgeslagen = true
         if let teams = teamEntries {
             scoreManager.saveTeamGame(
                 gameName: gameName,
-                teams: teams.map { ($0.teamName, $0.playerNames, $0.score, $0.isWinner) }
+                teams: teams.map { ($0.teamName, $0.playerNames, $0.score, $0.isWinner) },
+                scoreProgression: effectiveProgression,
+                crokinoleStats: crokinoleStats
             )
         } else {
             scoreManager.saveGame(
@@ -484,7 +554,8 @@ struct WinnaarView: View {
                 winner: winnaar,
                 juisteBalzakken: juisteBalzakken,
                 fouteBalzakken: fouteBalzakken,
-                scoreProgression: effectiveProgression
+                scoreProgression: effectiveProgression,
+                crokinoleStats: crokinoleStats
             )
         }
     }

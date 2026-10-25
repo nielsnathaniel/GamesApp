@@ -38,6 +38,15 @@ struct CrockinoleGameView: View {
     @State private var totaleScores: [Int] = [0, 0]
     @State private var huidigeRonde: Int = 1
     @State private var rondeGeschiedenis: [CrokinoleRondeEntry] = []
+    @State private var crokinoleRoundRecords: [CrokinoleRoundRecord] = []
+    @State private var maxRoundScore: Int = 0
+    @State private var maxRoundScorePlayer: String = ""
+    @State private var maxRoundScoreRound: Int = 1
+    @State private var maxSetScore: Int = 0
+    @State private var maxSetScorePlayer: String = ""
+    @State private var maxDifferential: Int = 0
+    @State private var huidigeSet: Int = 1
+    @State private var currentGameStats: CrokinoleGameStats? = nil
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var restoreTargetEntry: CrokinoleRondeEntry? = nil
     @State private var showRestoreDialog: Bool = false
@@ -269,6 +278,8 @@ struct CrockinoleGameView: View {
                     winningTeamName: winnerName,
                     teams: entries,
                     isLowestScoreWins: false,
+                    scoreProgression: crokinoleScoreProgression,
+                    crokinoleStats: currentGameStats,
                     onReset: {
                         resetGame()
                     }
@@ -281,6 +292,8 @@ struct CrockinoleGameView: View {
                     spelersNamen: [teamWitNaam, teamZwartNaam],
                     scores: setScores,
                     isLowestScoreWins: false,
+                    scoreProgression: crokinoleScoreProgression,
+                    crokinoleStats: currentGameStats,
                     onReset: {
                         resetGame()
                     }
@@ -845,42 +858,133 @@ struct CrockinoleGameView: View {
         let score0 = scores.indices.contains(0) ? scores[0] : 0
         let score1 = scores.indices.contains(1) ? scores[1] : 0
 
+        // Hoogste score in 1 ronde bijwerken
+        if score0 > maxRoundScore {
+            maxRoundScore = score0
+            maxRoundScorePlayer = teamWitNaam
+            maxRoundScoreRound = huidigeRonde
+        }
+        if score1 > maxRoundScore {
+            maxRoundScore = score1
+            maxRoundScorePlayer = teamZwartNaam
+            maxRoundScoreRound = huidigeRonde
+        }
+
+        let diff = abs(score0 - score1)
+        if diff > maxDifferential {
+            maxDifferential = diff
+        }
+
+        let roundWinner = score0 > score1 ? teamWitNaam : (score1 > score0 ? teamZwartNaam : "Gelijkspel")
+
         if score0 > score1 {
-            let diff = score0 - score1
             totaleScores[0] += diff
         } else if score1 > score0 {
-            let diff = score1 - score0
             totaleScores[1] += diff
         }
 
+        let pointsInSetBeforeReset = [totaleScores[0], totaleScores[1]]
+
+        var setWonInThisRound = false
+        var winningTeamName: String? = nil
+        var finalSetScore: Int? = nil
+
         // Controleer of een team 100 punten heeft bereikt in de set
-        for i in 0..<2 {
-            if totaleScores[i] >= 100 {
-                setScores[i] += 1
-                totaleScores[i] = 0
+        if totaleScores[0] >= 100 {
+            setScores[0] += 1
+            setWonInThisRound = true
+            winningTeamName = teamWitNaam
+            finalSetScore = totaleScores[0]
+            if totaleScores[0] > maxSetScore {
+                maxSetScore = totaleScores[0]
+                maxSetScorePlayer = teamWitNaam
             }
+            totaleScores[0] = 0
+            totaleScores[1] = 0
+            huidigeSet += 1
+        } else if totaleScores[1] >= 100 {
+            setScores[1] += 1
+            setWonInThisRound = true
+            winningTeamName = teamZwartNaam
+            finalSetScore = totaleScores[1]
+            if totaleScores[1] > maxSetScore {
+                maxSetScore = totaleScores[1]
+                maxSetScorePlayer = teamZwartNaam
+            }
+            totaleScores[0] = 0
+            totaleScores[1] = 0
+            huidigeSet += 1
         }
 
         // Sla snapshot van de ronde op
-        rondeGeschiedenis.append(
-            CrokinoleRondeEntry(
-                ronde: huidigeRonde,
-                scoreWit: score0,
-                scoreZwart: score1,
-                totaleScoresNaRonde: totaleScores,
-                setScoresNaRonde: setScores
-            )
+        let entry = CrokinoleRondeEntry(
+            ronde: huidigeRonde,
+            scoreWit: score0,
+            scoreZwart: score1,
+            totaleScoresNaRonde: totaleScores,
+            setScoresNaRonde: setScores
         )
+        rondeGeschiedenis.append(entry)
+
+        let roundRecord = CrokinoleRoundRecord(
+            roundNumber: huidigeRonde,
+            setNumber: huidigeSet,
+            scoreWit: score0,
+            scoreZwart: score1,
+            differential: diff,
+            roundWinner: roundWinner,
+            setScoresAfterRound: setScores,
+            pointsInSetAfterRound: pointsInSetBeforeReset,
+            setWonInThisRound: setWonInThisRound,
+            winningTeamName: winningTeamName,
+            finalSetScore: finalSetScore
+        )
+        crokinoleRoundRecords.append(roundRecord)
 
         // Controleer of een team 3 sets heeft gewonnen
         if setScores.contains(where: { $0 >= 3 }) {
             let winner = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
             winnaarTeam = winner
-            let detailed = [
-                (name: teamWitNaam, score: setScores[0]),
-                (name: teamZwartNaam, score: setScores[1])
-            ]
-            scoreManager.saveGame(gameName: "Crockinole", playerScores: detailed, winnerName: winner)
+
+            let stats = CrokinoleGameStats(
+                maxRoundScore: maxRoundScore,
+                maxRoundScorePlayer: maxRoundScorePlayer,
+                maxRoundScoreRound: maxRoundScoreRound,
+                maxDifferential: maxDifferential,
+                maxSetScore: maxSetScore,
+                maxSetScorePlayer: maxSetScorePlayer,
+                totalRounds: huidigeRonde,
+                totalSets: setScores[0] + setScores[1],
+                rounds: crokinoleRoundRecords
+            )
+            currentGameStats = stats
+
+            let progression = crokinoleScoreProgression
+
+            if isTeamMode {
+                let teamsToSave = [
+                    (teamName: teamWitNaam, playerNames: teamWitSpelers, score: setScores[0], isWinner: setScores[0] >= 3),
+                    (teamName: teamZwartNaam, playerNames: teamZwartSpelers, score: setScores[1], isWinner: setScores[1] >= 3)
+                ]
+                scoreManager.saveTeamGame(
+                    gameName: "Crockinole",
+                    teams: teamsToSave,
+                    scoreProgression: progression,
+                    crokinoleStats: stats
+                )
+            } else {
+                let detailed = [
+                    (name: teamWitNaam, score: setScores[0]),
+                    (name: teamZwartNaam, score: setScores[1])
+                ]
+                scoreManager.saveGame(
+                    gameName: "Crockinole",
+                    playerScores: detailed,
+                    winnerName: winner,
+                    scoreProgression: progression,
+                    crokinoleStats: stats
+                )
+            }
             showWinnaarView = true
         }
 
@@ -894,11 +998,94 @@ struct CrockinoleGameView: View {
         huidigeSchutterIndex = startSpelerIndex
     }
 
+    private var crokinoleScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        points.append(RoundScoreDataPoint(round: 0, playerName: teamWitNaam, cumulativeScore: 0))
+        points.append(RoundScoreDataPoint(round: 0, playerName: teamZwartNaam, cumulativeScore: 0))
+
+        for rec in crokinoleRoundRecords {
+            let witSets = rec.setScoresAfterRound[safe: 0] ?? 0
+            let zwartSets = rec.setScoresAfterRound[safe: 1] ?? 0
+            let witPts = rec.pointsInSetAfterRound[safe: 0] ?? 0
+            let zwartPts = rec.pointsInSetAfterRound[safe: 1] ?? 0
+
+            // 100 pt per gewonnen set + huidige set punten
+            let witVal = (witSets * 100) + (rec.setWonInThisRound && rec.winningTeamName == teamWitNaam ? 0 : witPts)
+            let zwartVal = (zwartSets * 100) + (rec.setWonInThisRound && rec.winningTeamName == teamZwartNaam ? 0 : zwartPts)
+
+            points.append(RoundScoreDataPoint(
+                round: rec.roundNumber,
+                playerName: teamWitNaam,
+                cumulativeScore: witVal
+            ))
+            points.append(RoundScoreDataPoint(
+                round: rec.roundNumber,
+                playerName: teamZwartNaam,
+                cumulativeScore: zwartVal
+            ))
+        }
+
+        return points
+    }
+
     // MARK: - Rondegeschiedenis & Herstel
 
     private var historySheetView: some View {
         NavigationStack {
             List {
+                // Live match records banner
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Image(systemName: "flame.fill")
+                                .foregroundColor(.orange)
+                            Text("Hoogste scores dit potje")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            Spacer()
+                        }
+
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("IN 1 RONDE")
+                                    .font(.system(size: 9, weight: .black))
+                                    .foregroundColor(.orange)
+                                Text(maxRoundScore > 0 ? "\(maxRoundScore) pt" : "-")
+                                    .font(.title3)
+                                    .fontWeight(.heavy)
+                                if maxRoundScore > 0 {
+                                    Text("\(maxRoundScorePlayer) • R\(maxRoundScoreRound)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.orange.opacity(0.12))
+                            .cornerRadius(10)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("IN 1 SET")
+                                    .font(.system(size: 9, weight: .black))
+                                    .foregroundColor(.yellow)
+                                Text(maxSetScore > 0 ? "\(maxSetScore) pt" : "-")
+                                    .font(.title3)
+                                    .fontWeight(.heavy)
+                                if maxSetScore > 0 {
+                                    Text("\(maxSetScorePlayer)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.yellow.opacity(0.12))
+                            .cornerRadius(10)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 if rondeGeschiedenis.isEmpty {
                     Text("Er zijn nog geen voltooide rondes.")
                         .foregroundColor(.secondary)
@@ -1001,6 +1188,7 @@ struct CrockinoleGameView: View {
         huidigeRonde = entry.ronde
         resetRonde()
         rondeGeschiedenis = kept
+        crokinoleRoundRecords = Array(crokinoleRoundRecords.prefix(idx))
         toonGeschiedenisSheet = false
     }
 
@@ -1014,6 +1202,7 @@ struct CrockinoleGameView: View {
         huidigeRonde = entry.ronde + 1
         resetRonde()
         rondeGeschiedenis = kept
+        crokinoleRoundRecords = Array(crokinoleRoundRecords.prefix(idx + 1))
         toonGeschiedenisSheet = false
     }
 
@@ -1022,9 +1211,18 @@ struct CrockinoleGameView: View {
         setScores = [0, 0]
         totaleScores = [0, 0]
         huidigeRonde = 1
+        huidigeSet = 1
         startSpelerIndex = 0
         huidigeSchutterIndex = 0
         rondeGeschiedenis = []
+        crokinoleRoundRecords = []
+        maxRoundScore = 0
+        maxRoundScorePlayer = ""
+        maxRoundScoreRound = 1
+        maxSetScore = 0
+        maxSetScorePlayer = ""
+        maxDifferential = 0
+        currentGameStats = nil
         resetSchijven()
         winnaarTeam = nil
         showWinnaarView = false

@@ -62,6 +62,62 @@ struct GameTeam: Identifiable, Codable {
     }
 }
 
+struct CrokinoleRoundRecord: Identifiable, Codable {
+    var id: UUID = UUID()
+    let roundNumber: Int
+    let setNumber: Int
+    let scoreWit: Int
+    let scoreZwart: Int
+    let differential: Int
+    let roundWinner: String
+    let setScoresAfterRound: [Int]
+    let pointsInSetAfterRound: [Int]
+    let setWonInThisRound: Bool
+    let winningTeamName: String?
+    let finalSetScore: Int?
+}
+
+struct CrokinoleGameStats: Codable {
+    var maxRoundScore: Int
+    var maxRoundScorePlayer: String
+    var maxRoundScoreRound: Int
+    var maxDifferential: Int
+    var maxSetScore: Int
+    var maxSetScorePlayer: String
+    var totalRounds: Int
+    var totalSets: Int
+    var rounds: [CrokinoleRoundRecord]
+}
+
+struct CrokinolePlayerRecord: Identifiable {
+    var id: String { playerName }
+    let playerName: String
+    let gamesPlayed: Int
+    let gamesWon: Int
+    let setsWon: Int
+    let setsLost: Int
+    let highestRoundScore: Int
+    let highestSetScore: Int
+    let averageRoundScore: Double
+}
+
+struct CrokinoleOverallStats {
+    let totalGamesPlayed: Int
+    let totalRoundsPlayed: Int
+    let totalSetsPlayed: Int
+    let allTimeHighestRound: (score: Int, player: String, date: Date, round: Int)?
+    let allTimeHighestSet: (score: Int, player: String, date: Date, set: Int)?
+    let allTimeHighestDifferential: (diff: Int, player: String, date: Date)?
+    let topRoundScores: [(score: Int, player: String, date: Date, round: Int)]
+    let topSetScores: [(score: Int, player: String, date: Date, set: Int)]
+    let averageRoundsPerSet: Double
+    let averageRoundsPerGame: Double
+    let cleanSweepsCount: Int // 3-0
+    let regularWinsCount: Int // 3-1
+    let thrillerWinsCount: Int // 3-2
+    let playerLeaderboard: [CrokinolePlayerRecord]
+}
+
 struct PlayedGame: Identifiable, Codable {
     var id: UUID = UUID()
     let date: Date
@@ -70,9 +126,10 @@ struct PlayedGame: Identifiable, Codable {
     let winner: String
     var teams: [GameTeam]? = nil
     var scoreProgression: [RoundScoreDataPoint]? = nil
+    var crokinoleStats: CrokinoleGameStats? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, date, gameName, scores, winner, teams, scoreProgression
+        case id, date, gameName, scores, winner, teams, scoreProgression, crokinoleStats
     }
 
     init(
@@ -82,7 +139,8 @@ struct PlayedGame: Identifiable, Codable {
         scores: [PlayerScore],
         winner: String,
         teams: [GameTeam]? = nil,
-        scoreProgression: [RoundScoreDataPoint]? = nil
+        scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil
     ) {
         self.id = id
         self.date = date
@@ -91,6 +149,7 @@ struct PlayedGame: Identifiable, Codable {
         self.winner = winner
         self.teams = teams
         self.scoreProgression = scoreProgression
+        self.crokinoleStats = crokinoleStats
     }
 
     init(from decoder: Decoder) throws {
@@ -102,6 +161,7 @@ struct PlayedGame: Identifiable, Codable {
         self.winner = try container.decode(String.self, forKey: .winner)
         self.teams = try container.decodeIfPresent([GameTeam].self, forKey: .teams)
         self.scoreProgression = try container.decodeIfPresent([RoundScoreDataPoint].self, forKey: .scoreProgression)
+        self.crokinoleStats = try container.decodeIfPresent(CrokinoleGameStats.self, forKey: .crokinoleStats)
     }
 }
 
@@ -445,7 +505,8 @@ class ScoreManager: ObservableObject {
         winner: Player?,
         juisteBalzakken: [Int]? = nil,
         fouteBalzakken: [Int]? = nil,
-        scoreProgression: [RoundScoreDataPoint]? = nil
+        scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil
     ) {
         let paired: [(name: String, score: Int, juiste: Int, foute: Int)] = players.indices.map { i in
             let name = players[i].name
@@ -458,7 +519,8 @@ class ScoreManager: ObservableObject {
             gameName: gameName,
             playerDetailedScores: paired,
             winnerName: winner?.name ?? "",
-            scoreProgression: scoreProgression
+            scoreProgression: scoreProgression,
+            crokinoleStats: crokinoleStats
         )
     }
 
@@ -466,14 +528,16 @@ class ScoreManager: ObservableObject {
         gameName: String,
         playerScores: [(player: Player, score: Int)],
         winner: Player?,
-        scoreProgression: [RoundScoreDataPoint]? = nil
+        scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil
     ) {
         let paired = playerScores.map { ($0.player.name, $0.score, 0, 0) }
         saveGame(
             gameName: gameName,
             playerDetailedScores: paired,
             winnerName: winner?.name ?? "",
-            scoreProgression: scoreProgression
+            scoreProgression: scoreProgression,
+            crokinoleStats: crokinoleStats
         )
     }
 
@@ -481,14 +545,16 @@ class ScoreManager: ObservableObject {
         gameName: String,
         playerScores: [(name: String, score: Int)],
         winnerName: String,
-        scoreProgression: [RoundScoreDataPoint]? = nil
+        scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil
     ) {
         let detailed = playerScores.map { ($0.name, $0.score, 0, 0) }
         saveGame(
             gameName: gameName,
             playerDetailedScores: detailed,
             winnerName: winnerName,
-            scoreProgression: scoreProgression
+            scoreProgression: scoreProgression,
+            crokinoleStats: crokinoleStats
         )
     }
 
@@ -519,7 +585,8 @@ class ScoreManager: ObservableObject {
         gameName: String,
         playerDetailedScores: [(name: String, score: Int, juiste: Int, foute: Int)],
         winnerName: String,
-        scoreProgression: [RoundScoreDataPoint]? = nil
+        scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil
     ) {
         let now = Date()
         var existingGames = fetchGames()
@@ -559,7 +626,8 @@ class ScoreManager: ObservableObject {
             gameName: gameName,
             scores: entries,
             winner: trimmedWinner,
-            scoreProgression: scoreProgression
+            scoreProgression: scoreProgression,
+            crokinoleStats: crokinoleStats
         )
         existingGames.append(game)
         persistGames(existingGames)
@@ -579,7 +647,9 @@ class ScoreManager: ObservableObject {
 
     func saveTeamGame(
         gameName: String,
-        teams: [(teamName: String, playerNames: [String], score: Int, isWinner: Bool)]
+        teams: [(teamName: String, playerNames: [String], score: Int, isWinner: Bool)],
+        scoreProgression: [RoundScoreDataPoint]? = nil,
+        crokinoleStats: CrokinoleGameStats? = nil
     ) {
         let now = Date()
         var existingGames = fetchGames()
@@ -652,7 +722,9 @@ class ScoreManager: ObservableObject {
             gameName: gameName,
             scores: playerScores,
             winner: effectiveWinnerName.isEmpty ? defaultWinner : effectiveWinnerName,
-            teams: gameTeams
+            teams: gameTeams,
+            scoreProgression: scoreProgression,
+            crokinoleStats: crokinoleStats
         )
         existingGames.append(game)
         persistGames(existingGames)
@@ -1209,6 +1281,157 @@ class ScoreManager: ObservableObject {
             }
             return $0.fouteBalzakken < $1.fouteBalzakken
         }
+    }
+
+    /// Geeft uitgebreide Crokinole statistieken terug (records in 1 ronde, in 1 set, setverdelingen en PR's)
+    func crokinoleOverallStats() -> CrokinoleOverallStats {
+        let matchingGames = playedGames.filter { matchesGameName($0.gameName, "Crockinole") }
+
+        let totalGames = matchingGames.count
+        var totalRounds = 0
+        var totalSets = 0
+
+        var allRoundScores: [(score: Int, player: String, date: Date, round: Int)] = []
+        var allSetScores: [(score: Int, player: String, date: Date, set: Int)] = []
+        var allDifferentials: [(diff: Int, player: String, date: Date)] = []
+
+        var cleanSweeps = 0 // 3-0
+        var regularWins = 0 // 3-1
+        var thrillerWins = 0 // 3-2
+
+        // Per-speler aggregators
+        var playerStatsMap: [String: (gamesPlayed: Int, gamesWon: Int, setsWon: Int, setsLost: Int, highestRound: Int, highestSet: Int, totalRoundPoints: Int, roundCount: Int)] = [:]
+
+        for game in matchingGames {
+            let sets = game.scores.map { $0.score }
+            let maxSets = sets.max() ?? 0
+            let minSets = sets.min() ?? 0
+            if maxSets == 3 {
+                if minSets == 0 { cleanSweeps += 1 }
+                else if minSets == 1 { regularWins += 1 }
+                else if minSets == 2 { thrillerWins += 1 }
+            }
+
+            // Update spelersaantallen
+            for p in game.playerNamesList {
+                var cur = playerStatsMap[p] ?? (0, 0, 0, 0, 0, 0, 0, 0)
+                cur.gamesPlayed += 1
+                if game.winner.contains(p) {
+                    cur.gamesWon += 1
+                }
+                playerStatsMap[p] = cur
+            }
+
+            if let stats = game.crokinoleStats {
+                totalRounds += stats.totalRounds
+                totalSets += stats.totalSets
+
+                // Rounds verwerken
+                for r in stats.rounds {
+                    allRoundScores.append((r.scoreWit, "Wit", game.date, r.roundNumber))
+                    allRoundScores.append((r.scoreZwart, "Zwart", game.date, r.roundNumber))
+                    if r.differential > 0 {
+                        allDifferentials.append((r.differential, r.roundWinner, game.date))
+                    }
+                    if r.setWonInThisRound, let setScore = r.finalSetScore, let winner = r.winningTeamName {
+                        allSetScores.append((setScore, winner, game.date, r.setNumber))
+                    }
+                }
+
+                // Speler PRs bijwerken vanuit stats
+                for p in game.playerNamesList {
+                    var cur = playerStatsMap[p] ?? (0, 0, 0, 0, 0, 0, 0, 0)
+                    if stats.maxRoundScore > cur.highestRound {
+                        cur.highestRound = stats.maxRoundScore
+                    }
+                    if stats.maxSetScore > cur.highestSet {
+                        cur.highestSet = stats.maxSetScore
+                    }
+                    playerStatsMap[p] = cur
+                }
+            } else {
+                // Fallback voor eerdere potjes:
+                let gameSets = sets.reduce(0, +)
+                totalSets += gameSets
+                totalRounds += max(gameSets * 3, 3)
+
+                for ps in game.scores {
+                    if ps.isWinner {
+                        allSetScores.append((100, ps.playerName, game.date, ps.score))
+                        var cur = playerStatsMap[ps.playerName] ?? (0, 0, 0, 0, 0, 0, 0, 0)
+                        if 100 > cur.highestSet {
+                            cur.highestSet = 100
+                        }
+                        playerStatsMap[ps.playerName] = cur
+                    }
+                }
+            }
+        }
+
+        let sortedRounds = allRoundScores.sorted { $0.score > $1.score }
+        let sortedSets = allSetScores.sorted { $0.score > $1.score }
+        let sortedDiffs = allDifferentials.sorted { $0.diff > $1.diff }
+
+        // Dedupliceer top rondes (hoogste score per speler/ronde)
+        var seenRoundKeys = Set<String>()
+        var topRounds: [(score: Int, player: String, date: Date, round: Int)] = []
+        for r in sortedRounds {
+            let key = "\(r.score)_\(r.player)_\(r.round)"
+            if !seenRoundKeys.contains(key) {
+                seenRoundKeys.insert(key)
+                topRounds.append(r)
+                if topRounds.count >= 5 { break }
+            }
+        }
+
+        var seenSetKeys = Set<String>()
+        var topSets: [(score: Int, player: String, date: Date, set: Int)] = []
+        for s in sortedSets {
+            let key = "\(s.score)_\(s.player)_\(s.set)"
+            if !seenSetKeys.contains(key) {
+                seenSetKeys.insert(key)
+                topSets.append(s)
+                if topSets.count >= 5 { break }
+            }
+        }
+
+        let avgRoundsPerSet = totalSets > 0 ? Double(totalRounds) / Double(totalSets) : 0.0
+        let avgRoundsPerGame = totalGames > 0 ? Double(totalRounds) / Double(totalGames) : 0.0
+
+        var playerRecords: [CrokinolePlayerRecord] = []
+        for (name, val) in playerStatsMap {
+            playerRecords.append(CrokinolePlayerRecord(
+                playerName: name,
+                gamesPlayed: val.gamesPlayed,
+                gamesWon: val.gamesWon,
+                setsWon: val.setsWon,
+                setsLost: val.setsLost,
+                highestRoundScore: val.highestRound,
+                highestSetScore: val.highestSet,
+                averageRoundScore: val.roundCount > 0 ? Double(val.totalRoundPoints) / Double(val.roundCount) : 0.0
+            ))
+        }
+        playerRecords.sort {
+            if $0.gamesWon != $1.gamesWon { return $0.gamesWon > $1.gamesWon }
+            return $0.highestRoundScore > $1.highestRoundScore
+        }
+
+        return CrokinoleOverallStats(
+            totalGamesPlayed: totalGames,
+            totalRoundsPlayed: totalRounds,
+            totalSetsPlayed: totalSets,
+            allTimeHighestRound: topRounds.first,
+            allTimeHighestSet: topSets.first,
+            allTimeHighestDifferential: sortedDiffs.first,
+            topRoundScores: topRounds,
+            topSetScores: topSets,
+            averageRoundsPerSet: avgRoundsPerSet,
+            averageRoundsPerGame: avgRoundsPerGame,
+            cleanSweepsCount: cleanSweeps,
+            regularWinsCount: regularWins,
+            thrillerWinsCount: thrillerWins,
+            playerLeaderboard: playerRecords
+        )
     }
 
     // MARK: - Statistieken per Spel
