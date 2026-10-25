@@ -744,7 +744,7 @@ class ScoreManager: ObservableObject {
     /// Geeft aan of bij een spel de laagste score wint
     func isLowestScoreWins(for gameName: String) -> Bool {
         let name = gameName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        return name == "beverbende" || name == "balzakken" || name == "pig hole" || name == "pighole" || name == "quickstop" || name == "quick stop"
+        return name == "beverbende" || name == "balzakken" || name == "pig hole" || name == "pighole" || name == "quickstop" || name == "quick stop" || name == "fifty fifty" || name == "fiftyfifty"
     }
 
     /// Meest gespeelde spellen met aantal potjes
