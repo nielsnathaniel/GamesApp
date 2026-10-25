@@ -14,6 +14,7 @@ struct StatisticsView: View {
     @State private var selectedH2HPlayerB: String = ""
     @State private var selectedScoreProgressionSessionId: UUID? = nil
     @State private var expandedSessionIds: Set<UUID> = []
+    @State private var filterOnlyPlayedGames: Bool = false
     @Namespace private var categoryAnimation
 
     init(isSheet: Bool = false, initialSegment: StatSegment = .overzicht, initialGame: String? = nil) {
@@ -47,7 +48,8 @@ struct StatisticsView: View {
         AppGameInfo(name: "Crockinole", assetName: "Crockinole", defaultIcon: "circle.circle.fill", defaultColor: .blue),
         AppGameInfo(name: "Beverbende", assetName: "Beverbende", defaultIcon: "pawprint.fill", defaultColor: .green),
         AppGameInfo(name: "Duizenden", assetName: "Duizenden", defaultIcon: "suit.spade.fill", defaultColor: .blue),
-        AppGameInfo(name: "Nmbr9", assetName: "Nmbr9", defaultIcon: "number.square.fill", defaultColor: .indigo)
+        AppGameInfo(name: "Nmbr9", assetName: "Nmbr9", defaultIcon: "number.square.fill", defaultColor: .indigo),
+        AppGameInfo(name: "Fifty Fifty", assetName: "FiftyFifty", defaultIcon: "dollarsign.circle.fill", defaultColor: .green)
     ]
 
     enum StatSegment: String, CaseIterable, Identifiable {
@@ -868,8 +870,11 @@ struct StatisticsView: View {
 
     private var perGameSection: some View {
         VStack(spacing: 16) {
-            // Horizontale spelselectiebalk
-            gameSelectorBar
+            // Speelgewoontes & Inzichten dashboard (bovenaan)
+            perGameHabitsDashboardCard
+
+            // Compacte tegel-grid (zoals spellenoverzicht, maar kleinere tegels)
+            gameSelectorTilesGrid
 
             let activeGame = selectedDetailGame
             let sessionCount = scoreManager.playedGames.filter { scoreManager.matchesGameName($0.gameName, activeGame) }.count
@@ -917,85 +922,496 @@ struct StatisticsView: View {
         }
     }
 
-    // MARK: - Per Spel UI Componenten
+    // MARK: - Speelgewoontes & Inzichten Datamodel
 
-    private var gameSelectorBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private struct PlayHabitStats {
+        var totalGames: Int
+        var top3Games: [(name: String, count: Int, percentage: Int)]
+        var topDayName: String
+        var topDayPercentage: Int
+        var weekendPercentage: Int
+        var topTimeSlot: String
+        var topTimeIcon: String
+        var topTimePercentage: Int
+        var topPlayerFavorites: [(player: String, game: String, count: Int)]
+        var mostFrequentDuo: (p1: String, p2: String, count: Int)?
+        var avgPlayersPerGame: Double
+    }
+
+    private var playHabitStats: PlayHabitStats? {
+        let allSessions = scoreManager.playedGames
+        guard !allSessions.isEmpty else { return nil }
+
+        let total = allSessions.count
+
+        // 1. Meest gespeelde spellen
+        var gameCounts: [String: Int] = [:]
+        for session in allSessions {
+            let canon = allAppGames.first(where: { scoreManager.matchesGameName($0.name, session.gameName) })?.name ?? session.gameName
+            gameCounts[canon, default: 0] += 1
+        }
+        let sortedGames = gameCounts.sorted { $0.value > $1.value }
+        let top3 = sortedGames.prefix(3).map {
+            (name: $0.key, count: $0.value, percentage: Int(round(Double($0.value) / Double(total) * 100.0)))
+        }
+
+        // 2. Dagen van de week (1=Zondag, ..., 7=Zaterdag)
+        var dayCounts: [Int: Int] = [:]
+        var weekendCount = 0
+        let cal = Calendar.current
+        for session in allSessions {
+            let w = cal.component(.weekday, from: session.date)
+            dayCounts[w, default: 0] += 1
+            if w == 1 || w == 7 { weekendCount += 1 }
+        }
+        let dayNames: [Int: String] = [
+            1: "Zondag",
+            2: "Maandag",
+            3: "Dinsdag",
+            4: "Woensdag",
+            5: "Donderdag",
+            6: "Vrijdag",
+            7: "Zaterdag"
+        ]
+        let bestDayEntry = dayCounts.max(by: { $0.value < $1.value })
+        let bestDayName = bestDayEntry.flatMap { dayNames[$0.key] } ?? "Onbekend"
+        let bestDayPct = bestDayEntry.map { Int(round(Double($0.value) / Double(total) * 100.0)) } ?? 0
+        let weekendPct = Int(round(Double(weekendCount) / Double(total) * 100.0))
+
+        // 3. Tijden van de dag
+        var timeSlotCounts: [String: Int] = [:]
+        for session in allSessions {
+            let hour = cal.component(.hour, from: session.date)
+            let slot: String
+            if hour >= 6 && hour < 12 {
+                slot = "Ochtend (06:00 - 12:00)"
+            } else if hour >= 12 && hour < 18 {
+                slot = "Middag (12:00 - 18:00)"
+            } else if hour >= 18 && hour < 24 {
+                slot = "Avond (18:00 - 24:00)"
+            } else {
+                slot = "Nacht (00:00 - 06:00)"
+            }
+            timeSlotCounts[slot, default: 0] += 1
+        }
+        let bestSlotEntry = timeSlotCounts.max(by: { $0.value < $1.value })
+        let bestSlotName = bestSlotEntry?.key ?? "Avond (18:00 - 24:00)"
+        let bestSlotPct = bestSlotEntry.map { Int(round(Double($0.value) / Double(total) * 100.0)) } ?? 0
+        let bestSlotIcon: String
+        if bestSlotName.contains("Ochtend") {
+            bestSlotIcon = "sun.and.horizon.fill"
+        } else if bestSlotName.contains("Middag") {
+            bestSlotIcon = "sun.max.fill"
+        } else if bestSlotName.contains("Avond") {
+            bestSlotIcon = "moon.stars.fill"
+        } else {
+            bestSlotIcon = "sparkles"
+        }
+
+        // 4. Populairste spel per speler & duo's
+        var playerGameCounts: [String: [String: Int]] = [:]
+        var playerTotalSessions: [String: Int] = [:]
+        var totalPlayerAppearances = 0
+        var duoCounts: [String: Int] = [:]
+
+        for session in allSessions {
+            let canonGame = allAppGames.first(where: { scoreManager.matchesGameName($0.name, session.gameName) })?.name ?? session.gameName
+            let players = session.scores.map { $0.playerName.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            totalPlayerAppearances += players.count
+
+            for p in players {
+                playerTotalSessions[p, default: 0] += 1
+                if playerGameCounts[p] == nil { playerGameCounts[p] = [:] }
+                playerGameCounts[p]![canonGame, default: 0] += 1
+            }
+
+            if players.count >= 2 {
+                for i in 0..<players.count {
+                    for j in (i+1)..<players.count {
+                        let pA = players[i]
+                        let pB = players[j]
+                        guard pA.caseInsensitiveCompare(pB) != .orderedSame else { continue }
+                        let pairKey = pA < pB ? "\(pA) & \(pB)" : "\(pB) & \(pA)"
+                        duoCounts[pairKey, default: 0] += 1
+                    }
+                }
+            }
+        }
+
+        let topPlayers = playerTotalSessions.sorted(by: { $0.value > $1.value }).prefix(4).map { $0.key }
+        var playerFavorites: [(player: String, game: String, count: Int)] = []
+        for p in topPlayers {
+            if let gamesForPlayer = playerGameCounts[p], let favorite = gamesForPlayer.max(by: { $0.value < $1.value }) {
+                playerFavorites.append((player: p, game: favorite.key, count: favorite.value))
+            }
+        }
+
+        let bestDuoEntry = duoCounts.max(by: { $0.value < $1.value })
+        var duoResult: (p1: String, p2: String, count: Int)? = nil
+        if let entry = bestDuoEntry, entry.value > 1 {
+            let parts = entry.key.components(separatedBy: " & ")
+            if parts.count == 2 {
+                duoResult = (p1: parts[0], p2: parts[1], count: entry.value)
+            }
+        }
+
+        let avgPlayers = total > 0 ? Double(totalPlayerAppearances) / Double(total) : 0.0
+
+        return PlayHabitStats(
+            totalGames: total,
+            top3Games: top3,
+            topDayName: bestDayName,
+            topDayPercentage: bestDayPct,
+            weekendPercentage: weekendPct,
+            topTimeSlot: bestSlotName,
+            topTimeIcon: bestSlotIcon,
+            topTimePercentage: bestSlotPct,
+            topPlayerFavorites: playerFavorites,
+            mostFrequentDuo: duoResult,
+            avgPlayersPerGame: avgPlayers
+        )
+    }
+
+    private var perGameHabitsDashboardCard: some View {
+        Group {
+            if let stats = playHabitStats {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Kop
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.teal.opacity(0.18))
+                                .frame(width: 34, height: 34)
+                            Image(systemName: "chart.bar.xaxis")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.teal)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Speelgewoontes & Inzichten")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            Text("Gebaseerd op \(stats.totalGames) potjes • Gem. \(String(format: "%.1f", stats.avgPlayersPerGame)) spelers/potje")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+                    }
+
+                    // Twee KPI cards naast elkaar: Populairste Tijdstip & Top Speeldag
+                    HStack(spacing: 10) {
+                        // Tijdstip tegel
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 5) {
+                                Image(systemName: stats.topTimeIcon)
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                                Text("POPULAIRSTE TIJD")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.secondary)
+                            }
+                            Text(stats.topTimeSlot.components(separatedBy: " (").first ?? stats.topTimeSlot)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.primary)
+                            Text("\(stats.topTimePercentage)% van alle potjes")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color(UIColor.tertiarySystemGroupedBackground))
+                        .cornerRadius(12)
+
+                        // Speeldag tegel
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                                Text("TOP SPEELDAG")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.secondary)
+                            }
+                            Text(stats.topDayName)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.primary)
+                            Text("\(stats.topDayPercentage)% (\(stats.weekendPercentage)% in weekend)")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color(UIColor.tertiarySystemGroupedBackground))
+                        .cornerRadius(12)
+                    }
+
+                    // Meest gespeelde spellen (Top 3 Bar Ranking)
+                    if !stats.top3Games.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("MEEST GESPEELDE SPELLEN")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+
+                            VStack(spacing: 10) {
+                                ForEach(Array(stats.top3Games.enumerated()), id: \.element.name) { idx, item in
+                                    let medal = idx == 0 ? "🥇" : (idx == 1 ? "🥈" : "🥉")
+                                    VStack(spacing: 4) {
+                                        HStack(spacing: 8) {
+                                            Text(medal)
+                                                .font(.caption)
+
+                                            gameThumbnail(for: item.name, size: 22)
+
+                                            Text(item.name)
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .lineLimit(1)
+
+                                            Spacer()
+
+                                            Text("\(item.count)x")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundColor(.primary)
+
+                                            Text("(\(item.percentage)%)")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                                .frame(width: 38, alignment: .trailing)
+                                        }
+
+                                        // Voortgangsbalkje
+                                        GeometryReader { geo in
+                                            ZStack(alignment: .leading) {
+                                                Capsule()
+                                                    .fill(Color.secondary.opacity(0.12))
+                                                    .frame(height: 5)
+                                                Capsule()
+                                                    .fill(idx == 0 ? Color.teal : (idx == 1 ? Color.blue : Color.purple))
+                                                    .frame(width: max(8, geo.size.width * CGFloat(item.percentage) / 100.0), height: 5)
+                                            }
+                                        }
+                                        .frame(height: 5)
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(Color(UIColor.tertiarySystemGroupedBackground))
+                            .cornerRadius(12)
+                        }
+                    }
+
+                    // Favoriete spel per topspeler & Tafelgenoten
+                    if !stats.topPlayerFavorites.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("POPULAIRST PER SPELER & GEZELSCHAP")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+
+                            VStack(spacing: 8) {
+                                ForEach(stats.topPlayerFavorites, id: \.player) { fav in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "person.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.teal)
+                                            .frame(width: 18)
+
+                                        Text(fav.player)
+                                            .font(.subheadline)
+                                            .fontWeight(.bold)
+
+                                        Spacer()
+
+                                        Text("Favoriet:")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+
+                                        HStack(spacing: 4) {
+                                            gameThumbnail(for: fav.game, size: 16)
+                                            Text(fav.game)
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundColor(.primary)
+                                            Text("(\(fav.count)x)")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(.teal)
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(Color.teal.opacity(0.1))
+                                        .cornerRadius(8)
+                                    }
+                                }
+
+                                if let duo = stats.mostFrequentDuo {
+                                    Divider()
+                                        .padding(.vertical, 2)
+
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "person.2.fill")
+                                            .font(.caption)
+                                            .foregroundColor(.indigo)
+                                            .frame(width: 18)
+
+                                        Text("Vast duo:")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+
+                                        Text("\(duo.p1) & \(duo.p2)")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(.indigo)
+
+                                        Spacer()
+
+                                        Text("\(duo.count) potjes samen")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(Color(UIColor.tertiarySystemGroupedBackground))
+                            .cornerRadius(12)
+                        }
+                    }
+                }
+                .padding(16)
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+            }
+        }
+    }
+
+    // MARK: - Per Spel Tegel-Raster (Kleinere tegels zoals het spellenoverzicht)
+
+    private var gameSelectorTilesGrid: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header met titel en filter
             HStack {
-                Image(systemName: "gamecontroller.fill")
-                    .foregroundColor(.teal)
-                    .font(.subheadline)
-                Text("Selecteer Spel")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.secondary)
-                    .textCase(.uppercase)
+                HStack(spacing: 6) {
+                    Image(systemName: "square.grid.3x3.fill")
+                        .foregroundColor(.teal)
+                        .font(.subheadline)
+                    Text("Selecteer Spel")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                }
+
                 Spacer()
-                Text("\(allAppGames.count) spellen")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+
+                // Filter knop: Alle vs Alleen gespeeld
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        filterOnlyPlayedGames.toggle()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: filterOnlyPlayedGames ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                            .font(.system(size: 13))
+                        Text(filterOnlyPlayedGames ? "Alleen gespeeld" : "Alle spellen")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(filterOnlyPlayedGames ? Color.teal.opacity(0.18) : Color(UIColor.secondarySystemGroupedBackground))
+                    .foregroundColor(filterOnlyPlayedGames ? .teal : .secondary)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(filterOnlyPlayedGames ? Color.teal.opacity(0.3) : Color.clear, lineWidth: 1)
+                    )
+                }
             }
             .padding(.horizontal, 4)
 
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(allAppGames) { game in
-                            let isSelected = scoreManager.matchesGameName(selectedDetailGame, game.name)
-                            let playCount = scoreManager.playedGames.filter { scoreManager.matchesGameName($0.gameName, game.name) }.count
-
-                            Button(action: {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                                    selectedDetailGame = game.name
-                                }
-                            }) {
-                                HStack(spacing: 6) {
-                                    gameThumbnail(for: game.name, size: 20)
-
-                                    Text(game.name)
-                                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-
-                                    if playCount > 0 {
-                                        Text("\(playCount)x")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .padding(.horizontal, 5)
-                                            .padding(.vertical, 2)
-                                            .background(isSelected ? Color.white.opacity(0.25) : Color.orange.opacity(0.18))
-                                            .foregroundColor(isSelected ? .white : .orange)
-                                            .clipShape(Capsule())
-                                    }
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background {
-                                    ZStack {
-                                        if isSelected {
-                                            game.defaultColor
-                                                .clipShape(Capsule())
-                                                .shadow(color: game.defaultColor.opacity(0.35), radius: 5, x: 0, y: 2)
-                                        } else {
-                                            Color(UIColor.secondarySystemGroupedBackground)
-                                                .clipShape(Capsule())
-                                                .overlay(
-                                                    Capsule()
-                                                        .stroke(Color.gray.opacity(0.18), lineWidth: 1)
-                                                )
-                                        }
-                                    }
-                                }
-                                .foregroundColor(isSelected ? .white : .primary)
-                            }
-                            .buttonStyle(.plain)
-                            .id(game.name)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                    .padding(.horizontal, 2)
+            // 3-koloms raster van compacte speltegels
+            let displayedGames = allAppGames.filter { game in
+                if filterOnlyPlayedGames {
+                    return scoreManager.playedGames.contains { scoreManager.matchesGameName($0.gameName, game.name) }
                 }
-                .onChange(of: selectedDetailGame) { _, newGame in
-                    withAnimation {
-                        proxy.scrollTo(newGame, anchor: .center)
+                return true
+            }
+
+            if displayedGames.isEmpty {
+                HStack {
+                    Spacer()
+                    Text("Nog geen spellen gespeeld")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 16)
+                    Spacer()
+                }
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(12)
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                    ForEach(displayedGames) { game in
+                        let isSelected = scoreManager.matchesGameName(selectedDetailGame, game.name)
+                        let playCount = scoreManager.playedGames.filter { scoreManager.matchesGameName($0.gameName, game.name) }.count
+
+                        Button(action: {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                                selectedDetailGame = game.name
+                            }
+                        }) {
+                            VStack(spacing: 6) {
+                                ZStack(alignment: .topTrailing) {
+                                    gameHeroIcon(for: game.name, size: 50)
+
+                                    // Vlam-badge met speelaantal
+                                    if playCount > 0 {
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "flame.fill")
+                                                .font(.system(size: 7))
+                                            Text("\(playCount)")
+                                                .font(.system(size: 9, weight: .black))
+                                        }
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(isSelected ? Color.teal : Color.orange)
+                                        .foregroundColor(.white)
+                                        .clipShape(Capsule())
+                                        .offset(x: 6, y: -4)
+                                        .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+                                    }
+
+                                    // Checkmark wanneer geselecteerd
+                                    if isSelected {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 15))
+                                            .foregroundColor(.teal)
+                                            .background(Circle().fill(Color.white).padding(1))
+                                            .offset(x: -24, y: -4)
+                                    }
+                                }
+                                .padding(.top, 4)
+
+                                Text(game.name)
+                                    .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                                    .foregroundColor(isSelected ? .primary : .secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+
+                                Text(playCount == 1 ? "1 potje" : "\(playCount) potjes")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(isSelected ? .teal : .secondary.opacity(0.75))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(isSelected ? Color.teal.opacity(0.12) : Color(UIColor.secondarySystemGroupedBackground))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(isSelected ? Color.teal : Color.clear, lineWidth: 2)
+                            )
+                            .shadow(color: isSelected ? Color.teal.opacity(0.2) : Color.black.opacity(0.03), radius: isSelected ? 4 : 2, x: 0, y: 1)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
