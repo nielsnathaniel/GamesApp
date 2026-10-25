@@ -2,6 +2,9 @@ import SwiftUI
 
 struct StatisticsView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
+    var isSheet: Bool = false
+    @Environment(\.dismiss) private var dismiss
+
     @State private var selectedSegment: StatSegment = .overzicht
     @State private var selectedGameFilter: String = "Alle Spellen"
     @State private var selectedTeamGameFilter: String = "Alle Spellen"
@@ -12,6 +15,15 @@ struct StatisticsView: View {
     @State private var selectedScoreProgressionSessionId: UUID? = nil
     @State private var expandedSessionIds: Set<UUID> = []
     @Namespace private var categoryAnimation
+
+    init(isSheet: Bool = false, initialSegment: StatSegment = .overzicht, initialGame: String? = nil) {
+        self.isSheet = isSheet
+        _selectedSegment = State(initialValue: initialSegment)
+        if let initialGame = initialGame {
+            _selectedDetailGame = State(initialValue: initialGame)
+            _selectedGameFilter = State(initialValue: initialGame)
+        }
+    }
 
     struct AppGameInfo: Identifiable {
         var id: String { name }
@@ -102,6 +114,14 @@ struct StatisticsView: View {
             }
             .navigationTitle("Statistieken")
             .toolbar {
+                if isSheet {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Sluit") {
+                            dismiss()
+                        }
+                        .font(.body.weight(.semibold))
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink(destination: SpelsessiesBeheerView()) {
                         HStack(spacing: 4) {

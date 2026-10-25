@@ -21,6 +21,7 @@ struct WinnaarView: View {
     var onReset: (() -> Void)? = nil
 
     @State private var isScoreOpgeslagen = false
+    @State private var showStatsSheet = false
     @Environment(\.dismiss) private var dismiss
     private let scoreManager = ScoreManager.shared
 
@@ -126,83 +127,227 @@ struct WinnaarView: View {
         }
     }
 
+    private var winnerScoreValue: Int? {
+        if let first = rankedIndices.first {
+            return sortedScores[safe: first]
+        }
+        return nil
+    }
+
+    private func scoreUnit(for score: Int) -> String {
+        if gameName == "Regenwormen" {
+            return score == 1 ? "worm" : "wormen"
+        }
+        if gameName.localizedCaseInsensitiveContains("crok") {
+            return "sets"
+        }
+        return score == 1 ? "punt" : "punten"
+    }
+
+    private func rankMedal(_ rank: Int) -> String {
+        switch rank {
+        case 0: return "🥇"
+        case 1: return "🥈"
+        case 2: return "🥉"
+        default: return "\(rank + 1)."
+        }
+    }
+
+    private var effectiveProgression: [RoundScoreDataPoint] {
+        if let points = scoreProgression, !points.isEmpty {
+            return points
+        }
+        var points: [RoundScoreDataPoint] = []
+        for (idx, speler) in sortedSpelers.enumerated() {
+            let score = sortedScores[safe: idx] ?? 0
+            points.append(RoundScoreDataPoint(round: 0, playerName: speler.name, cumulativeScore: 0))
+            points.append(RoundScoreDataPoint(round: 1, playerName: speler.name, cumulativeScore: score))
+        }
+        return points
+    }
+
     var body: some View {
-        VStack {
-            Text(gameName)
-                .font(.headline)
-                .foregroundColor(.secondary)
-                .padding(.top, 10)
+        ScrollView {
+            VStack(spacing: 16) {
+                // Spelnaam subtiel bovenaan
+                Text(gameName)
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
 
-            VStack(spacing: 4) {
-                Text(teamEntries != nil ? "Winnend Team:" : "Winnaar:")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.black.opacity(0.6))
+                // Feestelijke Winnaar Card
+                winnerBanner
 
-                Text(winnaar.name)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+                // Score automatisch opgeslagen badge
+                savedStatusBadge
 
-                if let teams = teamEntries, let winTeam = teams.first(where: { $0.isWinner }) {
-                    Text(winTeam.playerNames.joined(separator: " & "))
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.black.opacity(0.8))
-                }
+                // Eindstand uitslagenlijst
+                rankingsSection
+
+                // Scoreverloop grafiek (PROMINENT & DUIDELIJK)
+                scoreProgressionSection
+
+                // Drie keuzeknoppen
+                actionButtons
             }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color.yellow)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-            .padding(.horizontal)
-            .padding(.top, 10)
+            .padding(.vertical)
+        }
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showStatsSheet) {
+            StatisticsView(isSheet: true, initialSegment: .perSpel, initialGame: gameName)
+        }
+        .onAppear {
+            autoSaveScore()
+            HapticManager.shared.celebration()
+        }
+    }
 
-            List {
-                if let _ = teamEntries {
-                    ForEach(rankedTeams) { team in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
+    // MARK: - Subviews
+
+    private var winnerBanner: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Text("🏆")
+                    .font(.title2)
+                Text(teamEntries != nil ? "WINNEND TEAM" : "WINNAAR")
+                    .font(.caption)
+                    .fontWeight(.black)
+                    .foregroundColor(.black.opacity(0.65))
+                    .tracking(1.0)
+            }
+
+            Text(winnaar.name)
+                .font(.system(size: 32, weight: .heavy, design: .rounded))
+                .foregroundColor(.black)
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.8)
+
+            if let teams = teamEntries, let winTeam = teams.first(where: { $0.isWinner }) {
+                Text(winTeam.playerNames.joined(separator: " & "))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.black.opacity(0.8))
+            } else if let winnerScore = winnerScoreValue {
+                Text("\(winnerScore) \(scoreUnit(for: winnerScore))")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.black.opacity(0.85))
+            }
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
+        .background(
+            LinearGradient(
+                colors: [Color.yellow, Color.orange.opacity(0.85)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(18)
+        .shadow(color: Color.orange.opacity(0.35), radius: 10, x: 0, y: 5)
+        .padding(.horizontal)
+    }
+
+    private var savedStatusBadge: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+                .font(.subheadline)
+            Text("Score automatisch opgeslagen in statistieken")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .background(Color.green.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
+    private var rankingsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "list.number")
+                    .foregroundColor(.blue)
+                Text("Eindstand")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            .padding(.horizontal)
+
+            VStack(spacing: 0) {
+                if let teams = teamEntries {
+                    ForEach(Array(rankedTeams.enumerated()), id: \.element.id) { idx, team in
+                        HStack(spacing: 12) {
+                            Text(rankMedal(idx))
+                                .font(.title3)
+                                .frame(width: 32)
+
+                            VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 6) {
                                     Text(team.teamName)
                                         .font(.headline)
+                                        .fontWeight(.bold)
                                     if team.isWinner {
-                                        Text("🏆 Winnaar")
-                                            .font(.system(size: 10, weight: .bold))
+                                        Text("WINNAAR")
+                                            .font(.system(size: 9, weight: .black))
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 2)
-                                            .background(Color.yellow.opacity(0.3))
-                                            .cornerRadius(4)
+                                            .background(Color.yellow)
+                                            .foregroundColor(.black)
+                                            .clipShape(Capsule())
                                     }
                                 }
                                 Text(team.playerNames.joined(separator: " & "))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
+
                             Spacer()
+
                             let unit = gameName.localizedCaseInsensitiveContains("crok") ? "sets" : "pt"
                             Text("\(team.score) \(unit)")
-                                .fontWeight(.bold)
+                                .font(.headline)
+                                .fontWeight(.heavy)
                                 .foregroundColor(.primary)
                         }
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+
+                        if idx < rankedTeams.count - 1 {
+                            Divider()
+                                .padding(.leading, 58)
+                        }
                     }
                 } else {
-                    ForEach(rankedIndices, id: \.self) { index in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(sortedSpelers[index].name)
+                    ForEach(Array(rankedIndices.enumerated()), id: \.offset) { rankIdx, playerIdx in
+                        let speler = sortedSpelers[playerIdx]
+                        let score = sortedScores[safe: playerIdx] ?? 0
+
+                        HStack(spacing: 12) {
+                            Text(rankMedal(rankIdx))
+                                .font(.title3)
+                                .frame(width: 32)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(speler.name)
                                     .font(.headline)
-                                if let j = juisteBalzakken?[safe: index], let f = fouteBalzakken?[safe: index], (j > 0 || f > 0) {
+                                    .fontWeight(.bold)
+
+                                if let j = juisteBalzakken?[safe: playerIdx], let f = fouteBalzakken?[safe: playerIdx], (j > 0 || f > 0) {
                                     Text("🎯 \(j) Balzak\(j == 1 ? "" : "ken") • ⚠️ \(f) Valse")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                 }
                             }
+
                             Spacer()
+
                             if gameName == "Jatten" {
-                                if sortedSpelers[index].name == winnaar.name {
+                                if speler.name == winnaar.name {
                                     Text("🏆 6 dezelfde!")
                                         .font(.subheadline)
                                         .fontWeight(.bold)
@@ -213,91 +358,114 @@ struct WinnaarView: View {
                                         .foregroundColor(.secondary)
                                 }
                             } else {
-                                Text("\(sortedScores[safe: index] ?? 0) punten")
-                                    .fontWeight(.semibold)
+                                HStack(spacing: 4) {
+                                    Text("\(score)")
+                                        .font(.headline)
+                                        .fontWeight(.heavy)
+                                        .foregroundColor(.primary)
+                                    Text(scoreUnit(for: score))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+
+                        if rankIdx < rankedIndices.count - 1 {
+                            Divider()
+                                .padding(.leading, 58)
                         }
                     }
                 }
-
-                // Scoreverloop grafiek in de uitslag (indien beschikbaar)
-                if let points = scoreProgression, !points.isEmpty {
-                    Section(header: Text("Scoreverloop")) {
-                        ScoreProgressionChartView(
-                            title: "\(gameName) Scoreverloop",
-                            dataPoints: points,
-                            playerNames: sortedSpelers.map { $0.name }
-                        )
-                        .listRowInsets(EdgeInsets(top: 8, leading: 4, bottom: 8, trailing: 4))
-                    }
-                }
             }
-            .padding(.top, 16)
-
-            Spacer()
-
-            VStack(spacing: 12) {
-                Button(action: {
-                    autoSaveScore()
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onReset?()
-                    dismiss()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Score opgeslagen & Terug")
-                    }
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.green)
-                    .cornerRadius(10)
-                }
-
-                Button(action: {
-                    autoSaveScore()
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onReset?()
-                    dismiss()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.counterclockwise.circle.fill")
-                        Text("Opnieuw spelen")
-                    }
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.blue)
-                    .cornerRadius(10)
-                }
-
-                Button(action: {
-                    autoSaveScore()
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    onReset?()
-                    dismiss()
-                }) {
-                    Text("Klaar")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.red)
-                        .cornerRadius(10)
-                }
-            }
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
             .padding(.horizontal)
         }
-        .padding()
-        .onAppear {
-            autoSaveScore()
-            HapticManager.shared.celebration()
+    }
+
+    private var scoreProgressionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ScoreProgressionChartView(
+                title: "\(gameName) Scoreverloop",
+                dataPoints: effectiveProgression,
+                playerNames: sortedSpelers.map { $0.name },
+                chartHeight: 220
+            )
         }
+        .padding(.horizontal)
+    }
+
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            // Knop 1: Opnieuw spelen
+            Button(action: {
+                autoSaveScore()
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onReset?()
+                dismiss()
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.counterclockwise.circle.fill")
+                        .font(.title3)
+                    Text("Opnieuw spelen")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.blue)
+                .cornerRadius(14)
+                .shadow(color: Color.blue.opacity(0.25), radius: 6, x: 0, y: 3)
+            }
+
+            // Knop 2: Statistieken zien
+            Button(action: {
+                autoSaveScore()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showStatsSheet = true
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.title3)
+                    Text("Statistieken zien")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.purple)
+                .cornerRadius(14)
+                .shadow(color: Color.purple.opacity(0.25), radius: 6, x: 0, y: 3)
+            }
+
+            // Knop 3: Klaar (navigeert terug naar het spellenoverzicht)
+            Button(action: {
+                autoSaveScore()
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onReset?()
+                ActiveGameManager.shared.clearActiveGame()
+                NavigationUtil.popToRoot()
+                dismiss()
+            }) {
+                Text("Klaar")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.red)
+                    .cornerRadius(14)
+                    .shadow(color: Color.red.opacity(0.25), radius: 6, x: 0, y: 3)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 4)
+        .padding(.bottom, 20)
     }
 
     private func autoSaveScore() {
@@ -316,9 +484,41 @@ struct WinnaarView: View {
                 winner: winnaar,
                 juisteBalzakken: juisteBalzakken,
                 fouteBalzakken: fouteBalzakken,
-                scoreProgression: scoreProgression
+                scoreProgression: effectiveProgression
             )
         }
+    }
+}
+
+// MARK: - Navigation Utility to Pop Back to Root (Spellenoverzicht)
+
+enum NavigationUtil {
+    static func popToRoot() {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+              let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController ?? windowScene.windows.first?.rootViewController else {
+            return
+        }
+        findNavigationController(from: rootVC)?.popToRootViewController(animated: true)
+    }
+
+    private static func findNavigationController(from vc: UIViewController) -> UINavigationController? {
+        if let nav = vc as? UINavigationController {
+            return nav
+        }
+        if let tab = vc as? UITabBarController {
+            tab.selectedIndex = 0
+            if let selected = tab.selectedViewController {
+                return findNavigationController(from: selected)
+            }
+        }
+        for child in vc.children {
+            if let nav = findNavigationController(from: child) {
+                return nav
+            }
+        }
+        return nil
     }
 }
 

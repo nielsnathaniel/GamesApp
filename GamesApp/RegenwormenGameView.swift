@@ -1015,14 +1015,29 @@ struct RegenwormenGameView: View {
             }
         }
 
-        // Huidig punt
-        let currentRound = max(1, beurtNummer)
-        for (idx, p) in spelers.enumerated() {
-            points.append(RoundScoreDataPoint(
-                round: currentRound,
-                playerName: p.name,
-                cumulativeScore: totaleWormen(voor: idx)
-            ))
+        // Huidig punt toevoegen indien er nog geen geschiedenis was (directe eindstand modus)
+        // of indien de huidige stand afwijkt van de laatste geregistreerde beurt
+        let lastSnapRound = geschiedenis.last?.beurtNummer ?? 0
+        if geschiedenis.isEmpty {
+            for (idx, p) in spelers.enumerated() {
+                points.append(RoundScoreDataPoint(
+                    round: 1,
+                    playerName: p.name,
+                    cumulativeScore: totaleWormen(voor: idx)
+                ))
+            }
+        } else if let lastSnap = geschiedenis.last {
+            let currentScores = spelers.indices.map { totaleWormen(voor: $0) }
+            if currentScores != lastSnap.scoresNaBeurt {
+                let nextRound = lastSnapRound + 1
+                for (idx, p) in spelers.enumerated() {
+                    points.append(RoundScoreDataPoint(
+                        round: nextRound,
+                        playerName: p.name,
+                        cumulativeScore: currentScores[idx]
+                    ))
+                }
+            }
         }
 
         return points
