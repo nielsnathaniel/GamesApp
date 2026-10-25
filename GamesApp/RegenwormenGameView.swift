@@ -152,11 +152,6 @@ struct RegenwormenGameView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Header (bij beurt-voor-beurt tonen we de live actieve speler)
-                if geselecteerdeTab == .beurtInvoer {
-                    beurtHeaderView
-                }
-
                 // Tab Switcher (Eindstand, Beurt Invoer, Scoreverloop Grafiek)
                 Picker("Weergave", selection: $geselecteerdeTab) {
                     ForEach(RegenwormenViewTab.allCases) { tab in
@@ -165,6 +160,30 @@ struct RegenwormenGameView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
+
+                // Laatste actie / feedback snackbar
+                if let melding = laatsteMelding {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                        Text(melding)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color(UIColor.secondarySystemGroupedBackground))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+                    .transition(.opacity)
+                }
 
                 // Huidige weergave
                 switch geselecteerdeTab {
@@ -183,7 +202,45 @@ struct RegenwormenGameView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Regenwormen")
+        .scrollContentBackground(.hidden)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if geselecteerdeTab == .beurtInvoer {
+                activePlayerStickyHeader
+            }
+        }
+        .background(
+            ZStack {
+                Color(UIColor.systemGroupedBackground)
+                    .ignoresSafeArea()
+
+                if geselecteerdeTab == .beurtInvoer {
+                    LinearGradient(
+                        colors: [
+                            actieveKleur.opacity(0.25),
+                            actieveKleur.opacity(0.14),
+                            actieveKleur.opacity(0.04),
+                            Color(UIColor.systemGroupedBackground)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                    .animation(.easeInOut(duration: 0.35), value: actieveSpelerIndex)
+                } else {
+                    LinearGradient(
+                        colors: [
+                            Color.orange.opacity(0.14),
+                            Color.orange.opacity(0.03),
+                            Color(UIColor.systemGroupedBackground)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
+                }
+            }
+        )
+        .navigationTitle(geselecteerdeTab == .beurtInvoer ? "Regenwormen • \(actieveSpeler.name)" : "Regenwormen")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -279,75 +336,123 @@ struct RegenwormenGameView: View {
         }
     }
 
-    // MARK: - Header voor Beurt-Invoer
+    // MARK: - Sticky Pinned Header voor Beurt-Invoer
 
-    private var beurtHeaderView: some View {
-        VStack(spacing: 12) {
+    private var activePlayerStickyHeader: some View {
+        VStack(spacing: 0) {
             HStack(spacing: 12) {
+                // Avatar met spelerskleur en puls
                 ZStack {
                     Circle()
-                        .fill(actieveKleur.opacity(0.2))
-                        .frame(width: 46, height: 46)
+                        .fill(actieveKleur)
+                        .frame(width: 44, height: 44)
+                        .shadow(color: actieveKleur.opacity(0.45), radius: 4, x: 0, y: 2)
 
-                    Image(systemName: "dice.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(actieveKleur)
+                    Text(playerInitials(actieveSpeler.name))
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundColor(.white)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("Beurt \(beurtNummer)")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.secondary)
+                        Text("PUNTEN INVOEREN VOOR:")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(actieveKleur)
+                            .tracking(0.6)
 
-                        Circle()
-                            .fill(actieveKleur)
-                            .frame(width: 8, height: 8)
+                        Text("• Beurt \(beurtNummer)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary)
                     }
 
                     Text(actieveSpeler.name)
-                        .font(.title2)
-                        .fontWeight(.heavy)
+                        .font(.system(size: 20, weight: .heavy))
                         .foregroundColor(.primary)
+                        .lineLimit(1)
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Text("\(totaleWormen(voor: actieveSpelerIndex))")
-                            .font(.title)
-                            .fontWeight(.black)
-                            .foregroundColor(actieveKleur)
-                        Text("🪱")
-                            .font(.title3)
+                // Wissel knop menu om snel van beurt/speler te wisselen indien nodig
+                Menu {
+                    ForEach(spelers.indices, id: \.self) { idx in
+                        Button(action: {
+                            withAnimation {
+                                actieveSpelerIndex = idx
+                            }
+                        }) {
+                            HStack {
+                                Text(spelers[idx].name)
+                                if idx == actieveSpelerIndex {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
                     }
-                    Text("\(spelerStapels[safe: actieveSpelerIndex]?.count ?? 0) stenen")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(actieveKleur)
+                        .padding(7)
+                        .background(actieveKleur.opacity(0.12))
+                        .clipShape(Circle())
+                }
+
+                // Huidige wormen score pill van deze actieve speler
+                HStack(spacing: 6) {
+                    VStack(alignment: .trailing, spacing: 1) {
+                        HStack(spacing: 3) {
+                            Text("\(totaleWormen(voor: actieveSpelerIndex))")
+                                .font(.system(size: 20, weight: .black))
+                                .foregroundColor(actieveKleur)
+                            Text("🪱")
+                                .font(.subheadline)
+                        }
+                        Text("\(spelerStapels[safe: actieveSpelerIndex]?.count ?? 0) stenen")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(actieveKleur.opacity(0.12))
-                .cornerRadius(12)
+                .padding(.vertical, 5)
+                .background(actieveKleur.opacity(0.14))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(actieveKleur.opacity(0.4), lineWidth: 1)
+                )
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                Color(UIColor.secondarySystemGroupedBackground)
+                    .overlay(actieveKleur.opacity(0.12))
+            )
 
-            if let melding = laatsteMelding {
-                HStack(spacing: 6) {
-                    Image(systemName: "info.circle.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                    Text(melding)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .transition(.opacity)
-            }
+            // Dikke gekleurde accent-lijn onderaan
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [actieveKleur, actieveKleur.opacity(0.4)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 3)
+                .shadow(color: actieveKleur.opacity(0.35), radius: 2, x: 0, y: 1)
         }
+        .shadow(color: Color.black.opacity(0.08), radius: 5, x: 0, y: 3)
+        .animation(.easeInOut(duration: 0.25), value: actieveSpelerIndex)
+    }
+
+    private func playerInitials(_ name: String) -> String {
+        let parts = name.split(separator: " ").map { String($0) }
+        if parts.count >= 2, let first = parts.first?.first, let second = parts[1].first {
+            return "\(first)\(second)".uppercased()
+        } else if let first = name.first {
+            return String(first).uppercased()
+        }
+        return "?"
     }
 
     // MARK: - Modus 1: Eindstand (Stenen invullen per speler)
@@ -676,6 +781,29 @@ struct RegenwormenGameView: View {
                 }
                 .padding(.horizontal)
 
+                // Duidelijke actieve speler instructie banner
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.tap.fill")
+                        .foregroundColor(actieveKleur)
+                        .font(.subheadline)
+                    Text("Tik op een steen om te pakken voor ")
+                        .foregroundColor(.secondary)
+                    + Text(actieveSpeler.name)
+                        .bold()
+                        .foregroundColor(actieveKleur)
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(actieveKleur.opacity(0.14))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(actieveKleur.opacity(0.35), lineWidth: 1)
+                )
+                .padding(.horizontal)
+
                 if tafelStenen.isEmpty {
                     VStack(spacing: 6) {
                         Text("🔥 De barbecue is leeg!")
@@ -726,6 +854,29 @@ struct RegenwormenGameView: View {
                 }
                 .padding(.horizontal)
 
+                // Duidelijke actieve speler instructie banner voor afpakken
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.raised.fill")
+                        .foregroundColor(.purple)
+                        .font(.subheadline)
+                    Text("Tik op de bovenste steen om af te pakken voor ")
+                        .foregroundColor(.secondary)
+                    + Text(actieveSpeler.name)
+                        .bold()
+                        .foregroundColor(actieveKleur)
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.purple.opacity(0.12))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                )
+                .padding(.horizontal)
+
                 let medespelers = spelers.indices.filter { $0 != actieveSpelerIndex }
                 if medespelers.isEmpty {
                     Text("Geen medespelers")
@@ -772,8 +923,8 @@ struct RegenwormenGameView: View {
                                     }) {
                                         HStack(spacing: 8) {
                                             VStack(alignment: .trailing, spacing: 1) {
-                                                Text("Tik om af te pakken!")
-                                                    .font(.system(size: 9, weight: .bold))
+                                                Text("Pak af voor \(actieveSpeler.name)!")
+                                                    .font(.system(size: 10, weight: .bold))
                                                     .foregroundColor(.purple)
                                                 Text("Bovenop: steen \(steen)")
                                                     .font(.caption2)
@@ -821,7 +972,7 @@ struct RegenwormenGameView: View {
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: "xmark.circle.fill")
-                            Text("Mislukte Worp")
+                            Text("Mislukte Worp (\(actieveSpeler.name))")
                         }
                         .font(.subheadline)
                         .fontWeight(.bold)
@@ -830,6 +981,10 @@ struct RegenwormenGameView: View {
                         .padding(.vertical, 12)
                         .background(Color.red.opacity(0.12))
                         .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                        )
                     }
 
                     // Pas / Geen steen beurt
@@ -838,7 +993,7 @@ struct RegenwormenGameView: View {
                         volgendeBeurt(actieOmschrijving: "\(actieveSpeler.name) past (geen steen)")
                     }) {
                         HStack(spacing: 6) {
-                            Text("Pas / Volgende")
+                            Text("\(actieveSpeler.name) past")
                             Image(systemName: "arrow.right.circle.fill")
                         }
                         .font(.subheadline)
@@ -848,6 +1003,10 @@ struct RegenwormenGameView: View {
                         .padding(.vertical, 12)
                         .background(Color(UIColor.secondarySystemGroupedBackground))
                         .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                        )
                     }
                 }
                 .padding(.horizontal)
