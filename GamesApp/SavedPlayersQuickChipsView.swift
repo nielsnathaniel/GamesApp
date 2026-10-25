@@ -166,6 +166,17 @@ struct SavedPlayersQuickChipsView: View {
                 Text(name)
                     .font(.caption)
                     .fontWeight(assigned ? .bold : .medium)
+
+                let count = scoreManager.playerPlayCount(for: name)
+                if count > 0 {
+                    Text("\(count)x")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(assigned ? Color.white.opacity(0.25) : tintColor.opacity(0.18))
+                        .foregroundColor(assigned ? .white : tintColor)
+                        .clipShape(Capsule())
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

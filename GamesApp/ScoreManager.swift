@@ -241,9 +241,65 @@ class ScoreManager: ObservableObject {
 
     // MARK: - Spelersbeheer (Automatisch opslaan & Hergebruiken)
 
+    /// Geeft het totale aantal gespeelde potjes van een speler terug (voor populariteitssortering)
+    func playerPlayCount(for playerName: String) -> Int {
+        let gamesSource = playedGames.isEmpty ? fetchGames() : playedGames
+        let target = playerName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !target.isEmpty else { return 0 }
+
+        var count = 0
+        for game in gamesSource {
+            let inScores = game.scores.contains { $0.playerName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == target }
+            let inTeams = game.teams?.contains { team in
+                team.playerNames.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == target }
+            } ?? false
+
+            if inScores || inTeams {
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// Sorteert spelers op populariteit: spelers die het vaakst spelen staan vooraan.
+    /// Bij een gelijke stand aan gespeelde potjes wordt alfabetisch gesorteerd.
+    func sortPlayersByPopularity(_ names: [String]) -> [String] {
+        let gamesSource = playedGames.isEmpty ? fetchGames() : playedGames
+
+        var countMap: [String: Int] = [:]
+        for game in gamesSource {
+            var countedForGame = Set<String>()
+            for s in game.scores {
+                let norm = s.playerName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !norm.isEmpty { countedForGame.insert(norm) }
+            }
+            if let teams = game.teams {
+                for team in teams {
+                    for p in team.playerNames {
+                        let norm = p.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                        if !norm.isEmpty { countedForGame.insert(norm) }
+                    }
+                }
+            }
+            for norm in countedForGame {
+                countMap[norm, default: 0] += 1
+            }
+        }
+
+        return names.sorted { a, b in
+            let countA = countMap[a.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] ?? 0
+            let countB = countMap[b.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()] ?? 0
+
+            if countA != countB {
+                return countA > countB
+            }
+            return a.localizedCaseInsensitiveCompare(b) == .orderedAscending
+        }
+    }
+
     func fetchPlayerNames() -> [String] {
         if let data = UserDefaults.standard.stringArray(forKey: playersKey) {
-            return data.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+            return sortPlayersByPopularity(data)
         }
 
         // Alleen bij allereerste keer (geen UserDefaults key): migreer vanuit bestaande potjes & scores
@@ -264,7 +320,7 @@ class ScoreManager: ObservableObject {
             }
         }
 
-        let sorted = namesSet.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        let sorted = sortPlayersByPopularity(Array(namesSet))
         UserDefaults.standard.set(sorted, forKey: playersKey)
         return sorted
     }
@@ -293,7 +349,7 @@ class ScoreManager: ObservableObject {
     }
 
     private func persistPlayerNames(_ names: [String]) {
-        let sorted = names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        let sorted = sortPlayersByPopularity(names)
         UserDefaults.standard.set(sorted, forKey: playersKey)
         self.savedPlayerNames = sorted
     }
@@ -592,6 +648,7 @@ class ScoreManager: ObservableObject {
             let data = try encoder.encode(games)
             UserDefaults.standard.set(data, forKey: gamesKey)
             self.playedGames = games
+            self.savedPlayerNames = fetchPlayerNames()
         } catch {
             print("Fout bij opslaan van gespeelde potjes: \(error)")
         }

@@ -355,7 +355,9 @@ struct CrockinoleSetupView: View {
     // MARK: - Helpers
 
     private func playerQuickChip(_ name: String) -> some View {
-        Menu {
+        let playCount = scoreManager.playerPlayCount(for: name)
+
+        return Menu {
             if mode == .eenTegenEen {
                 Button("Zet bij Wit") { spelerWit = name }
                 Button("Zet bij Zwart") { spelerZwart = name }
@@ -372,6 +374,16 @@ struct CrockinoleSetupView: View {
                 Text(name)
                     .font(.caption)
                     .fontWeight(.medium)
+
+                if playCount > 0 {
+                    Text("\(playCount)x")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .clipShape(Capsule())
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

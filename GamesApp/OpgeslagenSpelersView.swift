@@ -82,10 +82,17 @@ struct OpgeslagenSpelersView: View {
                                     .foregroundColor(avatarColor(for: player))
                             }
 
-                            Text(player)
-                                .font(.body)
-                                .fontWeight(.medium)
-                                .foregroundColor(.primary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(player)
+                                    .font(.body)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+
+                                let playCount = scoreManager.playerPlayCount(for: player)
+                                Text(playCount == 1 ? "1 potje gespeeld" : "\(playCount) potjes gespeeld")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
 
                             Spacer()
 

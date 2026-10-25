@@ -283,7 +283,9 @@ struct CraniumSetupView: View {
     }
 
     private func playerQuickChip(_ name: String) -> some View {
-        Menu {
+        let playCount = scoreManager.playerPlayCount(for: name)
+
+        return Menu {
             ForEach(0..<aantalTeams, id: \.self) { tIdx in
                 Button("Zet in \(effectiveTeamName(for: tIdx))") {
                     assignPlayer(name, toTeam: tIdx)
@@ -296,6 +298,16 @@ struct CraniumSetupView: View {
                 Text(name)
                     .font(.caption)
                     .fontWeight(.medium)
+
+                if playCount > 0 {
+                    Text("\(playCount)x")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.purple.opacity(0.2))
+                        .foregroundColor(.purple)
+                        .clipShape(Capsule())
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

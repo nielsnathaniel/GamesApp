@@ -47,7 +47,7 @@ De app gebruikt een centrale `TabView` in [`ContentView.swift`](file:///Users/ni
     - **Populair**: Sorteert spellen op basis van het aantal gespeelde potjes (meest gespeeld bovenaan) met een subtiele vlam-badge (`🔥 Xx`) en speelfrequentie.
     - **Alfabetisch**: Sorteert de spellen op alfabetische volgorde (A-Z).
   - De geselecteerde sorteervoorkeur wordt bewaard via `@AppStorage` en toont een actieve vulling wanneer er een niet-standaard sortering actief is.
-* [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers`, winnaars, H2H-statistieken, 2v2 Duo-statistieken, spelspecifieke ranglijsten en records (`gameLeaderboard`, `bestScoreEver`, `recentSessions`) en Balzakken leaderboards.
+* [`ScoreManager.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/ScoreManager.swift): Singleton (`@Observable` / `ObservableObject`) data-engine. Regelt persistentie via `UserDefaults`, `GameHistory`, `savedPlayers` (automatisch gesorteerd op populariteit/frequentie: spelers die het vaakst meespelen staan vooraan), winnaars, H2H-statistieken, 2v2 Duo-statistieken, spelspecifieke ranglijsten en records (`gameLeaderboard`, `bestScoreEver`, `recentSessions`) en Balzakken leaderboards.
 * [`StatisticsView.swift`](file:///Users/niels/Documents/apps/GamesApp/GamesApp/StatisticsView.swift): Gloednieuw statistiekenscherm met een moderne horizontaal scrollende pill-navigatiebalk en interactieve filterbalk:
   1. *Overzicht:* KPI-tegels (totale potjes, actieve spelers, records) & populariteitsgrafieken.
   2. *Spelers:* Podium (🥇, 🥈, 🥉), winpercentages en ranglijsten voor alle spelers.
