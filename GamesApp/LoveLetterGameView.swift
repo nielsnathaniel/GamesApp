@@ -251,6 +251,7 @@ struct LoveLetterGameView: View {
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
                 isLowestScoreWins: false,
+                scoreProgression: loveLetterScoreProgression,
                 onReset: {
                     resetGame()
                 }
@@ -874,15 +875,45 @@ struct LoveLetterGameView: View {
 
     private func finalizeGame(winnerName: String) {
         winnaarPlayer = Player(name: winnerName)
-
-        // Sla op in ScoreManager
-        let detailed = spelers.indices.map { i in
-            (name: spelers[i], score: fichesPerSpeler[i])
-        }
-        scoreManager.saveGame(gameName: "Love Letter", playerScores: detailed, winnerName: winnerName)
-
-        // Navigeer naar WinnaarView
         showWinnaarView = true
+    }
+
+    private var loveLetterScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        var runningScores: [String: Int] = [:]
+        for p in spelers {
+            runningScores[p] = 0
+            points.append(RoundScoreDataPoint(roundNumber: 0, roundLabel: "Start", playerName: p, score: 0))
+        }
+
+        for (idx, r) in rondeGeschiedenis.enumerated() {
+            let roundNum = idx + 1
+            if let w = spelers.first(where: { $0.caseInsensitiveCompare(r.winnerName) == .orderedSame }) {
+                runningScores[w, default: 0] += 1
+            }
+            if let spy = r.spyBonusPlayer, let s = spelers.first(where: { $0.caseInsensitiveCompare(spy) == .orderedSame }) {
+                runningScores[s, default: 0] += 1
+            }
+            if let kan = r.kanonnierBonusPlayer, let k = spelers.first(where: { $0.caseInsensitiveCompare(kan) == .orderedSame }) {
+                runningScores[k, default: 0] += 1
+            }
+            if let bis = r.bisschopBonusPlayer, let b = spelers.first(where: { $0.caseInsensitiveCompare(bis) == .orderedSame }) {
+                runningScores[b, default: 0] += 1
+            }
+            if let jok = r.jokerBonusPlayer, let j = spelers.first(where: { $0.caseInsensitiveCompare(jok) == .orderedSame }) {
+                runningScores[j, default: 0] += 1
+            }
+
+            for p in spelers {
+                points.append(RoundScoreDataPoint(
+                    roundNumber: roundNum,
+                    roundLabel: "Ronde \(roundNum)",
+                    playerName: p,
+                    score: runningScores[p, default: 0]
+                ))
+            }
+        }
+        return points
     }
 
     private var sortedPlayers: [Player] {

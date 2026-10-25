@@ -124,6 +124,7 @@ struct QuickstopGameView: View {
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
                 isLowestScoreWins: true,
+                scoreProgression: quickstopScoreProgression,
                 onReset: {
                     resetGame()
                 }
@@ -535,12 +536,26 @@ struct QuickstopGameView: View {
     private func finalizeGame() {
         guard let lowest = sortedPlayers.first else { return }
         winnaarPlayer = lowest
-
-        let detailed = spelers.indices.map { i in
-            (name: spelers[i], score: totaleScores[i])
-        }
-        scoreManager.saveGame(gameName: "Quickstop", playerScores: detailed, winnerName: lowest.name)
         showWinnaarView = true
+    }
+
+    private var quickstopScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        for p in spelers {
+            points.append(RoundScoreDataPoint(roundNumber: 0, roundLabel: "Start", playerName: p, score: 0))
+        }
+        for entry in rondeGeschiedenis {
+            for (idx, p) in spelers.enumerated() {
+                let score = entry.totalenNaRonde[safe: idx] ?? 0
+                points.append(RoundScoreDataPoint(
+                    roundNumber: entry.ronde,
+                    roundLabel: "Ronde \(entry.ronde)",
+                    playerName: p,
+                    score: score
+                ))
+            }
+        }
+        return points
     }
 
     private var sortedPlayers: [Player] {

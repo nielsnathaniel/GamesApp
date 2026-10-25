@@ -152,6 +152,7 @@ struct Nmbr9ScoreView: View {
                             sortedSpelers: spelers,
                             sortedScores: totaleScores,
                             isLowestScoreWins: false,
+                            scoreProgression: nmbr9ScoreProgression,
                             onReset: {
                                 resetGame()
                             }
@@ -385,6 +386,25 @@ struct Nmbr9ScoreView: View {
         resetRandomNumbers()
         winnaar = nil
         showWinnaarView = false
+    }
+
+    private var nmbr9ScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        for p in spelers {
+            points.append(RoundScoreDataPoint(roundNumber: 0, roundLabel: "Start", playerName: p.name, score: 0))
+        }
+        for entry in rondeGeschiedenis {
+            for (idx, p) in spelers.enumerated() {
+                let score = entry.totaleScoresNaRonde[safe: idx] ?? 0
+                points.append(RoundScoreDataPoint(
+                    roundNumber: entry.ronde,
+                    roundLabel: "Niveau \(entry.ronde)",
+                    playerName: p.name,
+                    score: score
+                ))
+            }
+        }
+        return points
     }
 }
 

@@ -80,6 +80,7 @@ struct PigHoleGameView: View {
                 sortedSpelers: sortedPlayers,
                 sortedScores: sortedScores,
                 isLowestScoreWins: true,
+                scoreProgression: pigHoleScoreProgression,
                 onReset: {
                     resetGame()
                 }
@@ -403,12 +404,27 @@ struct PigHoleGameView: View {
     private func finalizeGame() {
         guard let winner = sortedPlayers.first else { return }
         winnaarPlayer = winner
-
-        let detailed = spelers.indices.map { i in
-            (name: spelers[i], score: varkens[i])
-        }
-        scoreManager.saveGame(gameName: "Pig Hole", playerScores: detailed, winnerName: winner.name)
         showWinnaarView = true
+    }
+
+    private var pigHoleScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        for p in spelers {
+            points.append(RoundScoreDataPoint(roundNumber: 0, roundLabel: "Start", playerName: p, score: startVarkens))
+        }
+        for (idx, entry) in geschiedenis.enumerated() {
+            let step = idx + 1
+            for (pIdx, p) in spelers.enumerated() {
+                let count = entry.varkensStand[safe: pIdx] ?? startVarkens
+                points.append(RoundScoreDataPoint(
+                    roundNumber: step,
+                    roundLabel: "Ronde \(entry.ronde)",
+                    playerName: p,
+                    score: count
+                ))
+            }
+        }
+        return points
     }
 
     // In Pig Hole: de speler met de MINSTE overgebleven varkentjes (0) wint!

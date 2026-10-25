@@ -198,6 +198,7 @@ struct BeverbendeScoreView: View {
                         sortedSpelers: spelers,
                         sortedScores: totaleScores,
                         isLowestScoreWins: true,
+                        scoreProgression: beverbendeScoreProgression,
                         onReset: {
                             resetGame()
                         }
@@ -399,6 +400,25 @@ struct BeverbendeScoreView: View {
         if !spelers.isEmpty {
             startSpelerIndex = Int.random(in: 0..<spelers.count)
         }
+    }
+
+    private var beverbendeScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        for p in spelers {
+            points.append(RoundScoreDataPoint(roundNumber: 0, roundLabel: "Start", playerName: p.name, score: 0))
+        }
+        for entry in rondeGeschiedenis {
+            for (idx, p) in spelers.enumerated() {
+                let score = entry.totalen[safe: idx] ?? 0
+                points.append(RoundScoreDataPoint(
+                    roundNumber: entry.ronde,
+                    roundLabel: "Ronde \(entry.ronde)",
+                    playerName: p.name,
+                    score: score
+                ))
+            }
+        }
+        return points
     }
 }
 

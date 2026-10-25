@@ -439,6 +439,7 @@ struct BalzakkenGameView: View {
                     isLowestScoreWins: true,
                     juisteBalzakken: juisteBalzakken,
                     fouteBalzakken: fouteBalzakken,
+                    scoreProgression: balzakkenScoreProgression,
                     onReset: {
                         resetGame()
                     }
@@ -683,6 +684,25 @@ struct BalzakkenGameView: View {
         rondeGeschiedenis = []
         winnaar = nil
         showWinnaarView = false
+    }
+
+    private var balzakkenScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        for p in spelers {
+            points.append(RoundScoreDataPoint(roundNumber: 0, roundLabel: "Start", playerName: p.name, score: 0))
+        }
+        for entry in rondeGeschiedenis {
+            for (idx, p) in spelers.enumerated() {
+                let score = entry.totalenNaRonde[safe: idx] ?? 0
+                points.append(RoundScoreDataPoint(
+                    roundNumber: entry.ronde,
+                    roundLabel: "Ronde \(entry.ronde)",
+                    playerName: p.name,
+                    score: score
+                ))
+            }
+        }
+        return points
     }
 }
 

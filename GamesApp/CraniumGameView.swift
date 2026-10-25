@@ -188,6 +188,7 @@ struct CraniumGameView: View {
                     winningTeamName: winner.name,
                     teams: teamEntries,
                     isLowestScoreWins: false,
+                    scoreProgression: craniumScoreProgression,
                     onReset: {
                         resetGame()
                     }
@@ -904,6 +905,29 @@ struct CraniumGameView: View {
         winningTeam = nil
         showWinnaarView = false
         resetTimer()
+    }
+
+    private var craniumScoreProgression: [RoundScoreDataPoint] {
+        var points: [RoundScoreDataPoint] = []
+        var runningScores: [String: Int] = [:]
+        for t in teams {
+            runningScores[t.name] = 0
+            points.append(RoundScoreDataPoint(roundNumber: 0, roundLabel: "Start", playerName: t.name, score: 0))
+        }
+
+        for (idx, entry) in geschiedenis.enumerated() {
+            runningScores[entry.teamName] = entry.totalAfter
+            let step = idx + 1
+            for t in teams {
+                points.append(RoundScoreDataPoint(
+                    roundNumber: step,
+                    roundLabel: "Beurt \(step)",
+                    playerName: t.name,
+                    score: runningScores[t.name, default: 0]
+                ))
+            }
+        }
+        return points
     }
 }
 
