@@ -35,7 +35,8 @@ struct BeverbendeSetupView: View {
 
     var body: some View {
         ScrollView {
-            VStack {
+            VStack(spacing: 20) {
+                // Header
                 HStack(spacing: 12) {
                     Image("Beverbende")
                         .resizable()
@@ -44,11 +45,16 @@ struct BeverbendeSetupView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                         .shadow(color: .green.opacity(0.3), radius: 4, x: 0, y: 2)
                     
-                    Text("Beverbende")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Beverbende")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        Text("Tactisch kaartspel • Minste strafpunten wint! 🦫")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
-                .padding(.top, 0)
+                .padding(.top, 4)
                 .frame(maxWidth: .infinity, alignment: .center)
 
                 // Speelwijze Kiezer (Live vs Snelle Eindscore)
@@ -70,71 +76,94 @@ struct BeverbendeSetupView: View {
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
                 }
-                .padding(.top, 4)
 
-                // Kies aantal spelers
-                Text("Aantal Spelers")
-                    .font(.headline)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3)) {
-                    ForEach(2...6, id: \.self) { number in
-                        Button(action: {
-                            aantalSpelers = number
-                            if speelwijze == .gelijkAanAantalSpelers {
-                                aantalRondes = number
+                // Kies aantal spelers (2 t/m 6)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Aantal Spelers")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 8) {
+                        ForEach(2...6, id: \.self) { number in
+                            Button(action: {
+                                HapticManager.shared.light()
+                                aantalSpelers = number
+                                if speelwijze == .gelijkAanAantalSpelers {
+                                    aantalRondes = number
+                                }
+                            }) {
+                                Text("\(number)")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(aantalSpelers == number ? .white : .green)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(aantalSpelers == number ? Color.green : Color(UIColor.secondarySystemGroupedBackground))
+                                    .cornerRadius(10)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.green.opacity(0.25), lineWidth: 1)
+                                    )
                             }
-                        }) {
-                            Text("\(number)")
-                                .font(.title2)
-                                .foregroundColor(aantalSpelers == number ? .white : .blue)
-                                .padding()
-                                .background(aantalSpelers == number ? Color.blue : Color.clear)
-                                .cornerRadius(10)
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding()
 
                 if invoerModus == .live {
                     // Kies aantal rondes
-                    Text("Aantal Rondes")
-                        .font(.headline)
-                    Picker("Rondes", selection: $speelwijze) {
-                        Text("Gelijk aan aantal spelers").tag(Speelwijze.gelijkAanAantalSpelers)
-                        Text("Kies zelf").tag(Speelwijze.kiesZelf)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .padding()
-                    .onChange(of: speelwijze) { _, newValue in
-                        if newValue == .gelijkAanAantalSpelers {
-                            aantalRondes = aantalSpelers
-                        }
-                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Aantal Rondes")
+                            .font(.headline)
+                            .padding(.horizontal)
 
-                    if speelwijze == .kiesZelf {
-                        HStack {
-                            Button(action: {
-                                if aantalRondes > 3 {
-                                    aantalRondes -= 1
-                                }
-                            }) {
-                                Image(systemName: "minus.circle")
-                                    .font(.title)
-                                    .foregroundColor(.red)
-                            }
-                            Text("\(aantalRondes)")
-                                .font(.title2)
-                                .frame(width: 40)
-                            Button(action: {
-                                if aantalRondes < 8 {
-                                    aantalRondes += 1
-                                }
-                            }) {
-                                Image(systemName: "plus.circle")
-                                    .font(.title)
-                                    .foregroundColor(.green)
+                        Picker("Rondes", selection: $speelwijze) {
+                            Text("Gelijk aan aantal spelers").tag(Speelwijze.gelijkAanAantalSpelers)
+                            Text("Kies zelf").tag(Speelwijze.kiesZelf)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .onChange(of: speelwijze) { _, newValue in
+                            if newValue == .gelijkAanAantalSpelers {
+                                aantalRondes = aantalSpelers
                             }
                         }
-                        .padding()
+
+                        if speelwijze == .kiesZelf {
+                            HStack {
+                                Spacer()
+                                Button(action: {
+                                    if aantalRondes > 3 {
+                                        HapticManager.shared.light()
+                                        aantalRondes -= 1
+                                    }
+                                }) {
+                                    Image(systemName: "minus.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(aantalRondes > 3 ? .green : .secondary.opacity(0.3))
+                                }
+                                .disabled(aantalRondes <= 3)
+
+                                Text("\(aantalRondes) rondes")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .frame(minWidth: 100)
+
+                                Button(action: {
+                                    if aantalRondes < 8 {
+                                        HapticManager.shared.light()
+                                        aantalRondes += 1
+                                    }
+                                }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(aantalRondes < 8 ? .green : .secondary.opacity(0.3))
+                                }
+                                .disabled(aantalRondes >= 8)
+                                Spacer()
+                            }
+                            .padding(.top, 4)
+                        }
                     }
                 }
 
@@ -146,19 +175,25 @@ struct BeverbendeSetupView: View {
                 )
 
                 // Invoervelden voor spelersnamen met dropdown voorstellen
-                VStack(spacing: 12) {
-                    ForEach(0..<aantalSpelers, id: \.self) { index in
-                        PlayerNameInputField(
-                            placeholder: "Naam Speler \(index + 1)",
-                            text: $spelers[index],
-                            suggestions: scoreManager.savedPlayerNames,
-                            submitLabel: index < aantalSpelers - 1 ? .next : .done
-                        )
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Spelers")
+                        .font(.headline)
                         .padding(.horizontal)
+
+                    VStack(spacing: 12) {
+                        ForEach(0..<aantalSpelers, id: \.self) { index in
+                            PlayerNameInputField(
+                                placeholder: "Naam Speler \(index + 1)",
+                                text: $spelers[index],
+                                suggestions: scoreManager.savedPlayerNames,
+                                submitLabel: index < aantalSpelers - 1 ? .next : .done
+                            )
+                            .padding(.horizontal)
+                        }
                     }
                 }
 
-                Spacer(minLength: 20)
+                Spacer(minLength: 16)
 
                 // Start spel knop
                 let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
@@ -167,13 +202,14 @@ struct BeverbendeSetupView: View {
                         Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
                         Text(invoerModus == .snel ? "Eindscore Invullen" : "Start Spel")
                     }
-                    .font(.title2)
+                    .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                     .padding()
                     .frame(maxWidth: .infinity)
                     .background(Color.green)
                     .cornerRadius(12)
+                    .shadow(color: Color.green.opacity(0.35), radius: 5, x: 0, y: 3)
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     scoreManager.savePlayerNames(spelers.prefix(aantalSpelers).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
@@ -184,8 +220,10 @@ struct BeverbendeSetupView: View {
                     Alert(title: Text("Invoerfout"), message: Text("Vul alle spelersnamen in."), dismissButton: .default(Text("OK")))
                 }
             }
-            .padding()
+            .padding(.vertical)
         }
+        .navigationTitle("Beverbende")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             scoreManager.refresh()
         }
