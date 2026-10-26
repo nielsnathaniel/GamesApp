@@ -3,6 +3,20 @@ import SwiftUI
 struct CrockinoleSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
 
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Set voor set"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
     enum CrokinoleMode: String, CaseIterable, Identifiable {
         case eenTegenEen = "1 vs 1"
         case tweeTegenTwee = "2 vs 2 (Teams)"
@@ -10,6 +24,7 @@ struct CrockinoleSetupView: View {
         var id: String { rawValue }
     }
 
+    @State private var invoerModus: InvoerModus = .live
     @State private var mode: CrokinoleMode = .eenTegenEen
 
     // 1 vs 1
@@ -87,6 +102,21 @@ struct CrockinoleSetupView: View {
                 .padding(.horizontal)
                 .padding(.top, 4)
 
+                // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Speelwijze")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Speelwijze", selection: $invoerModus) {
+                        ForEach(InvoerModus.allCases) { modus in
+                            Label(modus.rawValue, systemImage: modus.icon).tag(modus)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+                }
+
                 // 1. Spelmodus Selector
                 Picker("Spelmodus", selection: $mode) {
                     ForEach(CrokinoleMode.allCases) { m in
@@ -141,27 +171,29 @@ struct CrockinoleSetupView: View {
                     tweeTegenTweeInvoer
                 }
 
-                // 4. Invoermethode
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Invoermethode")
-                        .font(.headline)
+                // 4. Invoermethode (alleen bij live set voor set)
+                if invoerModus == .live {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Invoermethode")
+                            .font(.headline)
 
-                    Picker("Invoermethode", selection: $puntenMethode) {
-                        Text("Alles (Directe set-invoer)").tag("Alles")
-                        Text("Berekend (Schijf voor schijf)").tag("Berekend")
+                        Picker("Invoermethode", selection: $puntenMethode) {
+                            Text("Alles (Directe set-invoer)").tag("Alles")
+                            Text("Berekend (Schijf voor schijf)").tag("Berekend")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
                     }
-                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
 
                 Spacer(minLength: 16)
 
                 // 5. Start Spel Knop
                 NavigationLink(destination: destinationGameView) {
                     HStack {
-                        Image(systemName: "play.circle.fill")
+                        Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.circle.fill")
                             .font(.title3)
-                        Text(mode == .eenTegenEen ? "Start 1 vs 1 Wedstrijd" : "Start Team Wedstrijd")
+                        Text(invoerModus == .snel ? "Eindscore Invullen" : (mode == .eenTegenEen ? "Start 1 vs 1 Wedstrijd" : "Start Team Wedstrijd"))
                             .font(.title3)
                             .fontWeight(.bold)
                     }
@@ -403,27 +435,57 @@ struct CrockinoleSetupView: View {
         }
     }
 
+    @ViewBuilder
     private var destinationGameView: some View {
-        if mode == .eenTegenEen {
-            let w = spelerWit.trimmingCharacters(in: .whitespacesAndNewlines)
-            let z = spelerZwart.trimmingCharacters(in: .whitespacesAndNewlines)
-            return CrockinoleGameView(
-                isTeamMode: false,
-                teamWitNaam: w.isEmpty ? "Wit" : w,
-                teamWitSpelers: [w.isEmpty ? "Wit" : w],
-                teamZwartNaam: z.isEmpty ? "Zwart" : z,
-                teamZwartSpelers: [z.isEmpty ? "Zwart" : z],
-                puntenMethode: puntenMethode
-            )
+        if invoerModus == .snel {
+            if mode == .eenTegenEen {
+                let w = spelerWit.trimmingCharacters(in: .whitespacesAndNewlines)
+                let z = spelerZwart.trimmingCharacters(in: .whitespacesAndNewlines)
+                SnelleEindscoreGameView(
+                    gameName: "Crokinole",
+                    themeColor: .blue,
+                    spelers: [w.isEmpty ? "Wit" : w, z.isEmpty ? "Zwart" : z],
+                    isLowestScoreWins: false,
+                    scoreUnit: "punten",
+                    allowNegative: false,
+                    initialScore: 0
+                )
+            } else {
+                SnelleEindscoreGameView(
+                    gameName: "Crokinole",
+                    themeColor: .blue,
+                    teamEntries: [
+                        WinnaarTeamEntry(teamName: effectiveTeamWitNaam, playerNames: [spelerWit1, spelerWit2], score: 0, isWinner: false),
+                        WinnaarTeamEntry(teamName: effectiveTeamZwartNaam, playerNames: [spelerZwart1, spelerZwart2], score: 0, isWinner: false)
+                    ],
+                    isLowestScoreWins: false,
+                    scoreUnit: "punten",
+                    allowNegative: false,
+                    initialScore: 0
+                )
+            }
         } else {
-            return CrockinoleGameView(
-                isTeamMode: true,
-                teamWitNaam: effectiveTeamWitNaam,
-                teamWitSpelers: [spelerWit1, spelerWit2],
-                teamZwartNaam: effectiveTeamZwartNaam,
-                teamZwartSpelers: [spelerZwart1, spelerZwart2],
-                puntenMethode: puntenMethode
-            )
+            if mode == .eenTegenEen {
+                let w = spelerWit.trimmingCharacters(in: .whitespacesAndNewlines)
+                let z = spelerZwart.trimmingCharacters(in: .whitespacesAndNewlines)
+                CrockinoleGameView(
+                    isTeamMode: false,
+                    teamWitNaam: w.isEmpty ? "Wit" : w,
+                    teamWitSpelers: [w.isEmpty ? "Wit" : w],
+                    teamZwartNaam: z.isEmpty ? "Zwart" : z,
+                    teamZwartSpelers: [z.isEmpty ? "Zwart" : z],
+                    puntenMethode: puntenMethode
+                )
+            } else {
+                CrockinoleGameView(
+                    isTeamMode: true,
+                    teamWitNaam: effectiveTeamWitNaam,
+                    teamWitSpelers: [spelerWit1, spelerWit2],
+                    teamZwartNaam: effectiveTeamZwartNaam,
+                    teamZwartSpelers: [spelerZwart1, spelerZwart2],
+                    puntenMethode: puntenMethode
+                )
+            }
         }
     }
 }

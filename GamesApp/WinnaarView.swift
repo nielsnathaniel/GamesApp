@@ -4,8 +4,8 @@ struct WinnaarTeamEntry: Identifiable {
     var id: UUID = UUID()
     let teamName: String
     let playerNames: [String]
-    let score: Int
-    let isWinner: Bool
+    var score: Int
+    var isWinner: Bool
 }
 
 struct WinnaarView: View {

@@ -3,6 +3,21 @@ import SwiftUI
 struct BeverbendeSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
 
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Ronde voor ronde"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
+    @State private var invoerModus: InvoerModus = .live
     @State private var aantalSpelers: Int = 2
     @State private var aantalRondes: Int = 2
     @State private var speelwijze: Speelwijze = .gelijkAanAantalSpelers
@@ -36,6 +51,27 @@ struct BeverbendeSetupView: View {
                 .padding(.top, 0)
                 .frame(maxWidth: .infinity, alignment: .center)
 
+                // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Speelwijze")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Speelwijze", selection: $invoerModus) {
+                        ForEach(InvoerModus.allCases) { mode in
+                            Label(mode.rawValue, systemImage: mode.icon).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+
+                    Text(invoerModus == .snel ? "⚡️ Voer direct de uiteindelijke strafpunten per speler in." : "🎮 Begeleid het spel ronde na ronde met scores per beurt.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+                .padding(.top, 4)
+
                 // Kies aantal spelers
                 Text("Aantal Spelers")
                     .font(.headline)
@@ -58,46 +94,48 @@ struct BeverbendeSetupView: View {
                 }
                 .padding()
 
-                // Kies aantal rondes
-                Text("Aantal Rondes")
-                    .font(.headline)
-                Picker("Speelwijze", selection: $speelwijze) {
-                    Text("Gelijk aan aantal spelers").tag(Speelwijze.gelijkAanAantalSpelers)
-                    Text("Kies zelf").tag(Speelwijze.kiesZelf)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
-                .onChange(of: speelwijze) { _, newValue in
-                    if newValue == .gelijkAanAantalSpelers {
-                        aantalRondes = aantalSpelers
+                if invoerModus == .live {
+                    // Kies aantal rondes
+                    Text("Aantal Rondes")
+                        .font(.headline)
+                    Picker("Rondes", selection: $speelwijze) {
+                        Text("Gelijk aan aantal spelers").tag(Speelwijze.gelijkAanAantalSpelers)
+                        Text("Kies zelf").tag(Speelwijze.kiesZelf)
                     }
-                }
-
-                if speelwijze == .kiesZelf {
-                    HStack {
-                        Button(action: {
-                            if aantalRondes > 3 {
-                                aantalRondes -= 1
-                            }
-                        }) {
-                            Image(systemName: "minus.circle")
-                                .font(.title)
-                                .foregroundColor(.red)
-                        }
-                        Text("\(aantalRondes)")
-                            .font(.title2)
-                            .frame(width: 40)
-                        Button(action: {
-                            if aantalRondes < 8 {
-                                aantalRondes += 1
-                            }
-                        }) {
-                            Image(systemName: "plus.circle")
-                                .font(.title)
-                                .foregroundColor(.green)
-                        }
-                    }
+                    .pickerStyle(SegmentedPickerStyle())
                     .padding()
+                    .onChange(of: speelwijze) { _, newValue in
+                        if newValue == .gelijkAanAantalSpelers {
+                            aantalRondes = aantalSpelers
+                        }
+                    }
+
+                    if speelwijze == .kiesZelf {
+                        HStack {
+                            Button(action: {
+                                if aantalRondes > 3 {
+                                    aantalRondes -= 1
+                                }
+                            }) {
+                                Image(systemName: "minus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.red)
+                            }
+                            Text("\(aantalRondes)")
+                                .font(.title2)
+                                .frame(width: 40)
+                            Button(action: {
+                                if aantalRondes < 8 {
+                                    aantalRondes += 1
+                                }
+                            }) {
+                                Image(systemName: "plus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.green)
+                            }
+                        }
+                        .padding()
+                    }
                 }
 
                 // Opgeslagen Spelers Quick Chips
@@ -123,14 +161,19 @@ struct BeverbendeSetupView: View {
                 Spacer(minLength: 20)
 
                 // Start spel knop
-                NavigationLink(destination: BeverbendeScoreView(aantalRondes: effectiveAantalRondes, spelers: spelers.prefix(aantalSpelers).map { Player(name: $0) })) {
-                    Text("Start Spel")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.green)
-                        .cornerRadius(10)
+                let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                NavigationLink(destination: destinationView(trimmed: trimmed)) {
+                    HStack(spacing: 8) {
+                        Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
+                        Text(invoerModus == .snel ? "Eindscore Invullen" : "Start Spel")
+                    }
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green)
+                    .cornerRadius(12)
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     scoreManager.savePlayerNames(spelers.prefix(aantalSpelers).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
@@ -145,6 +188,23 @@ struct BeverbendeSetupView: View {
         }
         .onAppear {
             scoreManager.refresh()
+        }
+    }
+
+    @ViewBuilder
+    private func destinationView(trimmed: [String]) -> some View {
+        if invoerModus == .snel {
+            SnelleEindscoreGameView(
+                gameName: "Beverbende",
+                themeColor: .green,
+                spelers: trimmed,
+                isLowestScoreWins: true,
+                scoreUnit: "strafpunten",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            BeverbendeScoreView(aantalRondes: effectiveAantalRondes, spelers: trimmed.map { Player(name: $0) })
         }
     }
 }

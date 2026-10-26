@@ -3,6 +3,21 @@ import SwiftUI
 struct LoveLetterSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
 
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Ronde voor ronde"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
+    @State private var invoerModus: InvoerModus = .live
     @State private var aantalSpelers: Int = 4
     @State private var doelFiches: Int = 4
     @State private var spelers: [String] = Array(repeating: "", count: 8)
@@ -97,14 +112,36 @@ struct LoveLetterSetupView: View {
                 // Header met logo
                 headerView
 
+                // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Speelwijze")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Speelwijze", selection: $invoerModus) {
+                        ForEach(InvoerModus.allCases) { mode in
+                            Label(mode.rawValue, systemImage: mode.icon).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+
+                    Text(invoerModus == .snel ? "⚡️ Voer direct het aantal behaalde fiches per speler in." : "🎮 Speel ronde na ronde met eliminaties, handkaarten raden en automatische bonustelling.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+
                 // Kies aantal spelers (2 t/m 8)
                 playerCountSection
 
-                // Doel fiches (Tokens of Affection)
-                targetTokensSection
+                if invoerModus == .live {
+                    // Doel fiches (Tokens of Affection)
+                    targetTokensSection
 
-                // Kaartenset & Uitbreidingen
-                cardSetSection
+                    // Kaartenset & Uitbreidingen
+                    cardSetSection
+                }
 
                 // Opgeslagen Spelers Quick Chips
                 SavedPlayersQuickChipsView(
@@ -418,20 +455,17 @@ struct LoveLetterSetupView: View {
         }
     }
 
+    @ViewBuilder
     private var startGameButton: some View {
         let trimmedPlayers = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
-        let canStart = !trimmedPlayers.contains(where: { $0.isEmpty }) && !actieveKaarten.isEmpty
+        let canStart = !trimmedPlayers.contains(where: { $0.isEmpty }) && (invoerModus == .snel || !actieveKaarten.isEmpty)
 
-        return NavigationLink(
-            destination: LoveLetterGameView(
-                spelers: trimmedPlayers,
-                doelFiches: doelFiches,
-                actieveKaarten: actieveKaarten
-            )
+        NavigationLink(
+            destination: destinationView(trimmed: trimmedPlayers)
         ) {
             HStack(spacing: 8) {
-                Image(systemName: "play.fill")
-                Text("Start Spel")
+                Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
+                Text(invoerModus == .snel ? "Eindscore Invullen" : "Start Spel")
             }
             .font(.title3)
             .fontWeight(.bold)
@@ -447,6 +481,27 @@ struct LoveLetterSetupView: View {
         })
         .padding(.horizontal)
         .disabled(!canStart)
+    }
+
+    @ViewBuilder
+    private func destinationView(trimmed: [String]) -> some View {
+        if invoerModus == .snel {
+            SnelleEindscoreGameView(
+                gameName: "Love Letter",
+                themeColor: .pink,
+                spelers: trimmed,
+                isLowestScoreWins: false,
+                scoreUnit: "fiches",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            LoveLetterGameView(
+                spelers: trimmed,
+                doelFiches: doelFiches,
+                actieveKaarten: actieveKaarten
+            )
+        }
     }
 }
 

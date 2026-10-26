@@ -3,6 +3,21 @@ import SwiftUI
 struct QuickstopSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
 
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Ronde voor ronde"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
+    @State private var invoerModus: InvoerModus = .live
     @State private var aantalSpelers: Int = 4
     @State private var limietStrafpunten: Int = 40
     @State private var spelers: [String] = Array(repeating: "", count: 7)
@@ -37,6 +52,21 @@ struct QuickstopSetupView: View {
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity, alignment: .center)
 
+                // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Speelwijze")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Speelwijze", selection: $invoerModus) {
+                        ForEach(InvoerModus.allCases) { modus in
+                            Label(modus.rawValue, systemImage: modus.icon).tag(modus)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+                }
+
                 // Kies aantal spelers (2 t/m 7)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Aantal Spelers")
@@ -66,8 +96,9 @@ struct QuickstopSetupView: View {
                     .padding(.horizontal)
                 }
 
-                // Limiet strafpunten
-                VStack(alignment: .leading, spacing: 8) {
+                // Limiet strafpunten (alleen bij live ronde voor ronde)
+                if invoerModus == .live {
+                    VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Eindlimiet Strafpunten")
@@ -103,6 +134,7 @@ struct QuickstopSetupView: View {
                     }
                     .padding(.horizontal)
                 }
+                }
 
                 // Opgeslagen Spelers Quick Chips
                 SavedPlayersQuickChipsView(
@@ -133,15 +165,13 @@ struct QuickstopSetupView: View {
                 Spacer(minLength: 16)
 
                 // Start Spel knop
+                let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
                 NavigationLink(
-                    destination: QuickstopGameView(
-                        spelers: Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }),
-                        limietStrafpunten: limietStrafpunten
-                    )
+                    destination: destinationView(trimmed: trimmed)
                 ) {
                     HStack(spacing: 8) {
-                        Image(systemName: "play.fill")
-                        Text("Start Spel")
+                        Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
+                        Text(invoerModus == .snel ? "Eindscore Invullen" : "Start Spel")
                     }
                     .font(.title3)
                     .fontWeight(.bold)
@@ -164,6 +194,26 @@ struct QuickstopSetupView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             scoreManager.refresh()
+        }
+    }
+
+    @ViewBuilder
+    private func destinationView(trimmed: [String]) -> some View {
+        if invoerModus == .snel {
+            SnelleEindscoreGameView(
+                gameName: "Quickstop",
+                themeColor: .orange,
+                spelers: trimmed,
+                isLowestScoreWins: true,
+                scoreUnit: "⚡️",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            QuickstopGameView(
+                spelers: trimmed,
+                limietStrafpunten: limietStrafpunten
+            )
         }
     }
 }

@@ -1,7 +1,8 @@
 import SwiftUI
 
-enum RegenwormenGameMode: String, CaseIterable, Identifiable {
-    case eindstandStenen = "Eindstand (Stenen)"
+enum RegenwormenGameMode: String,CaseIterable, Identifiable {
+    case eindstandStenen = "Stenen kiezen"
+    case snelleEindscore = "Alleen wormen"
     case beurtVoorBeurt = "Beurt voor beurt"
 
     var id: String { rawValue }
@@ -9,6 +10,7 @@ enum RegenwormenGameMode: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .eindstandStenen: return "square.grid.4x4.fill"
+        case .snelleEindscore: return "bolt.fill"
         case .beurtVoorBeurt: return "hand.tap.fill"
         }
     }
@@ -66,7 +68,7 @@ struct RegenwormenSetupView: View {
                     .pickerStyle(.segmented)
                     .padding(.horizontal)
 
-                    Text(spelmodus == .eindstandStenen ? "💡 Wijs aan het einde van het spel direct de stenen aan per speler. Elke steen kan maar 1x gekozen worden en kleurt mee!" : "💡 Houd tijdens het spelen elke beurt bij, pak stenen van tafel of steel de bovenste steen van een medespeler met live grafiek!")
+                    Text(spelmodus == .eindstandStenen ? "💡 Wijs aan het einde van het spel direct de stenen aan per speler. Elke steen kan maar 1x gekozen worden en kleurt mee!" : (spelmodus == .snelleEindscore ? "💡 Vul direct het totale aantal wormen per speler in zonder stenen te selecteren." : "💡 Houd tijdens het spelen elke beurt bij, pak stenen van tafel of steel de bovenste steen van een medespeler met live grafiek!"))
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
@@ -131,15 +133,13 @@ struct RegenwormenSetupView: View {
                 Spacer(minLength: 20)
 
                 // Start spel knop
+                let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
                 NavigationLink(
-                    destination: RegenwormenGameView(
-                        spelers: spelers.prefix(aantalSpelers).map { Player(name: $0) },
-                        initialTab: spelmodus == .eindstandStenen ? .eindstand : .beurtInvoer
-                    )
+                    destination: destinationView(trimmed: trimmed)
                 ) {
                     HStack(spacing: 8) {
-                        Image(systemName: "play.fill")
-                        Text("Start Regenwormen")
+                        Image(systemName: spelmodus == .snelleEindscore ? "bolt.fill" : "play.fill")
+                        Text(spelmodus == .snelleEindscore ? "Eindscore Invullen" : "Start Regenwormen")
                     }
                     .font(.title3)
                     .fontWeight(.bold)
@@ -165,6 +165,26 @@ struct RegenwormenSetupView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             scoreManager.refresh()
+        }
+    }
+
+    @ViewBuilder
+    private func destinationView(trimmed: [String]) -> some View {
+        if spelmodus == .snelleEindscore {
+            SnelleEindscoreGameView(
+                gameName: "Regenwormen",
+                themeColor: .orange,
+                spelers: trimmed,
+                isLowestScoreWins: false,
+                scoreUnit: "wormen",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            RegenwormenGameView(
+                spelers: trimmed.map { Player(name: $0) },
+                initialTab: spelmodus == .eindstandStenen ? .eindstand : .beurtInvoer
+            )
         }
     }
 }

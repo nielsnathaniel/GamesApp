@@ -2,6 +2,22 @@ import SwiftUI
 
 struct DuizendenSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
+
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Ronde voor ronde"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
+    @State private var invoerModus: InvoerModus = .live
     @State private var aantalSpellenKaarten: Int = 2
     @State private var aantalSpelers: Int = 2
     @State private var spelers: [String] = Array(repeating: "", count: 6)
@@ -27,24 +43,41 @@ struct DuizendenSetupView: View {
                     .padding(.top, 0)
                     .frame(maxWidth: .infinity, alignment: .center)
 
-                    // Kies aantal spellen kaarten
-                    Text("Aantal Spellen Kaarten")
-                        .font(.headline)
-                    HStack {
-                        ForEach(2...4, id: \.self) { number in
-                            Button(action: {
-                                aantalSpellenKaarten = number
-                            }) {
-                                Text("\(number)")
-                                    .font(.title3)
-                                    .foregroundColor(aantalSpellenKaarten == number ? .white : .blue)
-                                    .padding(8)
-                                    .background(aantalSpellenKaarten == number ? Color.blue : Color.clear)
-                                    .cornerRadius(8)
+                    // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Speelwijze")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        Picker("Speelwijze", selection: $invoerModus) {
+                            ForEach(InvoerModus.allCases) { modus in
+                                Label(modus.rawValue, systemImage: modus.icon).tag(modus)
                             }
                         }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(.horizontal)
                     }
-                    .padding()
+
+                    if invoerModus == .live {
+                        // Kies aantal spellen kaarten
+                        Text("Aantal Spellen Kaarten")
+                            .font(.headline)
+                        HStack {
+                            ForEach(2...4, id: \.self) { number in
+                                Button(action: {
+                                    aantalSpellenKaarten = number
+                                }) {
+                                    Text("\(number)")
+                                        .font(.title3)
+                                        .foregroundColor(aantalSpellenKaarten == number ? .white : .blue)
+                                        .padding(8)
+                                        .background(aantalSpellenKaarten == number ? Color.blue : Color.clear)
+                                        .cornerRadius(8)
+                                }
+                            }
+                        }
+                        .padding()
+                    }
 
                     // Kies aantal spelers
                     Text("Aantal Spelers")
@@ -65,33 +98,35 @@ struct DuizendenSetupView: View {
                     }
                     .padding()
 
-                    // Eindscore instellen
-                    Text("Eindscore")
-                        .font(.headline)
-                    HStack {
-                        Button(action: {
-                            if eindscore > 500 {
-                                eindscore -= 100
+                    if invoerModus == .live {
+                        // Eindscore instellen
+                        Text("Eindscore")
+                            .font(.headline)
+                        HStack {
+                            Button(action: {
+                                if eindscore > 500 {
+                                    eindscore -= 100
+                                }
+                            }) {
+                                Image(systemName: "minus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.red)
                             }
-                        }) {
-                            Image(systemName: "minus.circle")
-                                .font(.title)
-                                .foregroundColor(.red)
-                        }
-                        Text("\(eindscore)")
-                            .font(.title2)
-                            .frame(width: 60)
-                        Button(action: {
-                            if eindscore < 2000 {
-                                eindscore += 100
+                            Text("\(eindscore)")
+                                .font(.title2)
+                                .frame(width: 60)
+                            Button(action: {
+                                if eindscore < 2000 {
+                                    eindscore += 100
+                                }
+                            }) {
+                                Image(systemName: "plus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.green)
                             }
-                        }) {
-                            Image(systemName: "plus.circle")
-                                .font(.title)
-                                .foregroundColor(.green)
                         }
+                        .padding()
                     }
-                    .padding()
 
                     // Opgeslagen Spelers Quick Chips
                     SavedPlayersQuickChipsView(
@@ -116,14 +151,19 @@ struct DuizendenSetupView: View {
                     Spacer(minLength: 20)
 
                     // Start spel knop
-                    NavigationLink(destination: DuizendenGameView(spelers: spelers.prefix(aantalSpelers).map { Player(name: $0) }, aantalSpellenKaarten: aantalSpellenKaarten, eindscore: eindscore)) {
-                        Text("Start Spel")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(Color.green)
-                            .cornerRadius(10)
+                    let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                    NavigationLink(destination: destinationView(trimmed: trimmed)) {
+                        HStack(spacing: 8) {
+                            Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
+                            Text(invoerModus == .snel ? "Eindscore Invullen" : "Start Spel")
+                        }
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.green)
+                        .cornerRadius(12)
                     }
                     .simultaneousGesture(TapGesture().onEnded {
                         scoreManager.savePlayerNames(spelers.prefix(aantalSpelers).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
@@ -140,7 +180,28 @@ struct DuizendenSetupView: View {
                 scoreManager.refresh()
             }
         }
+
+    @ViewBuilder
+    private func destinationView(trimmed: [String]) -> some View {
+        if invoerModus == .snel {
+            SnelleEindscoreGameView(
+                gameName: "Duizenden",
+                themeColor: .teal,
+                spelers: trimmed,
+                isLowestScoreWins: false,
+                scoreUnit: "punten",
+                allowNegative: true,
+                initialScore: 0
+            )
+        } else {
+            DuizendenGameView(
+                spelers: trimmed.map { Player(name: $0) },
+                aantalSpellenKaarten: aantalSpellenKaarten,
+                eindscore: eindscore
+            )
+        }
     }
+}
 
 #Preview {
     DuizendenSetupView()

@@ -16,6 +16,22 @@ enum Speelwijze: String, CaseIterable, Identifiable {
 
 struct Nmbr9DetailView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
+
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Ronde voor ronde"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
+    @State private var invoerModus: InvoerModus = .live
     @State private var aantalSpelers: Int = 2
     @State private var spelers: [Player] = Array(repeating: Player(name: ""), count: 4)
     @State private var selectedRekenversie: Rekenversie = .totaalwaardePerLaag
@@ -48,6 +64,22 @@ struct Nmbr9DetailView: View {
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .center)
 
+                // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Speelwijze")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Speelwijze", selection: $invoerModus) {
+                        ForEach(InvoerModus.allCases) { modus in
+                            Label(modus.rawValue, systemImage: modus.icon).tag(modus)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+                }
+                .padding(.bottom, 6)
+
                 VStack(alignment: .leading) {
                     Text("Aantal spelers:")
                         .font(.headline)
@@ -70,84 +102,86 @@ struct Nmbr9DetailView: View {
                 }
                 .padding(.horizontal)
 
-                VStack(alignment: .leading) {
-                    Text("Rekenversie:")
-                        .font(.headline)
-                    
-                    Picker("Rekenversie", selection: $selectedRekenversie) {
-                        ForEach(Rekenversie.allCases) { versie in
-                            Text(versie.rawValue).tag(versie)
+                if invoerModus == .live {
+                    VStack(alignment: .leading) {
+                        Text("Rekenversie:")
+                            .font(.headline)
+                        
+                        Picker("Rekenversie", selection: $selectedRekenversie) {
+                            ForEach(Rekenversie.allCases) { versie in
+                                Text(versie.rawValue).tag(versie)
+                            }
                         }
+                        .pickerStyle(SegmentedPickerStyle())
                     }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
-                .padding(.horizontal)
+                    .padding(.horizontal)
 
-                VStack(alignment: .leading) {
-                    Text("Speelwijze:")
-                        .font(.headline)
-                    
-                    Picker("Speelwijze", selection: $selectedSpeelwijze) {
-                        ForEach(Speelwijze.allCases) { wijze in
-                            Text(wijze.rawValue).tag(wijze)
+                    VStack(alignment: .leading) {
+                        Text("Speelwijze:")
+                            .font(.headline)
+                        
+                        Picker("Speelwijze", selection: $selectedSpeelwijze) {
+                            ForEach(Speelwijze.allCases) { wijze in
+                                Text(wijze.rawValue).tag(wijze)
+                            }
                         }
+                        .pickerStyle(SegmentedPickerStyle())
                     }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
-                .padding(.horizontal)
+                    .padding(.horizontal)
 
-                if selectedSpeelwijze == .aantalRondes {
-                    HStack {
-                        Button(action: {
-                            if aantalRondes > 1 {
-                                aantalRondes -= 1
+                    if selectedSpeelwijze == .aantalRondes {
+                        HStack {
+                            Button(action: {
+                                if aantalRondes > 1 {
+                                    aantalRondes -= 1
+                                }
+                            }) {
+                                Image(systemName: "minus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.red)
                             }
-                        }) {
-                            Image(systemName: "minus.circle")
-                                .font(.title)
-                                .foregroundColor(.red)
-                        }
-                        Text("\(aantalRondes) rondes")
-                            .font(.title2)
-                            .padding(.horizontal)
-                        Button(action: {
-                            if aantalRondes < 9 {
-                                aantalRondes += 1
+                            Text("\(aantalRondes) rondes")
+                                .font(.title2)
+                                .padding(.horizontal)
+                            Button(action: {
+                                if aantalRondes < 9 {
+                                    aantalRondes += 1
+                                }
+                            }) {
+                                Image(systemName: "plus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.green)
                             }
-                        }) {
-                            Image(systemName: "plus.circle")
-                                .font(.title)
-                                .foregroundColor(.green)
                         }
+                        .padding(.top, 10)
                     }
-                    .padding(.top, 10)
-                }
 
-                if selectedSpeelwijze == .totScore {
-                    HStack {
-                        Button(action: {
-                            if totaleScore > 50 {
-                                totaleScore -= 10
+                    if selectedSpeelwijze == .totScore {
+                        HStack {
+                            Button(action: {
+                                if totaleScore > 50 {
+                                    totaleScore -= 10
+                                }
+                            }) {
+                                Image(systemName: "minus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.red)
                             }
-                        }) {
-                            Image(systemName: "minus.circle")
-                                .font(.title)
-                                .foregroundColor(.red)
-                        }
-                        Text("\(totaleScore) punten")
-                            .font(.title2)
-                            .padding(.horizontal)
-                        Button(action: {
-                            if totaleScore < 500 {
-                                totaleScore += 10
+                            Text("\(totaleScore) punten")
+                                .font(.title2)
+                                .padding(.horizontal)
+                            Button(action: {
+                                if totaleScore < 500 {
+                                    totaleScore += 10
+                                }
+                            }) {
+                                Image(systemName: "plus.circle")
+                                    .font(.title)
+                                    .foregroundColor(.green)
                             }
-                        }) {
-                            Image(systemName: "plus.circle")
-                                .font(.title)
-                                .foregroundColor(.green)
                         }
+                        .padding(.top, 10)
                     }
-                    .padding(.top, 10)
                 }
 
                 // Opgeslagen Spelers Quick Chips
@@ -180,13 +214,17 @@ struct Nmbr9DetailView: View {
                 .padding(.top, 5)
 
                 NavigationLink(destination: destinationView()) {
-                    Text("Start Spel")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.green)
-                        .cornerRadius(10)
+                    HStack(spacing: 8) {
+                        Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
+                        Text(invoerModus == .snel ? "Eindscore Invullen" : "Start Spel")
+                    }
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green)
+                    .cornerRadius(12)
                 }
                 .simultaneousGesture(TapGesture().onEnded {
                     scoreManager.savePlayerNames(spelers.prefix(aantalSpelers).map { $0.name }.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
@@ -206,7 +244,28 @@ struct Nmbr9DetailView: View {
 
     @ViewBuilder
     private func destinationView() -> some View {
-        CurrentGameView(gameName: "Nmbr9", imageName: "Nmbr9", spelers: Array(spelers.prefix(aantalSpelers)), rekenversie: selectedRekenversie, speelwijze: selectedSpeelwijze, aantalRondes: aantalRondes, totaleScore: totaleScore)
+        let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines) })
+        if invoerModus == .snel {
+            SnelleEindscoreGameView(
+                gameName: "Nmbr9",
+                themeColor: .indigo,
+                spelers: trimmed,
+                isLowestScoreWins: false,
+                scoreUnit: "punten",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            CurrentGameView(
+                gameName: "Nmbr9",
+                imageName: "Nmbr9",
+                spelers: Array(spelers.prefix(aantalSpelers)),
+                rekenversie: selectedRekenversie,
+                speelwijze: selectedSpeelwijze,
+                aantalRondes: aantalRondes,
+                totaleScore: totaleScore
+            )
+        }
     }
 }
 

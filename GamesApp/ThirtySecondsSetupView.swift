@@ -18,6 +18,21 @@ struct ThirtySecondsSetupTeam: Identifiable {
 struct ThirtySecondsSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
 
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Ronde voor ronde"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
+    @State private var invoerModus: InvoerModus = .live
     @State private var aantalTeams: Int = 2
     @State private var doelScore: Int = 35
     @State private var timerDuur: Int = 30
@@ -67,11 +82,28 @@ struct ThirtySecondsSetupView: View {
                 // Header
                 headerView
 
+                // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Speelwijze")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Speelwijze", selection: $invoerModus) {
+                        ForEach(InvoerModus.allCases) { modus in
+                            Label(modus.rawValue, systemImage: modus.icon).tag(modus)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+                }
+
                 // 1. Aantal teams selector
                 teamsCountSelector
 
-                // 2. Doelscore & Timer selector
-                gameSettingsCard
+                // 2. Doelscore & Timer selector (alleen bij live ronde voor ronde)
+                if invoerModus == .live {
+                    gameSettingsCard
+                }
 
                 // 3. Bestaande spelers Quick Chips
                 quickChipsSection
@@ -426,8 +458,8 @@ struct ThirtySecondsSetupView: View {
     private var startButton: some View {
         NavigationLink(destination: destinationGameView) {
             HStack(spacing: 8) {
-                Image(systemName: "play.fill")
-                Text("Start 30 Seconds")
+                Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
+                Text(invoerModus == .snel ? "Eindscore Invullen" : "Start 30 Seconds")
                     .fontWeight(.bold)
             }
             .font(.title3)
@@ -451,6 +483,7 @@ struct ThirtySecondsSetupView: View {
         scoreManager.savePlayerNames(allValid)
     }
 
+    @ViewBuilder
     private var destinationGameView: some View {
         let configuredTeams = actieveTeams.enumerated().map { idx, t in
             ThirtySecondsTeam(
@@ -460,11 +493,30 @@ struct ThirtySecondsSetupView: View {
             )
         }
 
-        return ThirtySecondsGameView(
-            teams: configuredTeams,
-            doelScore: doelScore,
-            timerDuur: timerDuur
-        )
+        if invoerModus == .snel {
+            SnelleEindscoreGameView(
+                gameName: "30 Seconds",
+                themeColor: .orange,
+                teamEntries: configuredTeams.map {
+                    WinnaarTeamEntry(
+                        teamName: $0.name,
+                        playerNames: $0.playerNames,
+                        score: 0,
+                        isWinner: false
+                    )
+                },
+                isLowestScoreWins: false,
+                scoreUnit: "punten",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            ThirtySecondsGameView(
+                teams: configuredTeams,
+                doelScore: doelScore,
+                timerDuur: timerDuur
+            )
+        }
     }
 }
 

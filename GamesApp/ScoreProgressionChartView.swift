@@ -19,6 +19,13 @@ struct RoundScoreDataPoint: Identifiable, Codable {
         self.cumulativeScore = cumulativeScore
     }
 
+    init(roundNumber: Int, roundLabel: String? = nil, playerName: String, score: Int) {
+        self.id = UUID().uuidString
+        self.round = roundNumber
+        self.playerName = playerName
+        self.cumulativeScore = score
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = UUID().uuidString

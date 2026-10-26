@@ -3,6 +3,7 @@ import SwiftUI
 enum FiftyFiftyWhiteGoblinMode: String, CaseIterable, Identifiable {
     case rondes = "Ronde per ronde"
     case enkelePot = "Enkele pot"
+    case snelleEindscore = "Snelle eindscore"
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ enum FiftyFiftyWhiteGoblinMode: String, CaseIterable, Identifiable {
         switch self {
         case .rondes: return "arrow.triangle.2.circlepath"
         case .enkelePot: return "1.circle"
+        case .snelleEindscore: return "bolt.fill"
         }
     }
 }
@@ -179,7 +181,7 @@ struct FiftyFiftySetupView: View {
                         }
                         .padding(.horizontal)
                     }
-                } else {
+                } else if gameMode == .enkelePot {
                     VStack(alignment: .leading, spacing: 8) {
                         Toggle("Spelen tot een strafkaart-limiet", isOn: $gebruikLimiet)
                             .font(.headline)
@@ -243,18 +245,13 @@ struct FiftyFiftySetupView: View {
                 Spacer(minLength: 16)
 
                 // Start Spel knop
+                let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
                 NavigationLink(
-                    destination: FiftyFiftyGameView(
-                        spelers: Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }),
-                        gameMode: gameMode,
-                        aantalRondesDoel: aantalRondesDoel,
-                        gebruikLimiet: gebruikLimiet,
-                        limietStrafkaarten: limietStrafkaarten
-                    )
+                    destination: destinationView(trimmed: trimmed)
                 ) {
                     HStack(spacing: 8) {
-                        Image(systemName: "play.fill")
-                        Text("Start Fifty Fifty")
+                        Image(systemName: gameMode == .snelleEindscore ? "bolt.fill" : "play.fill")
+                        Text(gameMode == .snelleEindscore ? "Eindscore Invullen" : "Start Fifty Fifty")
                     }
                     .font(.title3)
                     .fontWeight(.bold)
@@ -277,6 +274,29 @@ struct FiftyFiftySetupView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             scoreManager.refresh()
+        }
+    }
+
+    @ViewBuilder
+    private func destinationView(trimmed: [String]) -> some View {
+        if gameMode == .snelleEindscore {
+            SnelleEindscoreGameView(
+                gameName: "Fifty Fifty",
+                themeColor: .orange,
+                spelers: trimmed,
+                isLowestScoreWins: true,
+                scoreUnit: "strafkaarten",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            FiftyFiftyGameView(
+                spelers: trimmed,
+                gameMode: gameMode,
+                aantalRondesDoel: aantalRondesDoel,
+                gebruikLimiet: gebruikLimiet,
+                limietStrafkaarten: limietStrafkaarten
+            )
         }
     }
 }

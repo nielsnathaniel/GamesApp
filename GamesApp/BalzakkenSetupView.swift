@@ -2,6 +2,22 @@ import SwiftUI
 
 struct BalzakkenSetupView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
+
+    enum InvoerModus: String, CaseIterable, Identifiable {
+        case live = "Ronde voor ronde"
+        case snel = "Snelle eindscore"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .live: return "play.circle.fill"
+            case .snel: return "bolt.fill"
+            }
+        }
+    }
+
+    @State private var invoerModus: InvoerModus = .live
     @State private var aantalSpelers: Int = 3
     @State private var spelers: [String] = Array(repeating: "", count: 6)
     @State private var showAlert = false
@@ -30,6 +46,27 @@ struct BalzakkenSetupView: View {
                 }
                 .padding(.top, 0)
                 .frame(maxWidth: .infinity, alignment: .center)
+
+                // Speelwijze Kiezer (Live vs Snelle Eindscore)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Speelwijze")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Speelwijze", selection: $invoerModus) {
+                        ForEach(InvoerModus.allCases) { mode in
+                            Label(mode.rawValue, systemImage: mode.icon).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+
+                    Text(invoerModus == .snel ? "⚡️ Voer direct de uiteindelijke strafpunten per speler in." : "🎮 Begeleid het spel ronde na ronde met automatische strafpunten & 69/99 regels.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+                .padding(.top, 6)
 
                 // Kies aantal spelers (2 t/m 6)
                 Text("Aantal Spelers")
@@ -92,21 +129,25 @@ struct BalzakkenSetupView: View {
                 Spacer(minLength: 20)
 
                 // Start spel knop
-                NavigationLink(destination: BalzakkenGameView(spelers: spelers.prefix(aantalSpelers).map { Player(name: $0) })) {
-                    Text("Start Spel")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.green)
-                        .cornerRadius(10)
+                let trimmed = Array(spelers.prefix(aantalSpelers).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+                NavigationLink(destination: destinationView(trimmed: trimmed)) {
+                    HStack(spacing: 8) {
+                        Image(systemName: invoerModus == .snel ? "bolt.fill" : "play.fill")
+                        Text(invoerModus == .snel ? "Eindscore Invullen" : "Start Spel")
+                    }
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red)
+                    .cornerRadius(10)
                 }
                 .simultaneousGesture(TapGesture().onEnded {
-                    scoreManager.savePlayerNames(spelers.prefix(aantalSpelers).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+                    scoreManager.savePlayerNames(trimmed.filter { !$0.isEmpty })
                 })
                 .padding(.horizontal)
-                .disabled(spelers.prefix(aantalSpelers).contains(where: { $0.trimmingCharacters(in: .whitespaces).isEmpty }))
+                .disabled(trimmed.contains(where: { $0.isEmpty }))
                 .alert(isPresented: $showAlert) {
                     Alert(title: Text("Invoerfout"), message: Text("Vul alle spelersnamen in."), dismissButton: .default(Text("OK")))
                 }
@@ -115,6 +156,23 @@ struct BalzakkenSetupView: View {
         }
         .onAppear {
             scoreManager.refresh()
+        }
+    }
+
+    @ViewBuilder
+    private func destinationView(trimmed: [String]) -> some View {
+        if invoerModus == .snel {
+            SnelleEindscoreGameView(
+                gameName: "Balzakken",
+                themeColor: .red,
+                spelers: trimmed,
+                isLowestScoreWins: true,
+                scoreUnit: "strafpunten",
+                allowNegative: false,
+                initialScore: 0
+            )
+        } else {
+            BalzakkenGameView(spelers: trimmed.map { Player(name: $0) })
         }
     }
 }
