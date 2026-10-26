@@ -13,16 +13,19 @@ final class SoundManager: ObservableObject {
     private var audioPlayers: [String: AVAudioPlayer] = [:]
 
     private init() {
-        configureAudioSession()
         prepareAudioBuffers()
+        configureAudioSession()
     }
 
     private func configureAudioSession() {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, options: [.mixWithOthers])
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("SoundManager: Kon audiosessie niet initialiseren: \(error)")
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.ambient, options: [.mixWithOthers])
+                try session.setActive(true)
+            } catch {
+                print("SoundManager: Kon audiosessie niet initialiseren: \(error)")
+            }
         }
     }
 
