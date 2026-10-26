@@ -17,6 +17,7 @@ struct StartspelerKiezerView: View {
     @State private var countdownProgress: CGFloat = 0.0
     @State private var isCountingDown: Bool = false
     @State private var isFinished: Bool = false
+    @State private var showTafelschikking: Bool = false
 
     private let vibrantColors: [Color] = [
         Color(red: 0.18, green: 0.80, blue: 0.44), // Emerald
@@ -80,6 +81,23 @@ struct StartspelerKiezerView: View {
                     }
 
                     Spacer()
+
+                    Button(action: {
+                        HapticManager.shared.light()
+                        showTafelschikking = true
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "person.3.sequence.fill")
+                            Text("Tafel")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.2))
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                    }
 
                     Button(action: {
                         HapticManager.shared.light()
@@ -163,6 +181,9 @@ struct StartspelerKiezerView: View {
         .toolbar(.hidden, for: .tabBar)
         .defersSystemGestures(on: .all)
         .persistentSystemOverlays(.hidden)
+        .sheet(isPresented: $showTafelschikking) {
+            TafelschikkingView()
+        }
     }
 
     // MARK: - Touch Management & Countdown
