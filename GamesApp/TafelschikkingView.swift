@@ -11,7 +11,13 @@ struct TafelschikkingView: View {
     @State private var showConfetti: Bool = false
     @State private var newPlayerName: String = ""
     @State private var showAddPlayerSheet: Bool = false
+    @State private var showReorderSheet: Bool = false
     @State private var selectedSwapIndex: Int? = nil
+
+    // Drag & Drop State
+    @State private var draggedPlayerIndex: Int? = nil
+    @State private var dragOffset: CGSize = .zero
+    @State private var hoverTargetIndex: Int? = nil
 
     var body: some View {
         NavigationStack {
@@ -130,30 +136,48 @@ struct TafelschikkingView: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: randomizeSeats) {
-                            Label("Hussel stoelen", systemImage: "shuffle")
+                    HStack(spacing: 12) {
+                        // Snelle knop om volgorde via lijst aan te passen
+                        Button(action: { showReorderSheet = true }) {
+                            Image(systemName: "arrow.up.arrow.down")
+                                .font(.body)
+                                .foregroundColor(.white)
                         }
                         .disabled(seatedPlayers.count < 2)
 
-                        Button(action: shiftSeatsClockwise) {
-                            Label("Draai 1 stoel door", systemImage: "arrow.clockwise")
-                        }
-                        .disabled(seatedPlayers.count < 2)
+                        Menu {
+                            Button(action: { showReorderSheet = true }) {
+                                Label("Volgorde lijst", systemImage: "list.number")
+                            }
+                            .disabled(seatedPlayers.count < 2)
 
-                        Button(role: .destructive, action: {
-                            seatedPlayers.removeAll()
-                            startPlayerIndex = nil
-                        }) {
-                            Label("Tafel leegmaken", systemImage: "trash")
+                            Button(action: randomizeSeats) {
+                                Label("Hussel stoelen", systemImage: "shuffle")
+                            }
+                            .disabled(seatedPlayers.count < 2)
+
+                            Button(action: shiftSeatsClockwise) {
+                                Label("Draai 1 stoel door", systemImage: "arrow.clockwise")
+                            }
+                            .disabled(seatedPlayers.count < 2)
+
+                            Button(role: .destructive, action: {
+                                seatedPlayers.removeAll()
+                                startPlayerIndex = nil
+                            }) {
+                                Label("Tafel leegmaken", systemImage: "trash")
+                            }
+                            .disabled(seatedPlayers.isEmpty)
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.title3)
+                                .foregroundColor(.white)
                         }
-                        .disabled(seatedPlayers.isEmpty)
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                            .foregroundColor(.white)
                     }
                 }
+            }
+            .sheet(isPresented: $showReorderSheet) {
+                reorderSheet
             }
             .onAppear {
                 loadInitialPlayers()
@@ -172,7 +196,7 @@ struct TafelschikkingView: View {
                         .font(.headline)
                         .foregroundColor(.white)
                 }
-                Text(seatedPlayers.count < 2 ? "Voeg minimaal 2 spelers toe aan de tafel" : "Volgorde bepaalt automatisch de beurtvolgorde")
+                Text(seatedPlayers.count < 2 ? "Voeg minimaal 2 spelers toe aan de tafel" : "Sleep een speler naar een andere stoel om te wisselen")
                     .font(.caption2)
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -289,6 +313,45 @@ struct TafelschikkingView: View {
         .presentationDetents([.fraction(0.35)])
     }
 
+    // MARK: - Reorder Sheet (Drag Handles)
+    private var reorderSheet: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(seatedPlayers, id: \.self) { player in
+                        HStack(spacing: 12) {
+                            PlayerAvatarView(name: player, size: 36)
+                            Text(player)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Spacer()
+                        }
+                    }
+                    .onMove { indices, newOffset in
+                        seatedPlayers.move(fromOffsets: indices, toOffset: newOffset)
+                        startPlayerIndex = nil
+                    }
+                } footer: {
+                    Text("Sleep de hendels rechts om de zitplaatsen met de klok mee te herschikken.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .environment(\.editMode, .constant(.active))
+            .navigationTitle("Tafelvolgorde")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Klaar") {
+                        showReorderSheet = false
+                    }
+                    .fontWeight(.bold)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
     // MARK: - Center Spinner (Bottle / Compass Needle)
     private func centerSpinner(radius: CGFloat) -> some View {
         ZStack {
@@ -334,7 +397,7 @@ struct TafelschikkingView: View {
         }
     }
 
-    // MARK: - Player Seat View
+    // MARK: - Player Seat View (with Direct Circular Drag & Drop)
     private func playerSeatView(
         player: String,
         index: Int,
@@ -344,12 +407,17 @@ struct TafelschikkingView: View {
     ) -> some View {
         // Bereken positie op de cirkel (start bovenaan -π/2 en ga met de klok mee)
         let angle = (2.0 * Double.pi * Double(index) / Double(total)) - (Double.pi / 2.0)
-        let x = radius * cos(angle)
-        let y = radius * sin(angle)
+        let baseX = radius * cos(angle)
+        let baseY = radius * sin(angle)
 
         let isStartPlayer = startPlayerIndex == index
         let turnOrder = turnOrderLabel(for: index)
         let isSelectedForSwap = selectedSwapIndex == index
+        let isDraggingThis = draggedPlayerIndex == index
+        let isHoverTarget = hoverTargetIndex == index
+
+        let currentX = isDraggingThis ? (baseX + dragOffset.width) : baseX
+        let currentY = isDraggingThis ? (baseY + dragOffset.height) : baseY
 
         return VStack(spacing: 3) {
             ZStack(alignment: .topTrailing) {
@@ -357,13 +425,14 @@ struct TafelschikkingView: View {
                     .overlay(
                         Circle()
                             .stroke(
-                                isStartPlayer ? Color.yellow : (isSelectedForSwap ? Color.cyan : Color.white.opacity(0.4)),
-                                lineWidth: isStartPlayer ? 3.5 : (isSelectedForSwap ? 3 : 1.5)
+                                isDraggingThis ? Color.green : (isHoverTarget ? Color.cyan : (isStartPlayer ? Color.yellow : (isSelectedForSwap ? Color.cyan : Color.white.opacity(0.4)))),
+                                lineWidth: (isDraggingThis || isHoverTarget) ? 4.0 : (isStartPlayer ? 3.5 : (isSelectedForSwap ? 3 : 1.5))
                             )
                     )
+                    .scaleEffect(isDraggingThis ? 1.25 : (isHoverTarget ? 1.15 : 1.0))
                     .shadow(
-                        color: isStartPlayer ? Color.yellow.opacity(0.8) : (isSelectedForSwap ? Color.cyan.opacity(0.8) : Color.black.opacity(0.3)),
-                        radius: isStartPlayer ? 8 : (isSelectedForSwap ? 6 : 3)
+                        color: isDraggingThis ? Color.green.opacity(0.9) : (isHoverTarget ? Color.cyan.opacity(0.9) : (isStartPlayer ? Color.yellow.opacity(0.8) : Color.black.opacity(0.3))),
+                        radius: isDraggingThis ? 14 : (isHoverTarget ? 10 : (isStartPlayer ? 8 : 3))
                     )
 
                 // Beurtvolgorde badge (bijv. 👑 1e, 2e, 3e...)
@@ -380,16 +449,26 @@ struct TafelschikkingView: View {
             }
 
             // Naam en wisselknop
-            Text(player)
+            Text(isHoverTarget ? "Wissel" : player)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(isHoverTarget ? .cyan : .white)
                 .lineLimit(1)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 2)
-                .background(Color.black.opacity(0.6))
+                .background(isHoverTarget ? Color.cyan.opacity(0.35) : Color.black.opacity(0.6))
                 .clipShape(Capsule())
         }
-        .offset(x: x, y: y)
+        .offset(x: currentX, y: currentY)
+        .zIndex(isDraggingThis ? 100 : (isHoverTarget ? 50 : 1))
+        .gesture(
+            DragGesture(minimumDistance: 3, coordinateSpace: .global)
+                .onChanged { gesture in
+                    handleDragChanged(index: index, translation: gesture.translation, radius: radius, total: total)
+                }
+                .onEnded { gesture in
+                    handleDragEnded(index: index)
+                }
+        )
         .onTapGesture {
             handleSeatTap(index: index)
         }
@@ -438,6 +517,18 @@ struct TafelschikkingView: View {
                         .foregroundColor(.white.opacity(0.7))
                 }
                 .padding(.horizontal, 16)
+            }
+
+            if seatedPlayers.count >= 2 {
+                Button(action: { showReorderSheet = true }) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.up.arrow.down")
+                        Text("Pas volgorde aan via lijst")
+                    }
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white.opacity(0.8))
+                }
             }
 
             HStack(spacing: 12) {
@@ -518,6 +609,60 @@ struct TafelschikkingView: View {
         }
     }
 
+    // MARK: - Drag Gesture Handling
+    private func handleDragChanged(index: Int, translation: CGSize, radius: CGFloat, total: Int) {
+        guard !isSpinning, total >= 2 else { return }
+        if draggedPlayerIndex == nil {
+            draggedPlayerIndex = index
+            selectedSwapIndex = nil
+            HapticManager.shared.light()
+        }
+        dragOffset = translation
+
+        // Bereken positie van vinger ten opzichte van tafelcentrum
+        let originalAngle = (2.0 * Double.pi * Double(index) / Double(total)) - (Double.pi / 2.0)
+        let fingerX = (radius * cos(originalAngle)) + translation.width
+        let fingerY = (radius * sin(originalAngle)) + translation.height
+
+        // Zoek de dichtstbijzijnde andere stoel
+        var closestIdx: Int? = nil
+        var minDistance: CGFloat = 85.0 // Ruime magnetische radius voor soepel oppikken
+
+        for j in 0..<total where j != index {
+            let jAngle = (2.0 * Double.pi * Double(j) / Double(total)) - (Double.pi / 2.0)
+            let jX = radius * cos(jAngle)
+            let jY = radius * sin(jAngle)
+            let dist = hypot(fingerX - jX, fingerY - jY)
+            if dist < minDistance {
+                minDistance = dist
+                closestIdx = j
+            }
+        }
+
+        if hoverTargetIndex != closestIdx {
+            hoverTargetIndex = closestIdx
+            if closestIdx != nil {
+                HapticManager.shared.light()
+            }
+        }
+    }
+
+    private func handleDragEnded(index: Int) {
+        if let target = hoverTargetIndex, target != index {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                seatedPlayers.swapAt(index, target)
+                startPlayerIndex = nil
+            }
+            HapticManager.shared.success()
+        }
+
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            dragOffset = .zero
+            draggedPlayerIndex = nil
+            hoverTargetIndex = nil
+        }
+    }
+
     private func shiftSeatsClockwise() {
         HapticManager.shared.light()
         guard seatedPlayers.count > 1 else { return }
@@ -542,12 +687,9 @@ struct TafelschikkingView: View {
         let winner = Int.random(in: 0..<seatedPlayers.count)
 
         // Bereken exacte hoek van de speler
-        // Positie speler: angleInRad = 2π * winner / total - π/2
-        // Dus in graden vanaf 12 uur (waar naald naar wijst bij rotatie 0):
-        // Speler 0 staat op -90° (12 uur), Speler op hoek in graden = (360 * winner / total)
         let playerAngle = Double(winner) * (360.0 / Double(seatedPlayers.count))
 
-        // Voeg 5 tot 8 volle rondes (1800° tot 2880°) toe voor een spectaculaire spin
+        // Voeg 5 tot 7 volle rondes toe voor een spectaculaire spin
         let fullRotations = Double(Int.random(in: 5...7)) * 360.0
         let targetRotation = needleRotation + fullRotations + (playerAngle - (needleRotation.truncatingRemainder(dividingBy: 360.0)))
 
