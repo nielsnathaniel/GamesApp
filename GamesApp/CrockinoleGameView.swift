@@ -50,6 +50,7 @@ struct CrockinoleGameView: View {
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var restoreTargetEntry: CrokinoleRondeEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaarTeam: String?
 
@@ -231,11 +232,38 @@ struct CrockinoleGameView: View {
                         Image(systemName: "gearshape")
                             .foregroundColor(.blue)
                     }
+
+                    Button(action: {
+                        showPuntenWijzigenSheet = true
+                    }) {
+                        Image(systemName: "pencil.circle")
+                            .foregroundColor(.blue)
+                    }
                 }
             }
         }
         .sheet(isPresented: $toonGeschiedenisSheet) {
             historySheetView
+        }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                spelers: [teamWitNaam, teamZwartNaam],
+                huidigeScores: totaleScores,
+                titel: "Crokinole Stand Wijzigen",
+                isLowestScoreWins: false
+            ) { nieuweScores in
+                totaleScores = nieuweScores
+                let entry = CrokinoleRondeEntry(
+                    id: UUID(),
+                    ronde: huidigeRonde,
+                    scoreWit: 0,
+                    scoreZwart: 0,
+                    totaleScoresNaRonde: nieuweScores,
+                    setScoresNaRonde: setScores
+                )
+                rondeGeschiedenis.append(entry)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
         }
         .confirmationDialog(
             "Herstel Ronde \(restoreTargetEntry?.ronde ?? 1)?",
@@ -243,6 +271,9 @@ struct CrockinoleGameView: View {
             titleVisibility: .visible
         ) {
             if let entry = restoreTargetEntry {
+                Button("✏️ Punten direct wijzigen...") {
+                    openPuntenWijzigenVanuitGeschiedenis()
+                }
                 Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
                     herstelNaarStartVanRonde(entry)
                 }
@@ -253,7 +284,7 @@ struct CrockinoleGameView: View {
             }
         } message: {
             if let entry = restoreTargetEntry {
-                Text("Wil je de setscores en punten terugzetten naar ronde \(entry.ronde)?")
+                Text("Wil je de setscores en punten terugzetten naar ronde \(entry.ronde)? Of pas de punten direct aan.")
             }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
@@ -1146,6 +1177,11 @@ struct CrockinoleGameView: View {
                                 showRestoreDialog = true
                             }
                             .contextMenu {
+                                Button(action: {
+                                    openPuntenWijzigenVanuitGeschiedenis()
+                                }) {
+                                    Label("Punten direct wijzigen", systemImage: "pencil.line")
+                                }
                                 Button(role: .destructive, action: {
                                     herstelNaarStartVanRonde(entry)
                                 }) {
@@ -1164,12 +1200,26 @@ struct CrockinoleGameView: View {
             .navigationTitle("Rondegeschiedenis")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Klaar") {
                         toonGeschiedenisSheet = false
                     }
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        toonGeschiedenisSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

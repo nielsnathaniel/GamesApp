@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct QuickstopRondeEntry: Identifiable {
-    var id: Int { ronde }
+    var id: UUID = UUID()
     let ronde: Int
     let starter: String
     let scoresDezeRonde: [Int]
@@ -26,6 +26,7 @@ struct QuickstopGameView: View {
     @State private var showFinishConfirm: Bool = false
     @State private var restoreTargetEntry: QuickstopRondeEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
 
     // Thema inspiratie generator
     @State private var huidigeThema: String = "Iets wat in de koelkast staat"
@@ -109,13 +110,43 @@ struct QuickstopGameView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { toonGeschiedenisSheet = true }) {
-                    Image(systemName: "clock.arrow.circlepath")
+                HStack(spacing: 8) {
+                    Button(action: { showPuntenWijzigenSheet = true }) {
+                        Image(systemName: "pencil.circle")
+                    }
+                    Button(action: { toonGeschiedenisSheet = true }) {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
                 }
             }
         }
         .sheet(isPresented: $toonGeschiedenisSheet) {
             historySheet
+        }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                spelers: spelers,
+                huidigeScores: totaleScores,
+                titel: "Quickstop Stand Wijzigen",
+                isLowestScoreWins: true
+            ) { nieuweScores in
+                var rondeDiffs: [Int] = []
+                for i in spelers.indices {
+                    let oldScore = totaleScores[safe: i] ?? 0
+                    let newScore = nieuweScores[safe: i] ?? oldScore
+                    rondeDiffs.append(newScore - oldScore)
+                }
+                totaleScores = nieuweScores
+                let entry = QuickstopRondeEntry(
+                    id: UUID(),
+                    ronde: huidigeRonde,
+                    starter: "Handmatige correctie",
+                    scoresDezeRonde: rondeDiffs,
+                    totalenNaRonde: nieuweScores
+                )
+                rondeGeschiedenis.append(entry)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
             WinnaarView(
@@ -628,6 +659,11 @@ struct QuickstopGameView: View {
                                 showRestoreDialog = true
                             }
                             .contextMenu {
+                                Button(action: {
+                                    openPuntenWijzigenVanuitGeschiedenis()
+                                }) {
+                                    Label("Punten direct wijzigen", systemImage: "pencil.line")
+                                }
                                 Button(role: .destructive, action: {
                                     herstelNaarStartVanRonde(entry)
                                 }) {
@@ -646,6 +682,13 @@ struct QuickstopGameView: View {
             .navigationTitle("Rondegeschiedenis")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Klaar") { toonGeschiedenisSheet = false }
                 }
@@ -656,6 +699,9 @@ struct QuickstopGameView: View {
                 titleVisibility: .visible
             ) {
                 if let entry = restoreTargetEntry {
+                    Button("✏️ Punten direct wijzigen...") {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }
                     Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
                         herstelNaarStartVanRonde(entry)
                     }
@@ -666,9 +712,16 @@ struct QuickstopGameView: View {
                 }
             } message: {
                 if let entry = restoreTargetEntry {
-                    Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)?")
+                    Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)? Of pas de stand direct aan.")
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        toonGeschiedenisSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

@@ -34,6 +34,7 @@ struct CurrentGameView: View {
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var restoreTargetEntry: CurrentGameRondeEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
     @State private var showAlert: Bool = false
     @State private var alertMessage: String = ""
     @State private var showWinnaarView: Bool = false
@@ -223,15 +224,46 @@ struct CurrentGameView: View {
         .padding()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    toonGeschiedenisSheet = true
-                }) {
-                    Image(systemName: "clock.arrow.circlepath")
+                HStack(spacing: 8) {
+                    Button(action: {
+                        showPuntenWijzigenSheet = true
+                    }) {
+                        Image(systemName: "pencil.circle")
+                    }
+                    Button(action: {
+                        toonGeschiedenisSheet = true
+                    }) {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
                 }
             }
         }
         .sheet(isPresented: $toonGeschiedenisSheet) {
             historySheetView
+        }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                players: spelers,
+                huidigeScores: totaleScores,
+                titel: "\(gameName) Stand Wijzigen",
+                isLowestScoreWins: false
+            ) { nieuweScores in
+                var rondeDiffs: [Int] = []
+                for i in spelers.indices {
+                    let oldScore = totaleScores[safe: i] ?? 0
+                    let newScore = nieuweScores[safe: i] ?? oldScore
+                    rondeDiffs.append(newScore - oldScore)
+                }
+                totaleScores = nieuweScores
+                let entry = CurrentGameRondeEntry(
+                    id: UUID(),
+                    ronde: huidigeRonde,
+                    rondeScores: rondeDiffs,
+                    totaleScoresNaRonde: nieuweScores
+                )
+                rondeGeschiedenis.append(entry)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
         }
         .confirmationDialog(
             "Herstel Ronde \(restoreTargetEntry?.ronde ?? 1)?",
@@ -239,6 +271,9 @@ struct CurrentGameView: View {
             titleVisibility: .visible
         ) {
             if let entry = restoreTargetEntry {
+                Button("✏️ Punten direct wijzigen...") {
+                    openPuntenWijzigenVanuitGeschiedenis()
+                }
                 Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
                     herstelNaarStartVanRonde(entry)
                 }
@@ -249,7 +284,7 @@ struct CurrentGameView: View {
             }
         } message: {
             if let entry = restoreTargetEntry {
-                Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)?")
+                Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)? Of pas de stand direct aan.")
             }
         }
         .onAppear {
@@ -391,6 +426,11 @@ struct CurrentGameView: View {
                                 showRestoreDialog = true
                             }
                             .contextMenu {
+                                Button(action: {
+                                    openPuntenWijzigenVanuitGeschiedenis()
+                                }) {
+                                    Label("Punten direct wijzigen", systemImage: "pencil.line")
+                                }
                                 Button(role: .destructive, action: {
                                     herstelNaarStartVanRonde(entry)
                                 }) {
@@ -409,12 +449,26 @@ struct CurrentGameView: View {
             .navigationTitle("Rondegeschiedenis")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Klaar") {
                         toonGeschiedenisSheet = false
                     }
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        toonGeschiedenisSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

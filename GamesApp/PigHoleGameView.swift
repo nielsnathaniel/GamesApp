@@ -31,6 +31,7 @@ struct PigHoleGameView: View {
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var restoreTargetEntry: PigHoleActionEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaarPlayer: Player = Player(name: "")
     @State private var showFinishConfirm: Bool = false
@@ -96,21 +97,51 @@ struct PigHoleGameView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    toonGeschiedenisSheet = true
-                }) {
-                    Image(systemName: "clock.arrow.circlepath")
+                HStack(spacing: 8) {
+                    Button(action: {
+                        showPuntenWijzigenSheet = true
+                    }) {
+                        Image(systemName: "pencil.circle")
+                    }
+                    Button(action: {
+                        toonGeschiedenisSheet = true
+                    }) {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
                 }
             }
         }
         .sheet(isPresented: $toonGeschiedenisSheet) {
             historySheetView
         }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                spelers: spelers,
+                huidigeScores: varkens,
+                titel: "Pig Hole Stand Wijzigen",
+                subtitel: "Pas het aantal varkens per speler direct aan.",
+                isLowestScoreWins: true
+            ) { nieuweScores in
+                varkens = nieuweScores
+                let entry = PigHoleActionEntry(
+                    id: UUID(),
+                    ronde: huidigeRonde,
+                    beurtSpeler: "Handmatige correctie",
+                    actie: "Stand handmatig aangepast",
+                    varkensStand: nieuweScores
+                )
+                geschiedenis.append(entry)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
         .confirmationDialog(
             "Herstel actie / ronde?",
             isPresented: $showRestoreDialog,
             titleVisibility: .visible
         ) {
+            Button("✏️ Varkens/punten direct wijzigen...") {
+                openPuntenWijzigenVanuitGeschiedenis()
+            }
             if let entry = restoreTargetEntry {
                 Button("Herstel vóór deze actie (Wis deze actie)", role: .destructive) {
                     herstelNaarActie(entry, includeThisAction: false)
@@ -118,11 +149,11 @@ struct PigHoleGameView: View {
                 Button("Herstel t/m deze actie") {
                     herstelNaarActie(entry, includeThisAction: true)
                 }
-                Button("Annuleren", role: .cancel) {}
             }
+            Button("Annuleren", role: .cancel) {}
         } message: {
             if let entry = restoreTargetEntry {
-                Text("Wil je de stand van het spel terugzetten naar: \(entry.actie) (Ronde \(entry.ronde))?")
+                Text("Wil je de stand van het spel terugzetten naar: \(entry.actie) (Ronde \(entry.ronde))? Of pas het aantal varkens direct aan.")
             }
         }
     }
@@ -509,6 +540,11 @@ struct PigHoleGameView: View {
                             showRestoreDialog = true
                         }
                         .contextMenu {
+                            Button(action: {
+                                openPuntenWijzigenVanuitGeschiedenis()
+                            }) {
+                                Label("Varkens/stand direct wijzigen", systemImage: "pencil.line")
+                            }
                             Button(role: .destructive, action: {
                                 herstelNaarActie(entry, includeThisAction: false)
                             }) {
@@ -526,12 +562,26 @@ struct PigHoleGameView: View {
             .navigationTitle("Rondegeschiedenis")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Klaar") {
                         toonGeschiedenisSheet = false
                     }
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        toonGeschiedenisSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

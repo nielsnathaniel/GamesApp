@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct FiftyFiftyWhiteGoblinRondeEntry: Identifiable {
-    var id: Int { ronde }
+    var id: UUID = UUID()
     let ronde: Int
     let strafkaartenDezeRonde: [Int]
     let vosOpHandDezeRonde: [Bool]
@@ -34,6 +34,7 @@ struct FiftyFiftyGameView: View {
     @State private var showFinishConfirm: Bool = false
     @State private var restoreTargetEntry: FiftyFiftyWhiteGoblinRondeEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
 
     init(
         spelers: [String],
@@ -142,11 +143,33 @@ struct FiftyFiftyGameView: View {
         } message: {
             Text("De scores worden opgeslagen. De speler met de minste strafkaarten (zonder vos op hand) wint!")
         }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                spelers: spelers,
+                huidigeScores: totaleStrafkaarten,
+                titel: "Fifty Fifty Stand Wijzigen",
+                isLowestScoreWins: true
+            ) { nieuweScores in
+                totaleStrafkaarten = nieuweScores
+                let entry = FiftyFiftyWhiteGoblinRondeEntry(
+                    id: UUID(),
+                    ronde: huidigeRonde,
+                    strafkaartenDezeRonde: Array(repeating: 0, count: spelers.count),
+                    vosOpHandDezeRonde: Array(repeating: false, count: spelers.count),
+                    totaleStrafkaartenNaRonde: nieuweScores
+                )
+                rondeGeschiedenis.append(entry)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
         .confirmationDialog(
             "Ronde herstellen?",
             isPresented: $showRestoreDialog,
             titleVisibility: .visible
         ) {
+            Button("✏️ Punten direct wijzigen...") {
+                openPuntenWijzigenVanuitGeschiedenis()
+            }
             if let target = restoreTargetEntry {
                 Button("Herstel naar Ronde \(target.ronde)", role: .destructive) {
                     restoreToRound(target)
@@ -155,7 +178,7 @@ struct FiftyFiftyGameView: View {
             Button("Annuleren", role: .cancel) {}
         } message: {
             if let target = restoreTargetEntry {
-                Text("De rondes na ronde \(target.ronde) worden teruggedraaid.")
+                Text("De rondes na ronde \(target.ronde) worden teruggedraaid. Of pas de punten direct aan.")
             }
         }
         .onAppear {
@@ -706,6 +729,11 @@ struct FiftyFiftyGameView: View {
                                 showRestoreDialog = true
                             }
                             .contextMenu {
+                                Button(action: {
+                                    openPuntenWijzigenVanuitGeschiedenis()
+                                }) {
+                                    Label("Punten direct wijzigen", systemImage: "pencil.line")
+                                }
                                 Button(role: .destructive) {
                                     restoreTargetEntry = entry
                                     showRestoreDialog = true
@@ -720,12 +748,26 @@ struct FiftyFiftyGameView: View {
             .navigationTitle("Ronde Geschiedenis")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Klaar") {
                         toonGeschiedenisSheet = false
                     }
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        toonGeschiedenisSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 }

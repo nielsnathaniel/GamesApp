@@ -171,6 +171,7 @@ struct LoveLetterGameView: View {
     @State private var showCardsOverviewSheet: Bool = false
     @State private var restoreTargetRecord: LoveLetterRoundRecord? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winnaarPlayer: Player = Player(name: "")
 
@@ -207,6 +208,10 @@ struct LoveLetterGameView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 14) {
+                    Button(action: { showPuntenWijzigenSheet = true }) {
+                        Image(systemName: "pencil.circle")
+                    }
+
                     Button(action: { showCardsOverviewSheet = true }) {
                         Label("Kaarten", systemImage: "rectangle.portrait.on.rectangle.portrait.angled")
                     }
@@ -240,6 +245,18 @@ struct LoveLetterGameView: View {
         }
         .sheet(isPresented: $showHistorySheet) {
             historySheetView
+        }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                spelers: spelers,
+                huidigeScores: fichesPerSpeler,
+                titel: "Love Letter Fiches Wijzigen",
+                subtitel: "Pas het aantal fiches per speler direct aan.",
+                isLowestScoreWins: false
+            ) { nieuweScores in
+                fichesPerSpeler = nieuweScores
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
         }
         .sheet(isPresented: $showCardsOverviewSheet) {
             cardsOverviewSheet
@@ -688,6 +705,11 @@ struct LoveLetterGameView: View {
                             showRestoreDialog = true
                         }
                         .contextMenu {
+                            Button(action: {
+                                openPuntenWijzigenVanuitGeschiedenis()
+                            }) {
+                                Label("Fiches direct wijzigen", systemImage: "pencil.line")
+                            }
                             Button(role: .destructive, action: {
                                 herstelNaarRonde(round, includeThisRound: false)
                             }) {
@@ -708,6 +730,13 @@ struct LoveLetterGameView: View {
             .navigationTitle("Rondelogboek")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Fiches wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Klaar") { showHistorySheet = false }
                 }
@@ -718,6 +747,9 @@ struct LoveLetterGameView: View {
                 titleVisibility: .visible
             ) {
                 if let record = restoreTargetRecord {
+                    Button("✏️ Fiches direct wijzigen...") {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }
                     Button("Herstel naar stand vóór Ronde \(record.roundNumber) (Wis ronde)", role: .destructive) {
                         herstelNaarRonde(record, includeThisRound: false)
                     }
@@ -728,9 +760,16 @@ struct LoveLetterGameView: View {
                 }
             } message: {
                 if let record = restoreTargetRecord {
-                    Text("Wil je de stand van ronde \(record.roundNumber) herstellen?")
+                    Text("Wil je de stand van ronde \(record.roundNumber) herstellen? Of pas de fiches direct aan.")
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        showHistorySheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

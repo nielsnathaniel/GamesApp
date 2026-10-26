@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct BalzakkenRondeEntry: Identifiable {
-    var id: Int { ronde }
+    var id: UUID = UUID()
     let ronde: Int
     let starter: String
     let scoresDezeRonde: [Int]
@@ -30,6 +30,7 @@ struct BalzakkenGameView: View {
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var restoreTargetEntry: BalzakkenRondeEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
     @State private var isExpanded: [Bool] = []
     @State private var showWinnaarView: Bool = false
     @State private var winnaar: Player?
@@ -118,24 +119,37 @@ struct BalzakkenGameView: View {
                 .cornerRadius(12)
                 .padding(.horizontal)
 
-                // Knop naar puntengeschiedenis van dit spel
-                Button(action: {
-                    toonGeschiedenisSheet = true
-                }) {
-                    HStack {
-                        Image(systemName: "clock.arrow.circlepath")
-                        Text("Puntengeschiedenis (\(rondeGeschiedenis.count) \(rondeGeschiedenis.count == 1 ? "ronde" : "rondes"))")
-                            .fontWeight(.semibold)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                // Knoppen voor geschiedenis en directe score-aanpassing
+                HStack(spacing: 10) {
+                    Button(action: {
+                        toonGeschiedenisSheet = true
+                    }) {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text("Geschiedenis (\(rondeGeschiedenis.count))")
+                                .fontWeight(.semibold)
+                        }
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(10)
                     }
-                    .font(.subheadline)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color(UIColor.secondarySystemBackground))
-                    .cornerRadius(10)
+
+                    Button(action: {
+                        showPuntenWijzigenSheet = true
+                    }) {
+                        HStack {
+                            Image(systemName: "pencil.circle")
+                            Text("Punten wijzigen")
+                                .fontWeight(.semibold)
+                        }
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(10)
+                    }
                 }
                 .padding(.horizontal)
 
@@ -422,6 +436,32 @@ struct BalzakkenGameView: View {
         .sheet(isPresented: $toonGeschiedenisSheet) {
             puntengeschiedenisView
         }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                players: spelers,
+                huidigeScores: totaleScores,
+                titel: "Balzakken Stand Wijzigen",
+                isLowestScoreWins: true
+            ) { nieuweScores in
+                var rondeDiffs: [Int] = []
+                for i in spelers.indices {
+                    let oldScore = totaleScores[safe: i] ?? 0
+                    let newScore = nieuweScores[safe: i] ?? oldScore
+                    rondeDiffs.append(newScore - oldScore)
+                }
+                totaleScores = nieuweScores
+                let entry = BalzakkenRondeEntry(
+                    id: UUID(),
+                    ronde: huidigeRonde,
+                    starter: "Handmatige correctie",
+                    scoresDezeRonde: rondeDiffs,
+                    totalenNaRonde: nieuweScores,
+                    specialeEvents: ["Stand handmatig aangepast"]
+                )
+                rondeGeschiedenis.append(entry)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
         .alert("Lekkere Tussenstand! 🎉", isPresented: $showSpecialRuleAlert) {
             Button("Top!", role: .cancel) {
                 controleerEindeSpel()
@@ -525,6 +565,11 @@ struct BalzakkenGameView: View {
                             showRestoreDialog = true
                         }
                         .contextMenu {
+                            Button(action: {
+                                openPuntenWijzigenVanuitGeschiedenis()
+                            }) {
+                                Label("Punten direct wijzigen", systemImage: "pencil.line")
+                            }
                             Button(role: .destructive, action: {
                                 herstelNaarStartVanRonde(entry)
                             }) {
@@ -542,6 +587,13 @@ struct BalzakkenGameView: View {
             .navigationTitle("Puntenverloop Dit Spel")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Sluit") {
                         toonGeschiedenisSheet = false
@@ -554,6 +606,9 @@ struct BalzakkenGameView: View {
                 titleVisibility: .visible
             ) {
                 if let entry = restoreTargetEntry {
+                    Button("✏️ Punten direct wijzigen...") {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }
                     Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
                         herstelNaarStartVanRonde(entry)
                     }
@@ -564,9 +619,16 @@ struct BalzakkenGameView: View {
                 }
             } message: {
                 if let entry = restoreTargetEntry {
-                    Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)?")
+                    Text("Wil je de scores en rondeteller terugzetten naar ronde \(entry.ronde)? Of pas de stand direct aan.")
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        toonGeschiedenisSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

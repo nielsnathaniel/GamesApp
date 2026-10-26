@@ -16,10 +16,11 @@ struct BeverbendeScoreView: View {
     @State private var toonGeschiedenisSheet: Bool = false
     @State private var restoreTargetEntry: BeverbendeRondeEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
     @State private var rondeGeschiedenis: [BeverbendeRondeEntry] = []
 
     struct BeverbendeRondeEntry: Identifiable {
-        var id: Int { ronde }
+        var id: UUID = UUID()
         let ronde: Int
         let starter: String
         let rondeScores: [Int]
@@ -39,6 +40,16 @@ struct BeverbendeScoreView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 Spacer()
+                Button(action: {
+                    showPuntenWijzigenSheet = true
+                }) {
+                    Label("Punten wijzigen", systemImage: "pencil.circle")
+                        .font(.footnote)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .cornerRadius(8)
+                }
                 Button(action: {
                     toonGeschiedenisSheet = true
                 }) {
@@ -214,6 +225,31 @@ struct BeverbendeScoreView: View {
             }
         }
         .padding()
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                players: spelers,
+                huidigeScores: totaleScores,
+                titel: "Beverbende Stand Wijzigen",
+                isLowestScoreWins: true
+            ) { nieuweScores in
+                var rondeDiffs: [Int] = []
+                for i in spelers.indices {
+                    let oldScore = totaleScores[safe: i] ?? 0
+                    let newScore = nieuweScores[safe: i] ?? oldScore
+                    rondeDiffs.append(newScore - oldScore)
+                }
+                totaleScores = nieuweScores
+                let entry = BeverbendeRondeEntry(
+                    id: UUID(),
+                    ronde: huidigeRonde,
+                    starter: "Handmatige correctie",
+                    rondeScores: rondeDiffs,
+                    totalen: nieuweScores
+                )
+                rondeGeschiedenis.append(entry)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
         .onAppear {
             if scores.isEmpty {
                 scores = Array(repeating: Array(repeating: 0, count: 4), count: spelers.count)
@@ -277,6 +313,11 @@ struct BeverbendeScoreView: View {
                                 showRestoreDialog = true
                             }
                             .contextMenu {
+                                Button(action: {
+                                    openPuntenWijzigenVanuitGeschiedenis()
+                                }) {
+                                    Label("Punten direct wijzigen", systemImage: "pencil.line")
+                                }
                                 Button(role: .destructive, action: {
                                     herstelNaarStartVanRonde(entry)
                                 }) {
@@ -294,6 +335,13 @@ struct BeverbendeScoreView: View {
                 .navigationTitle("Puntenverloop Beverbende")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            openPuntenWijzigenVanuitGeschiedenis()
+                        }) {
+                            Label("Punten wijzigen", systemImage: "pencil.circle")
+                        }
+                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Sluit") {
                             toonGeschiedenisSheet = false
@@ -306,6 +354,9 @@ struct BeverbendeScoreView: View {
                     titleVisibility: .visible
                 ) {
                     if let entry = restoreTargetEntry {
+                        Button("✏️ Punten direct wijzigen...") {
+                            openPuntenWijzigenVanuitGeschiedenis()
+                        }
                         Button("Herstel naar start van Ronde \(entry.ronde) (Wis deze ronde)", role: .destructive) {
                             herstelNaarStartVanRonde(entry)
                         }
@@ -316,10 +367,17 @@ struct BeverbendeScoreView: View {
                     }
                 } message: {
                     if let entry = restoreTargetEntry {
-                        Text("Wil je de stand terugzetten naar ronde \(entry.ronde)?")
+                        Text("Wil je de stand terugzetten naar ronde \(entry.ronde)? Of pas de punten rechtstreeks aan.")
                     }
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        toonGeschiedenisSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

@@ -112,6 +112,7 @@ struct CraniumGameView: View {
     @State private var showHistorySheet: Bool = false
     @State private var restoreTargetEntry: CraniumRoundEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
     @State private var showWinnaarView: Bool = false
     @State private var winningTeam: CraniumTeam? = nil
     @State private var showAfrondenSheet: Bool = false
@@ -161,13 +162,48 @@ struct CraniumGameView: View {
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showHistorySheet = true }) {
-                    Label("Logboek", systemImage: "clock.arrow.circlepath")
+                HStack(spacing: 8) {
+                    Button(action: { showPuntenWijzigenSheet = true }) {
+                        Image(systemName: "pencil.circle")
+                    }
+                    Button(action: { showHistorySheet = true }) {
+                        Label("Logboek", systemImage: "clock.arrow.circlepath")
+                    }
                 }
             }
         }
         .sheet(isPresented: $showHistorySheet) {
             historySheetView
+        }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                spelers: teams.map { $0.name },
+                huidigeScores: teams.map { $0.score },
+                titel: "Cranium Stand Wijzigen",
+                isLowestScoreWins: false
+            ) { nieuweScores in
+                for i in teams.indices {
+                    if let nieuw = nieuweScores[safe: i] {
+                        let diff = nieuw - teams[i].score
+                        teams[i].score = nieuw
+                        if diff != 0 {
+                            geschiedenis.append(
+                                CraniumRoundEntry(
+                                    roundNumber: huidigeRonde,
+                                    teamName: teams[i].name,
+                                    performerName: "Handmatige correctie",
+                                    category: "Correctie",
+                                    isSuccess: diff > 0,
+                                    isClubCranium: false,
+                                    clubWinnerTeam: nil,
+                                    totalAfter: nieuw
+                                )
+                            )
+                        }
+                    }
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
             if let winner = winningTeam {
@@ -711,6 +747,11 @@ struct CraniumGameView: View {
                             showRestoreDialog = true
                         }
                         .contextMenu {
+                            Button(action: {
+                                openPuntenWijzigenVanuitGeschiedenis()
+                            }) {
+                                Label("Punten direct wijzigen", systemImage: "pencil.line")
+                            }
                             Button(role: .destructive, action: {
                                 herstelBeurt(entry, includeThisTurn: false)
                             }) {
@@ -728,6 +769,13 @@ struct CraniumGameView: View {
             .navigationTitle("Cranium Beurtenlog")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Sluit") { showHistorySheet = false }
                 }
@@ -738,6 +786,9 @@ struct CraniumGameView: View {
                 titleVisibility: .visible
             ) {
                 if let entry = restoreTargetEntry {
+                    Button("✏️ Punten direct wijzigen...") {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }
                     Button("Herstel naar stand vóór deze opdracht (Wis opdracht)", role: .destructive) {
                         herstelBeurt(entry, includeThisTurn: false)
                     }
@@ -748,9 +799,16 @@ struct CraniumGameView: View {
                 }
             } message: {
                 if let entry = restoreTargetEntry {
-                    Text("Wil je de opdracht van \(entry.teamName) in ronde \(entry.roundNumber) herstellen?")
+                    Text("Wil je de opdracht van \(entry.teamName) in ronde \(entry.roundNumber) herstellen? Of pas de stand direct aan.")
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        showHistorySheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 

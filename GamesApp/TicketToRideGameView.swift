@@ -55,6 +55,7 @@ struct TicketToRideGameView: View {
     @State private var showRondesSheet: Bool = false
     @State private var restoreTargetTurn: TTRTurnEntry? = nil
     @State private var showRestoreDialog: Bool = false
+    @State private var showPuntenWijzigenSheet: Bool = false
 
     init(
         spelers: [String],
@@ -152,21 +153,57 @@ struct TicketToRideGameView: View {
                 }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showRondesSheet = true
-                }) {
-                    Image(systemName: "clock.arrow.circlepath")
+                HStack(spacing: 8) {
+                    Button(action: {
+                        showPuntenWijzigenSheet = true
+                    }) {
+                        Image(systemName: "pencil.circle")
+                    }
+                    Button(action: {
+                        showRondesSheet = true
+                    }) {
+                        Image(systemName: "clock.arrow.circlepath")
+                    }
                 }
             }
         }
         .sheet(isPresented: $showRondesSheet) {
             allRoundsSheetView
         }
+        .sheet(isPresented: $showPuntenWijzigenSheet) {
+            PuntenWijzigenSheet(
+                spelers: spelers,
+                huidigeScores: playerScores.map { $0.routePoints },
+                titel: "Ticket to Ride Punten Wijzigen",
+                isLowestScoreWins: false
+            ) { nieuweScores in
+                for i in spelers.indices {
+                    if let nieuw = nieuweScores[safe: i] {
+                        let diff = nieuw - playerScores[i].routePoints
+                        playerScores[i].routePoints = nieuw
+                        if diff != 0 {
+                            turnHistory.append(
+                                TTRTurnEntry(
+                                    round: currentRound,
+                                    playerIndex: i,
+                                    points: diff,
+                                    description: "Handmatige correctie (\(diff > 0 ? "+\(diff)" : "\(diff)") pt)"
+                                )
+                            )
+                        }
+                    }
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+        }
         .confirmationDialog(
             "Herstel beurt?",
             isPresented: $showRestoreDialog,
             titleVisibility: .visible
         ) {
+            Button("✏️ Punten direct wijzigen...") {
+                openPuntenWijzigenVanuitGeschiedenis()
+            }
             if let target = restoreTargetTurn {
                 Button("Herstel vóór beurt van \(spelers[safe: target.playerIndex] ?? "") (Wis deze beurt)", role: .destructive) {
                     herstelNaarTurn(target, includeThisTurn: false)
@@ -174,11 +211,11 @@ struct TicketToRideGameView: View {
                 Button("Herstel t/m beurt van \(spelers[safe: target.playerIndex] ?? "")") {
                     herstelNaarTurn(target, includeThisTurn: true)
                 }
-                Button("Annuleren", role: .cancel) {}
             }
+            Button("Annuleren", role: .cancel) {}
         } message: {
             if let target = restoreTargetTurn {
-                Text("Wil je de routepunten en stand terugzetten naar beurt in Ronde \(target.round)?")
+                Text("Wil je de routepunten en stand terugzetten naar beurt in Ronde \(target.round)? Of pas de stand direct aan.")
             }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
@@ -1353,6 +1390,11 @@ struct TicketToRideGameView: View {
                                     showRestoreDialog = true
                                 }
                                 .contextMenu {
+                                    Button(action: {
+                                        openPuntenWijzigenVanuitGeschiedenis()
+                                    }) {
+                                        Label("Punten direct wijzigen", systemImage: "pencil.line")
+                                    }
                                     Button(role: .destructive, action: {
                                         herstelNaarTurn(turn, includeThisTurn: false)
                                     }) {
@@ -1372,12 +1414,26 @@ struct TicketToRideGameView: View {
             .navigationTitle("Rondegeschiedenis")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        openPuntenWijzigenVanuitGeschiedenis()
+                    }) {
+                        Label("Punten wijzigen", systemImage: "pencil.circle")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Klaar") {
                         showRondesSheet = false
                     }
                 }
             }
+        }
+    }
+
+    private func openPuntenWijzigenVanuitGeschiedenis() {
+        showRondesSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            showPuntenWijzigenSheet = true
         }
     }
 
