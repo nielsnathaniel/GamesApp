@@ -30,6 +30,7 @@ import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
 import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
@@ -83,6 +84,7 @@ fun TicketToRideScreen(
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
     var showDisputeDialog by remember { mutableStateOf(false) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
 
     val calculatedTotals = remember(playerScores, isDirectMode) {
         playerScores.map { it.calculatedTotal(isDirectMode) }
@@ -118,6 +120,11 @@ fun TicketToRideScreen(
                     }
                 },
                 actions = {
+                    if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
+                    }
                     IconButton(onClick = { showDisputeDialog = true }) {
                         Text("⚖️", fontSize = 18.sp)
                     }
@@ -526,6 +533,27 @@ fun TicketToRideScreen(
         WieHeeftGelijkDialog(
             initialGameFilter = "Ticket to Ride",
             onDismiss = { showDisputeDialog = false }
+        )
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = selectedPlayerNames,
+            currentScores = calculatedTotals,
+            isLowestScoreWins = false,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                playerScores = playerScores.indices.map { i ->
+                    val item = playerScores[i]
+                    val target = newScores.getOrElse(i) { 0 }
+                    if (isDirectMode) {
+                        item.copy(directScore = target)
+                    } else {
+                        val other = item.calculatedTotal(false) - item.routePoints
+                        item.copy(routePoints = target - other)
+                    }
+                }.toMutableList()
+            }
         )
     }
 }

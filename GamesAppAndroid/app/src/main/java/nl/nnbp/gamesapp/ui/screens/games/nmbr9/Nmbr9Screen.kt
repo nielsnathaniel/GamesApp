@@ -24,8 +24,10 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -48,6 +50,20 @@ fun Nmbr9Screen(
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Nmbr9",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = false,
+            scoreUnit = "pt",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     // Bereken totale score per speler: Laag 1 * 1 + Laag 2 * 2 + Laag 3 * 3 + Laag 4 * 4
     val computedScores = remember(playerLevelPoints) {
@@ -88,6 +104,13 @@ fun Nmbr9Screen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
                     }
+                },
+                actions = {
+                    if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
+                    }
                 }
             )
         }
@@ -117,6 +140,30 @@ fun Nmbr9Screen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
+                        }
+                    }
+
+                    item {
+                        AppCard {
+                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = !isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = false },
+                                    label = { Text("Lagen tellen") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = true },
+                                    label = { Text("⚡️ Alleen eindscore") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
 
@@ -166,8 +213,12 @@ fun Nmbr9Screen(
 
                 Button(
                     onClick = {
-                        playerLevelPoints = MutableList(selectedPlayerNames.size) { mutableListOf(0, 0, 0, 0) }
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            playerLevelPoints = MutableList(selectedPlayerNames.size) { mutableListOf(0, 0, 0, 0) }
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.isNotEmpty(),
                     modifier = Modifier
@@ -175,7 +226,10 @@ fun Nmbr9Screen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Berekening", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Berekening",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -326,5 +380,20 @@ fun Nmbr9Screen(
                 }
             }
         }
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = selectedPlayerNames,
+            currentScores = computedScores,
+            isLowestScoreWins = false,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                playerLevelPoints = newScores.indices.map { i ->
+                    val pts = newScores.getOrElse(i) { 0 }
+                    mutableListOf(pts, 0, 0, 0)
+                }.toMutableList()
+            }
+        )
     }
 }

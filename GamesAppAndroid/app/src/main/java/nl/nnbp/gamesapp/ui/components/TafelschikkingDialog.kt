@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import nl.nnbp.gamesapp.data.model.Player
+import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.CardBackground
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 import nl.nnbp.gamesapp.ui.theme.SurfaceDark
@@ -246,6 +247,27 @@ fun TafelschikkingDialog(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.White.copy(alpha = 0.5f),
                                     fontSize = 11.sp
+                                )
+                            }
+
+                            // Maak startspeler / zet bovenaan
+                            IconButton(
+                                onClick = {
+                                    if (index > 0) {
+                                        val mutable = orderedPlayers.toMutableList()
+                                        val target = mutable.removeAt(index)
+                                        mutable.add(0, target)
+                                        orderedPlayers = mutable
+                                    }
+                                },
+                                enabled = index > 0,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.VerticalAlignTop,
+                                    contentDescription = "Zet bovenaan (Startspeler)",
+                                    tint = if (index > 0) AccentOrange else Color.White.copy(alpha = 0.2f),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
 

@@ -22,8 +22,10 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.ui.audio.SoundManager
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.BadgesOverviewDialog
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,6 +43,7 @@ fun SettingsScreen(
     var isSoundEnabled by remember { mutableStateOf(soundManager.isSoundEnabled) }
     var expandedRulesGame by remember { mutableStateOf<String?>(null) }
     var showDisputeDialog by remember { mutableStateOf(false) }
+    var showBadgesDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -150,6 +153,27 @@ fun SettingsScreen(
                             Column {
                                 Text("Opgeslagen Spelsessies", fontWeight = FontWeight.Bold)
                                 Text("${games.size} gespeelde potjes geregistreerd", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showBadgesDialog = true }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = AccentOrange)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Bordspel Badges & Medailles", fontWeight = FontWeight.Bold)
+                                Text("Bekijk alle 12 ontgrendelbare prestaties", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                             }
                         }
                         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
@@ -307,5 +331,9 @@ fun SettingsScreen(
 
     if (showDisputeDialog) {
         WieHeeftGelijkDialog(onDismiss = { showDisputeDialog = false })
+    }
+
+    if (showBadgesDialog) {
+        BadgesOverviewDialog(onDismiss = { showBadgesDialog = false })
     }
 }

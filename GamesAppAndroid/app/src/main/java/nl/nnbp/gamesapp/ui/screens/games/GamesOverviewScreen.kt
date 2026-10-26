@@ -24,6 +24,8 @@ import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.GameSortOption
 import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.data.model.Player
+import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 import nl.nnbp.gamesapp.ui.theme.RoyalPurple
@@ -43,6 +45,8 @@ fun GamesOverviewScreen(
     var sortOption by remember { mutableStateOf(GameSortOption.TOEGEVOEGD) }
     var showSortMenu by remember { mutableStateOf(false) }
     var showDiscardDraftDialog by remember { mutableStateOf(false) }
+    var showTafelschikkingDialog by remember { mutableStateOf(false) }
+    val savedPlayerNames by scoreManager.savedPlayerNames.collectAsState()
 
     val sortedGames = remember(sortOption, playedGames) {
         when (sortOption) {
@@ -167,6 +171,55 @@ fun GamesOverviewScreen(
                 }
             }
 
+            // Tafelschikking Assistent Teaser Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .clickable { showTafelschikkingDialog = true },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(AccentOrange.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🎲", fontSize = 22.sp)
+                        }
+                        Column {
+                            Text(
+                                text = "Tafelschikking Assistent",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "Wie zit waar? Draai & bepaal startspeler",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
             // Grid met spellen
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -207,6 +260,25 @@ fun GamesOverviewScreen(
                     Text("Annuleren")
                 }
             }
+        )
+    }
+
+    if (showTafelschikkingDialog) {
+        val players = if (savedPlayerNames.isNotEmpty()) {
+            savedPlayerNames.map { name ->
+                val prof = scoreManager.getPlayerProfile(name)
+                Player(name = name, colorHex = prof.colorHex, avatarEmoji = prof.avatarEmoji)
+            }
+        } else {
+            listOf("Speler 1", "Speler 2", "Speler 3", "Speler 4").map { name ->
+                val prof = scoreManager.getPlayerProfile(name)
+                Player(name = name, colorHex = prof.colorHex, avatarEmoji = prof.avatarEmoji)
+            }
+        }
+        TafelschikkingDialog(
+            players = players,
+            onDismiss = { showTafelschikkingDialog = false },
+            onApplyOrder = { /* Ordered applied */ }
         )
     }
 }

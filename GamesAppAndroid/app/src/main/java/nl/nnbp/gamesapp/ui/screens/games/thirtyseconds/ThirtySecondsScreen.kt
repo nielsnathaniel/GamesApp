@@ -26,6 +26,7 @@ import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.audio.SoundManager
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
@@ -65,6 +66,7 @@ fun ThirtySecondsScreen(
     var remainingSeconds by remember { mutableIntStateOf(30) }
     var isTimerRunning by remember { mutableStateOf(false) }
     var showDisputeDialog by remember { mutableStateOf(false) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
 
     // Beurt-invoer
     var diceRoll by remember { mutableIntStateOf(0) }
@@ -125,6 +127,11 @@ fun ThirtySecondsScreen(
                     }
                 },
                 actions = {
+                    if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
+                    }
                     IconButton(onClick = { showDisputeDialog = true }) {
                         Text("⚖️", fontSize = 18.sp)
                     }
@@ -464,6 +471,18 @@ fun ThirtySecondsScreen(
         WieHeeftGelijkDialog(
             initialGameFilter = "30 Seconds",
             onDismiss = { showDisputeDialog = false }
+        )
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = listOf(team1Name, team2Name),
+            currentScores = teamScores,
+            isLowestScoreWins = false,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                teamScores = newScores.toMutableList()
+            }
         )
     }
 }

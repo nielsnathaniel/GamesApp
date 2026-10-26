@@ -24,8 +24,10 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -59,6 +61,20 @@ fun FiftyFiftyScreen(
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Fifty Fifty",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = true,
+            scoreUnit = "strafkaarten",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     if (isGameOver && winnerPlayer != null) {
         val allScores = selectedPlayerNames.indices.map { i ->
@@ -87,6 +103,13 @@ fun FiftyFiftyScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
+                    }
+                },
+                actions = {
+                    if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
                     }
                 }
             )
@@ -122,20 +145,46 @@ fun FiftyFiftyScreen(
 
                     item {
                         AppCard {
+                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Aantal rondes:", fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(3, 5, 7).forEach { r ->
-                                        FilterChip(
-                                            selected = targetRounds == r,
-                                            onClick = { targetRounds = r },
-                                            label = { Text("$r rondes") },
-                                            shape = RoundedCornerShape(10.dp)
-                                        )
+                                FilterChip(
+                                    selected = !isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = false },
+                                    label = { Text("Rondes bijhouden") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = true },
+                                    label = { Text("⚡️ Alleen eindscore") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!isQuickScoreMode) {
+                        item {
+                            AppCard {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Aantal rondes:", fontWeight = FontWeight.SemiBold)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf(3, 5, 7).forEach { r ->
+                                            FilterChip(
+                                                selected = targetRounds == r,
+                                                onClick = { targetRounds = r },
+                                                label = { Text("$r rondes") },
+                                                shape = RoundedCornerShape(10.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -184,10 +233,14 @@ fun FiftyFiftyScreen(
 
                 Button(
                     onClick = {
-                        roundPenalties = MutableList(selectedPlayerNames.size) { 0 }
-                        hasFoxInHand = MutableList(selectedPlayerNames.size) { false }
-                        totalPenalties = MutableList(selectedPlayerNames.size) { 0 }
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            roundPenalties = MutableList(selectedPlayerNames.size) { 0 }
+                            hasFoxInHand = MutableList(selectedPlayerNames.size) { false }
+                            totalPenalties = MutableList(selectedPlayerNames.size) { 0 }
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
                     modifier = Modifier
@@ -195,7 +248,10 @@ fun FiftyFiftyScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel ($targetRounds rondes)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Spel ($targetRounds rondes)",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -395,5 +451,17 @@ fun FiftyFiftyScreen(
                 }
             }
         }
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = selectedPlayerNames,
+            currentScores = totalPenalties,
+            isLowestScoreWins = true,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                totalPenalties = newScores.toMutableList()
+            }
+        )
     }
 }

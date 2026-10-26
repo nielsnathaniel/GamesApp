@@ -22,8 +22,10 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -90,6 +92,20 @@ fun QuickstopScreen(
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Quickstop",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = true,
+            scoreUnit = "⚡️",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     val currentStarterIndex = remember(startPlayerIndex, currentRound, selectedPlayerNames) {
         if (selectedPlayerNames.isEmpty()) 0 else (startPlayerIndex + (currentRound - 1)) % selectedPlayerNames.size
@@ -126,6 +142,9 @@ fun QuickstopScreen(
                 },
                 actions = {
                     if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
                         TextButton(onClick = { showHistoryDialog = true }) {
                             Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -172,20 +191,46 @@ fun QuickstopScreen(
 
                     item {
                         AppCard {
+                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Limiet strafpunten:", fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(30, 40, 50).forEach { limit ->
-                                        FilterChip(
-                                            selected = penaltyLimit == limit,
-                                            onClick = { penaltyLimit = limit },
-                                            label = { Text("$limit pt") },
-                                            shape = RoundedCornerShape(10.dp)
-                                        )
+                                FilterChip(
+                                    selected = !isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = false },
+                                    label = { Text("Rondes bijhouden") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = true },
+                                    label = { Text("⚡️ Alleen eindscore") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!isQuickScoreMode) {
+                        item {
+                            AppCard {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Limiet strafpunten:", fontWeight = FontWeight.SemiBold)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf(30, 40, 50).forEach { limit ->
+                                            FilterChip(
+                                                selected = penaltyLimit == limit,
+                                                onClick = { penaltyLimit = limit },
+                                                label = { Text("$limit pt") },
+                                                shape = RoundedCornerShape(10.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -234,10 +279,14 @@ fun QuickstopScreen(
 
                 Button(
                     onClick = {
-                        roundScores = MutableList(selectedPlayerNames.size) { 0 }
-                        totalScores = MutableList(selectedPlayerNames.size) { 0 }
-                        startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            roundScores = MutableList(selectedPlayerNames.size) { 0 }
+                            totalScores = MutableList(selectedPlayerNames.size) { 0 }
+                            startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
                     modifier = Modifier
@@ -245,7 +294,10 @@ fun QuickstopScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel (Limiet: $penaltyLimit pt)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Spel (Limiet: $penaltyLimit pt)",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -506,9 +558,31 @@ fun QuickstopScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showHistoryDialog = false }) {
-                    Text("Sluiten")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        showHistoryDialog = false
+                        showEditScoresDialog = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Punten wijzigen")
+                    }
+                    TextButton(onClick = { showHistoryDialog = false }) {
+                        Text("Sluiten")
+                    }
                 }
+            }
+        )
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = selectedPlayerNames,
+            currentScores = totalScores,
+            isLowestScoreWins = true,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                totalScores = newScores.toMutableList()
             }
         )
     }

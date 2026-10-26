@@ -28,11 +28,13 @@ import nl.nnbp.gamesapp.data.model.RoundScoreDataPoint
 import nl.nnbp.gamesapp.ui.audio.SoundManager
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.StartspelerKiezerDialog
 import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
 import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -68,6 +70,20 @@ fun BalzakkenScreen(
     var showStartspelerDialog by remember { mutableStateOf(false) }
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
     var showDisputeDialog by remember { mutableStateOf(false) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Balzakken",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = true,
+            scoreUnit = "strafpt",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     // Active in-game states
     var currentRound by remember { mutableStateOf(1) }
@@ -123,6 +139,9 @@ fun BalzakkenScreen(
                 },
                 actions = {
                     if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
                         TextButton(onClick = { showHistorySheet = true }) {
                             Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -167,6 +186,30 @@ fun BalzakkenScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = AccentOrange
                             )
+                        }
+                    }
+
+                    item {
+                        AppCard {
+                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = !isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = false },
+                                    label = { Text("Rondes bijhouden") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = true },
+                                    label = { Text("⚡️ Alleen eindscore") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
 
@@ -231,13 +274,17 @@ fun BalzakkenScreen(
 
                 Button(
                     onClick = {
-                        roundScores = MutableList(selectedPlayerNames.size) { 0 }
-                        totalScores = MutableList(selectedPlayerNames.size) { 0 }
-                        juisteBalzakken = MutableList(selectedPlayerNames.size) { 0 }
-                        fouteBalzakken = MutableList(selectedPlayerNames.size) { 0 }
-                        roundStatus = MutableList(selectedPlayerNames.size) { BalzakStatus.GEEN }
-                        startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            roundScores = MutableList(selectedPlayerNames.size) { 0 }
+                            totalScores = MutableList(selectedPlayerNames.size) { 0 }
+                            juisteBalzakken = MutableList(selectedPlayerNames.size) { 0 }
+                            fouteBalzakken = MutableList(selectedPlayerNames.size) { 0 }
+                            roundStatus = MutableList(selectedPlayerNames.size) { BalzakStatus.GEEN }
+                            startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
                     modifier = Modifier
@@ -245,7 +292,10 @@ fun BalzakkenScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Potje (${selectedPlayerNames.size} spelers)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Potje (${selectedPlayerNames.size} spelers)",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -696,9 +746,31 @@ fun BalzakkenScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showHistorySheet = false }) {
-                    Text("Sluiten")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        showHistorySheet = false
+                        showEditScoresDialog = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Punten wijzigen")
+                    }
+                    TextButton(onClick = { showHistorySheet = false }) {
+                        Text("Sluiten")
+                    }
                 }
+            }
+        )
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = selectedPlayerNames,
+            currentScores = totalScores,
+            isLowestScoreWins = true,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                totalScores = newScores.toMutableList()
             }
         )
     }

@@ -26,6 +26,7 @@ import nl.nnbp.gamesapp.data.model.CrokinoleGameStats
 import nl.nnbp.gamesapp.data.model.CrokinoleRoundRecord
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
@@ -92,6 +93,7 @@ fun CrockinoleScreen(
 
     var roundRecords by remember { mutableStateOf(mutableListOf<CrokinoleRoundRecord>()) }
     var showHistorySheet by remember { mutableStateOf(false) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerTeamName by remember { mutableStateOf<String?>(null) }
@@ -131,6 +133,9 @@ fun CrockinoleScreen(
                 },
                 actions = {
                     if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
                         TextButton(onClick = { showHistorySheet = true }) {
                             Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -538,9 +543,34 @@ fun CrockinoleScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showHistorySheet = false }) {
-                    Text("Sluiten")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        showHistorySheet = false
+                        showEditScoresDialog = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Punten wijzigen")
+                    }
+                    TextButton(onClick = { showHistorySheet = false }) {
+                        Text("Sluiten")
+                    }
                 }
+            }
+        )
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = listOf(teamWitDisplayName, teamZwartDisplayName),
+            currentScores = listOf(setPointsWit, setPointsZwart),
+            isLowestScoreWins = false,
+            title = "Setpunten Wijzigen",
+            subtitle = "Pas de stand van Wit en Zwart direct aan.",
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                setPointsWit = newScores.getOrElse(0) { setPointsWit }
+                setPointsZwart = newScores.getOrElse(1) { setPointsZwart }
             }
         )
     }

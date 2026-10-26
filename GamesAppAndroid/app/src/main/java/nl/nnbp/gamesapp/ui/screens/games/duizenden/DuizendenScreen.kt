@@ -25,10 +25,12 @@ import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
 import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
 import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -62,6 +64,20 @@ fun DuizendenScreen(
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
     var showDisputeDialog by remember { mutableStateOf(false) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Duizenden",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = false,
+            scoreUnit = "pt",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     if (isGameOver && winnerPlayer != null) {
         val playerScores = selectedPlayerNames.indices.map { i ->
@@ -94,6 +110,9 @@ fun DuizendenScreen(
                 },
                 actions = {
                     if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
                         TextButton(onClick = { showHistorySheet = true }) {
                             Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -137,20 +156,46 @@ fun DuizendenScreen(
 
                     item {
                         AppCard {
+                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Doelscore:", fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(500, 1000, 1500).forEach { pts ->
-                                        FilterChip(
-                                            selected = targetScore == pts,
-                                            onClick = { targetScore = pts },
-                                            label = { Text("$pts pt") },
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
+                                FilterChip(
+                                    selected = !isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = false },
+                                    label = { Text("Rondes bijhouden") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = true },
+                                    label = { Text("⚡️ Alleen eindscore") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!isQuickScoreMode) {
+                        item {
+                            AppCard {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Doelscore:", fontWeight = FontWeight.SemiBold)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf(500, 1000, 1500).forEach { pts ->
+                                            FilterChip(
+                                                selected = targetScore == pts,
+                                                onClick = { targetScore = pts },
+                                                label = { Text("$pts pt") },
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -218,9 +263,13 @@ fun DuizendenScreen(
 
                 Button(
                     onClick = {
-                        roundScores = MutableList(selectedPlayerNames.size) { 0 }
-                        totalScores = MutableList(selectedPlayerNames.size) { 0 }
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            roundScores = MutableList(selectedPlayerNames.size) { 0 }
+                            totalScores = MutableList(selectedPlayerNames.size) { 0 }
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
                     modifier = Modifier
@@ -228,7 +277,10 @@ fun DuizendenScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel (Doel: $targetScore pt)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Spel (Doel: $targetScore pt)",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -510,9 +562,31 @@ fun DuizendenScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showHistorySheet = false }) {
-                    Text("Sluiten")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        showHistorySheet = false
+                        showEditScoresDialog = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Punten wijzigen")
+                    }
+                    TextButton(onClick = { showHistorySheet = false }) {
+                        Text("Sluiten")
+                    }
                 }
+            }
+        )
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = selectedPlayerNames,
+            currentScores = totalScores,
+            isLowestScoreWins = false,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                totalScores = newScores.toMutableList()
             }
         )
     }

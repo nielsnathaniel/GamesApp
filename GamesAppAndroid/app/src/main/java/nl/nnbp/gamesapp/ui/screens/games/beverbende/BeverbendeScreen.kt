@@ -26,10 +26,12 @@ import nl.nnbp.gamesapp.data.model.Player
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
+import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
 import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -68,6 +70,20 @@ fun BeverbendeScreen(
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
     var showDisputeDialog by remember { mutableStateOf(false) }
+    var showEditScoresDialog by remember { mutableStateOf(false) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Beverbende",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = true,
+            scoreUnit = "strafpt",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     val currentStarterIndex = remember(startPlayerIndex, currentRound, selectedPlayerNames) {
         if (selectedPlayerNames.isEmpty()) 0 else (startPlayerIndex + (currentRound - 1)) % selectedPlayerNames.size
@@ -104,6 +120,9 @@ fun BeverbendeScreen(
                 },
                 actions = {
                     if (isGameStarted) {
+                        IconButton(onClick = { showEditScoresDialog = true }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        }
                         TextButton(onClick = { showHistorySheet = true }) {
                             Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -147,35 +166,61 @@ fun BeverbendeScreen(
 
                     item {
                         AppCard {
+                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text("Aantal rondes:", fontWeight = FontWeight.SemiBold)
+                                FilterChip(
+                                    selected = !isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = false },
+                                    label = { Text("Rondes bijhouden") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = isQuickScoreMode,
+                                    onClick = { isQuickScoreMode = true },
+                                    label = { Text("⚡️ Alleen eindscore") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    if (!isQuickScoreMode) {
+                        item {
+                            AppCard {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    FilledTonalButton(
-                                        onClick = { if (targetRounds > 1) targetRounds-- },
-                                        contentPadding = PaddingValues(0.dp),
-                                        modifier = Modifier.size(36.dp),
-                                        shape = CircleShape
+                                    Text("Aantal rondes:", fontWeight = FontWeight.SemiBold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                    Text(
-                                        text = "$targetRounds",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                                    )
-                                    FilledTonalButton(
-                                        onClick = { if (targetRounds < 15) targetRounds++ },
-                                        contentPadding = PaddingValues(0.dp),
-                                        modifier = Modifier.size(36.dp),
-                                        shape = CircleShape
-                                    ) {
-                                        Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        FilledTonalButton(
+                                            onClick = { if (targetRounds > 1) targetRounds-- },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(36.dp),
+                                            shape = CircleShape
+                                        ) {
+                                            Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Text(
+                                            text = "$targetRounds",
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                        FilledTonalButton(
+                                            onClick = { if (targetRounds < 15) targetRounds++ },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(36.dp),
+                                            shape = CircleShape
+                                        ) {
+                                            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
@@ -243,10 +288,14 @@ fun BeverbendeScreen(
 
                 Button(
                     onClick = {
-                        playerCards = MutableList(selectedPlayerNames.size) { mutableListOf(0, 0, 0, 0) }
-                        totalScores = MutableList(selectedPlayerNames.size) { 0 }
-                        startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            playerCards = MutableList(selectedPlayerNames.size) { mutableListOf(0, 0, 0, 0) }
+                            totalScores = MutableList(selectedPlayerNames.size) { 0 }
+                            startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
                     modifier = Modifier
@@ -254,7 +303,10 @@ fun BeverbendeScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel ($targetRounds rondes)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Spel ($targetRounds rondes)",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -537,9 +589,31 @@ fun BeverbendeScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showHistorySheet = false }) {
-                    Text("Sluiten")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = {
+                        showHistorySheet = false
+                        showEditScoresDialog = true
+                    }) {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Punten wijzigen")
+                    }
+                    TextButton(onClick = { showHistorySheet = false }) {
+                        Text("Sluiten")
+                    }
                 }
+            }
+        )
+    }
+
+    if (showEditScoresDialog) {
+        PuntenWijzigenDialog(
+            playerNames = selectedPlayerNames,
+            currentScores = totalScores,
+            isLowestScoreWins = true,
+            onDismiss = { showEditScoresDialog = false },
+            onSave = { newScores ->
+                totalScores = newScores.toMutableList()
             }
         )
     }
