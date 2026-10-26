@@ -12,7 +12,6 @@ struct SpelsessiesBeheerView: View {
     @State private var dayToDelete: DayGroup?
     @State private var showDeleteDayAlert: Bool = false
 
-    @State private var showDeleteBeforeYesterdayAlert: Bool = false
     @State private var showDeleteGameTypeAlert: Bool = false
 
     struct DayGroup: Identifiable {
@@ -57,13 +56,6 @@ struct SpelsessiesBeheerView: View {
         }
     }
 
-    private var gamesBeforeYesterdayCount: Int {
-        let calendar = Calendar.current
-        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) else { return 0 }
-        let startOfYesterday = calendar.startOfDay(for: yesterday)
-        return scoreManager.playedGames.filter { $0.date < startOfYesterday }.count
-    }
-
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -72,12 +64,7 @@ struct SpelsessiesBeheerView: View {
                     filterChipsBar
                 }
 
-                // 2. Snelle opruim-kaart voor testdata (vóór gisteren)
-                if gamesBeforeYesterdayCount > 0 && selectedGameFilter == "Alle Spellen" {
-                    quickCleanupBanner
-                }
-
-                // 3. Actieve filters melding & snelle wis-knop voor dat specifieke spel
+                // 2. Actieve filters melding & snelle wis-knop voor dat specifieke spel
                 if selectedGameFilter != "Alle Spellen" {
                     activeFilterBanner
                 }
@@ -136,18 +123,7 @@ struct SpelsessiesBeheerView: View {
                 Text("Weet je zeker dat je deze dag wilt wissen?")
             }
         }
-        // Alert 3: Alles van vóór gisteren wissen
-        .alert("Testdata vóór gisteren opruimen", isPresented: $showDeleteBeforeYesterdayAlert) {
-            Button("Verwijder testdata", role: .destructive) {
-                withAnimation {
-                    scoreManager.deleteGamesBeforeYesterday()
-                }
-            }
-            Button("Annuleer", role: .cancel) {}
-        } message: {
-            Text("Weet je zeker dat je alle \(gamesBeforeYesterdayCount) potjes van vóór gisteren wilt verwijderen? De echte gegevens van gisteren en vandaag blijven volledig bewaard.")
-        }
-        // Alert 4: Alle potjes van geselecteerd spel wissen
+        // Alert 3: Alle potjes van geselecteerd spel wissen
         .alert("Alle potjes van \(selectedGameFilter) wissen", isPresented: $showDeleteGameTypeAlert) {
             Button("Wis alle \(selectedGameFilter) potjes", role: .destructive) {
                 withAnimation {
@@ -209,51 +185,6 @@ struct SpelsessiesBeheerView: View {
             .padding(.horizontal)
             .padding(.vertical, 2)
         }
-    }
-
-    // MARK: - Quick Cleanup Banner (Vóór Gisteren)
-
-    private var quickCleanupBanner: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(Color.orange.opacity(0.15))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "sparkles")
-                        .foregroundColor(.orange)
-                        .font(.system(size: 18))
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Oude testdata opruimen?")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                    Text("Er zijn \(gamesBeforeYesterdayCount) potjes gespeeld vóór gisteren. Gisteren & vandaag blijven bewaard.")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Button("Wis testdata") {
-                    showDeleteBeforeYesterdayAlert = true
-                }
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(Color.orange)
-                .cornerRadius(8)
-                .shadow(color: Color.orange.opacity(0.3), radius: 3, x: 0, y: 1.5)
-            }
-        }
-        .padding()
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(14)
-        .padding(.horizontal)
-        .shadow(color: .black.opacity(0.03), radius: 5, x: 0, y: 2)
     }
 
     // MARK: - Actieve Filter Banner

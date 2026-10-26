@@ -8,7 +8,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,7 +35,6 @@ fun SpelsessiesBeheerScreen(
 
     var selectedGameFilter by remember { mutableStateOf<String?>(null) }
     var sessionToDelete by remember { mutableStateOf<PlayedGame?>(null) }
-    var showCleanTestDialog by remember { mutableStateOf(false) }
 
     val filteredGames = remember(games, selectedGameFilter) {
         if (selectedGameFilter == null || selectedGameFilter == "Alle") {
@@ -76,15 +74,6 @@ fun SpelsessiesBeheerScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showCleanTestDialog = true }) {
-                        Icon(
-                            Icons.Default.CleaningServices,
-                            contentDescription = "Testdata opschonen",
-                            tint = PrimaryBlue
-                        )
                     }
                 }
             )
@@ -210,29 +199,6 @@ fun SpelsessiesBeheerScreen(
             },
             dismissButton = {
                 TextButton(onClick = { sessionToDelete = null }) {
-                    Text("Annuleren")
-                }
-            }
-        )
-    }
-
-    if (showCleanTestDialog) {
-        AlertDialog(
-            onDismissRequest = { showCleanTestDialog = false },
-            title = { Text("Testdata vóór gisteren wissen?") },
-            text = { Text("Hiermee worden in 1 tik alle oude spelsessies van vóór gisteren verwijderd. De potjes van vandaag en gisteren blijven veilig bewaard.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scoreManager.deleteGamesBeforeYesterday()
-                        showCleanTestDialog = false
-                    }
-                ) {
-                    Text("Wis Oude Data", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCleanTestDialog = false }) {
                     Text("Annuleren")
                 }
             }
