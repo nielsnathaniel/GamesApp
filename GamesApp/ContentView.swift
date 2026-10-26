@@ -48,11 +48,12 @@ struct ContentView: View {
         ("30 Seconds", "ThirtySeconds"),
         ("Cranium", "Cranium"),
         ("Fifty Fifty", "FiftyFifty"),
-        ("Wie begint?", "WieBegint")
+        ("Wie begint?", "WieBegint"),
+        ("Tafelschikking", "Tafelschikking")
     ]
 
     private func playCount(for gameName: String) -> Int {
-        if gameName == "Wie begint?" { return 0 }
+        if gameName == "Wie begint?" || gameName == "Tafelschikking" { return 0 }
         return scoreManager.playedGames.filter { played in
             let n1 = played.gameName.lowercased()
             let n2 = gameName.lowercased()
@@ -189,7 +190,7 @@ struct ContentView: View {
                                     ZStack(alignment: .topTrailing) {
                                         gameIcon(for: game.0, assetName: game.1)
 
-                                        if game.0 == "Wie begint?" {
+                                        if game.0 == "Wie begint?" || game.0 == "Tafelschikking" {
                                             HStack(spacing: 3) {
                                                 Image(systemName: "sparkles")
                                                     .font(.system(size: 8))
@@ -198,7 +199,7 @@ struct ContentView: View {
                                             }
                                             .padding(.horizontal, 6)
                                             .padding(.vertical, 3)
-                                            .background(Color.yellow)
+                                            .background(game.0 == "Tafelschikking" ? Color.green : Color.yellow)
                                             .foregroundColor(.black)
                                             .clipShape(Capsule())
                                             .offset(x: 10, y: -6)
@@ -226,6 +227,10 @@ struct ContentView: View {
 
                                         if game.0 == "Wie begint?" {
                                             Text("Startspeler")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        } else if game.0 == "Tafelschikking" {
+                                            Text("Wie zit waar?")
                                                 .font(.caption2)
                                                 .foregroundColor(.secondary)
                                         } else if sortOption == .populair {
@@ -345,6 +350,25 @@ struct ContentView: View {
             .frame(width: 80, height: 80)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+        } else if gameName == "Tafelschikking" {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.green.opacity(0.3), Color.teal.opacity(0.25)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 80, height: 80)
+
+                Image(systemName: "person.3.sequence.fill")
+                    .font(.system(size: 34))
+                    .foregroundColor(.green)
+            }
+            .frame(width: 80, height: 80)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
         } else if let actualName = resolveImageName(for: assetName) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -445,6 +469,8 @@ struct ContentView: View {
             FiftyFiftySetupView()
         case "Wie begint?":
             StartspelerKiezerView()
+        case "Tafelschikking":
+            TafelschikkingView()
         default:
             Text("Onbekend Spel")
         }
