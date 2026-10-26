@@ -8,6 +8,7 @@ struct OpgeslagenSpelersView: View {
     @State private var playerToDelete: String? = nil
     @State private var showDeleteSingleAlert: Bool = false
     @State private var showClearAllAlert: Bool = false
+    @State private var playerToEdit: String? = nil
 
     private var filteredPlayers: [String] {
         let players = scoreManager.fetchPlayerNames()
@@ -72,15 +73,8 @@ struct OpgeslagenSpelersView: View {
                 } else {
                     ForEach(filteredPlayers, id: \.self) { player in
                         HStack(spacing: 12) {
-                            // Initiaal badge
-                            ZStack {
-                                Circle()
-                                    .fill(avatarColor(for: player).opacity(0.15))
-                                    .frame(width: 36, height: 36)
-                                Text(playerInitials(player))
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(avatarColor(for: player))
-                            }
+                            // Avatar Badge
+                            PlayerAvatarView(name: player, size: 40)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(player)
@@ -96,6 +90,27 @@ struct OpgeslagenSpelersView: View {
 
                             Spacer()
 
+                            // Bewerken knop (Tafelkleur & avatar/foto)
+                            Button(action: {
+                                HapticManager.shared.light()
+                                playerToEdit = player
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "paintpalette.fill")
+                                        .font(.system(size: 12))
+                                    Text("Profiel")
+                                        .font(.caption2)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(scoreManager.profile(for: player).color)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(scoreManager.profile(for: player).color.opacity(0.12))
+                                .cornerRadius(8)
+                            }
+                            .buttonStyle(.plain)
+
+                            // Verwijder knop
                             Button(role: .destructive, action: {
                                 playerToDelete = player
                                 showDeleteSingleAlert = true
@@ -110,6 +125,10 @@ struct OpgeslagenSpelersView: View {
                             .buttonStyle(.plain)
                         }
                         .padding(.vertical, 3)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            playerToEdit = player
+                        }
                     }
                     .onDelete { indexSet in
                         for idx in indexSet {
@@ -211,6 +230,14 @@ struct OpgeslagenSpelersView: View {
                 }
             }
             Button("Annuleer", role: .cancel) {}
+        }
+        .sheet(isPresented: Binding(
+            get: { playerToEdit != nil },
+            set: { if !$0 { playerToEdit = nil } }
+        )) {
+            if let target = playerToEdit {
+                PlayerProfileEditSheet(playerName: target)
+            }
         }
     }
 

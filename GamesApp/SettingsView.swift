@@ -39,7 +39,34 @@ struct SettingsView: View {
                     }
                 }
 
-                // 2. Speluitleg & Regels
+                // 2. Wie heeft gelijk? & Scheidsrechter
+                Section(header: Label("Spelregels & Scheidsrechter", systemImage: "scale.3d")) {
+                    NavigationLink(destination: GameRulesKnowledgeView()) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.orange.opacity(0.12))
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "magnifyingglass.circle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.system(size: 20))
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Wie heeft gelijk?")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+
+                                Text("Discussie-oplosser, uitzonderingen & zoekbalk")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                // 3. Speluitleg & Regels Quick Reference
                 Section(header: Label("Spelregels Quick Reference", systemImage: "book.closed.fill")) {
                     DisclosureGroup("Balzakken Regels") {
                         VStack(alignment: .leading, spacing: 6) {

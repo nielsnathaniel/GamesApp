@@ -160,9 +160,13 @@ struct SavedPlayersQuickChipsView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: assigned ? "checkmark.circle.fill" : "person.fill")
-                    .font(.system(size: assigned ? 10 : 9))
+            HStack(spacing: 5) {
+                if assigned {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 11, weight: .bold))
+                } else {
+                    PlayerAvatarView(name: name, size: 18, showBorder: false)
+                }
                 Text(name)
                     .font(.caption)
                     .fontWeight(assigned ? .bold : .medium)

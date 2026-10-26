@@ -37,6 +37,7 @@ struct ThirtySecondsRoundEntry: Identifiable {
 
 struct ThirtySecondsGameView: View {
     private let scoreManager = ScoreManager.shared
+    @ObservedObject private var soundManager = SoundManager.shared
 
     let doelScore: Int
     let timerDuur: Int
@@ -363,6 +364,18 @@ struct ThirtySecondsGameView: View {
                         .fontWeight(.semibold)
 
                     Spacer()
+
+                    Button(action: {
+                        HapticManager.shared.light()
+                        soundManager.isSoundEnabled.toggle()
+                    }) {
+                        Image(systemName: soundManager.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                            .font(.subheadline)
+                            .foregroundColor(soundManager.isSoundEnabled ? .blue : .secondary)
+                            .padding(6)
+                            .background(Color(UIColor.tertiarySystemFill))
+                            .clipShape(Circle())
+                    }
 
                     if isTimerActive {
                         Text("AAN HET AFTELEN")
@@ -705,12 +718,14 @@ struct ThirtySecondsGameView: View {
             .sink { _ in
                 if remainingSeconds > 0 {
                     remainingSeconds -= 1
-                    if remainingSeconds <= 3 && remainingSeconds > 0 {
+                    if remainingSeconds <= 5 && remainingSeconds > 0 {
                         HapticManager.shared.warning()
+                        SoundManager.shared.playTimerTick()
                     }
                 } else {
                     stopTimer()
                     HapticManager.shared.error()
+                    SoundManager.shared.playTimerBuzzer()
                 }
             }
     }

@@ -100,6 +100,13 @@ struct TicketToRideGameView: View {
                 // Modus Wisselaar (3 opties)
                 modeSwitchBar
 
+                // Live Spanning & Inhaalslag Indicator
+                let ttrPairs = spelers.indices.map { (name: spelers[$0], score: effectiveScore(for: $0)) }
+                if ttrPairs.contains(where: { $0.score > 0 }) {
+                    LiveGameLeadIndicatorView(playerScores: ttrPairs, isLowestScoreWins: false)
+                        .padding(.horizontal)
+                }
+
                 switch currentMode {
                 case .categorieen:
                     categoriesView

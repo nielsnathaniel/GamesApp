@@ -159,6 +159,13 @@ struct RegenwormenGameView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
 
+                // Live Spanning & Inhaalslag Indicator
+                let wormPairs = spelers.indices.map { (name: spelers[$0].name, score: totaleWormen(voor: $0)) }
+                if wormPairs.contains(where: { $0.score > 0 }) {
+                    LiveGameLeadIndicatorView(playerScores: wormPairs, isLowestScoreWins: false)
+                        .padding(.horizontal)
+                }
+
                 // Laatste actie / feedback snackbar
                 if let melding = laatsteMelding {
                     HStack(spacing: 8) {

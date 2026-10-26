@@ -80,6 +80,13 @@ struct BeverbendeScoreView: View {
             .cornerRadius(10)
             .padding(.horizontal)
 
+            // Live Inhaalslag & Spanning Indicator (vanaf ronde 2)
+            if huidigeRonde > 1 && totaleScores.count == spelers.count {
+                let pairs = zip(spelers.map { $0.name }, totaleScores).map { (name: $0.0, score: $0.1) }
+                LiveGameLeadIndicatorView(playerScores: pairs, isLowestScoreWins: true)
+                    .padding(.horizontal)
+            }
+
             ScrollView {
                 VStack {
                     ForEach(spelers.indices, id: \.self) { index in

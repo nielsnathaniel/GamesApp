@@ -317,10 +317,12 @@ class ScoreManager: ObservableObject {
     private let scoresKey = "saved_game_scores"
     private let gamesKey = "saved_played_games"
     private let playersKey = "saved_player_names"
+    private let profilesKey = "saved_player_profiles"
 
     @Published var scores: [Score] = []
     @Published var playedGames: [PlayedGame] = []
     @Published var savedPlayerNames: [String] = []
+    @Published var playerProfiles: [String: PlayerProfile] = [:]
 
     init() {
         refresh()
@@ -330,6 +332,7 @@ class ScoreManager: ObservableObject {
         scores = fetchScores()
         playedGames = fetchGames()
         savedPlayerNames = fetchPlayerNames()
+        playerProfiles = fetchProfiles()
     }
 
     // MARK: - Spelersbeheer (Automatisch opslaan & Hergebruiken)
@@ -446,6 +449,105 @@ class ScoreManager: ObservableObject {
         UserDefaults.standard.set(sorted, forKey: playersKey)
         self.savedPlayerNames = sorted
         DataBackupManager.shared.scheduleAutoSyncToiCloud()
+    }
+
+    // MARK: - Spelerprofielen (Tafelkleuren & Avatars)
+
+    func fetchProfiles() -> [String: PlayerProfile] {
+        guard let data = UserDefaults.standard.data(forKey: profilesKey) else {
+            return [:]
+        }
+        do {
+            let decoder = JSONDecoder()
+            return try decoder.decode([String: PlayerProfile].self, from: data)
+        } catch {
+            print("Fout bij laden van spelerprofielen: \(error)")
+            return [:]
+        }
+    }
+
+    func profile(for name: String) -> PlayerProfile {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else {
+            return PlayerProfile(name: name, colorHex: "#3B82F6")
+        }
+        if let existing = playerProfiles[key] {
+            return existing
+        }
+        // Deterministische standaardkleur op basis van naam
+        let fallback = PlayerProfile(
+            name: name,
+            colorHex: TableColorPalette.defaultColorHex(for: name)
+        )
+        return fallback
+    }
+
+    func saveProfile(_ profile: PlayerProfile) {
+        let key = profile.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return }
+
+        var dict = fetchProfiles()
+        dict[key] = profile
+        if let data = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(data, forKey: profilesKey)
+        }
+        self.playerProfiles = dict
+        DataBackupManager.shared.scheduleAutoSyncToiCloud()
+    }
+
+    func deleteProfile(for name: String) {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        var dict = fetchProfiles()
+        dict.removeValue(forKey: key)
+        if let data = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(data, forKey: profilesKey)
+        }
+        self.playerProfiles = dict
+    }
+
+    // MARK: - Spelerspaspoort Inzichten
+
+    /// Aartsvijand (Angstgegner): De tegenspeler van wie hij/zij procentueel het vaakst verliest (min. 1 verlies)
+    func nemesis(for playerName: String) -> (opponent: String, totalGames: Int, losses: Int, winRate: Double)? {
+        let opponents = fetchPlayerNames().filter { $0.caseInsensitiveCompare(playerName) != .orderedSame }
+        var records: [(opponent: String, totalGames: Int, losses: Int, winRate: Double)] = []
+
+        for opp in opponents {
+            let h2h = headToHead(playerA: playerName, playerB: opp)
+            if h2h.totalGames > 0 && h2h.winsB > 0 {
+                let winRate = (Double(h2h.winsA) / Double(h2h.totalGames)) * 100.0
+                records.append((opponent: opp, totalGames: h2h.totalGames, losses: h2h.winsB, winRate: winRate))
+            }
+        }
+
+        // Sorteer op minste winstpercentage, en bij gelijkheid op meeste verliezen
+        return records.sorted { r1, r2 in
+            if abs(r1.winRate - r2.winRate) > 0.1 {
+                return r1.winRate < r2.winRate
+            }
+            return r1.losses > r2.losses
+        }.first
+    }
+
+    /// Favoriete Spel: Het spel dat deze speler het vaakst heeft gespeeld
+    func favoriteGame(for playerName: String) -> (gameName: String, count: Int)? {
+        let stats = detailedStats(for: playerName)
+        guard let top = stats.statsPerGame.first else { return nil }
+        return (top.gameName, top.played)
+    }
+
+    /// Beste Spel: Het spel met het hoogste winpercentage (minstens 1 overwinning)
+    func bestGame(for playerName: String) -> (gameName: String, winRate: Double, wins: Int, played: Int)? {
+        let stats = detailedStats(for: playerName)
+        let winningGames = stats.statsPerGame.filter { $0.won > 0 }
+        guard let best = winningGames.sorted(by: { g1, g2 in
+            if abs(g1.winRate - g2.winRate) > 0.1 {
+                return g1.winRate > g2.winRate
+            }
+            return g1.won > g2.won
+        }).first else { return nil }
+
+        return (best.gameName, best.winRate, best.won, best.played)
     }
 
     // MARK: - Scores & Gespeelde Potjes ophalen
@@ -802,11 +904,14 @@ class ScoreManager: ObservableObject {
         var current = fetchPlayerNames()
         current.removeAll { $0.caseInsensitiveCompare(name) == .orderedSame }
         persistPlayerNames(current)
+        deleteProfile(for: name)
     }
 
     func clearAllPlayers() {
         UserDefaults.standard.set([String](), forKey: playersKey)
+        UserDefaults.standard.removeObject(forKey: profilesKey)
         self.savedPlayerNames = []
+        self.playerProfiles = [:]
         DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 
@@ -820,9 +925,11 @@ class ScoreManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: scoresKey)
         UserDefaults.standard.removeObject(forKey: gamesKey)
         UserDefaults.standard.removeObject(forKey: playersKey)
+        UserDefaults.standard.removeObject(forKey: profilesKey)
         scores = []
         playedGames = []
         savedPlayerNames = []
+        playerProfiles = [:]
         DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 

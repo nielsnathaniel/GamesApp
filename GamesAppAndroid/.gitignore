@@ -1,0 +1,19 @@
+# Android Studio / Gradle
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+
+# APK / Bundle outputs
+*.apk
+*.aab
+
+# Signing
+*.jks
+*.keystore

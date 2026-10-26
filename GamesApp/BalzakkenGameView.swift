@@ -609,11 +609,13 @@ struct BalzakkenGameView: View {
                         juisteBalzakken[i] += 1
                     }
                     specialEvents.append("🎯 \(spelers[i].name) had een Goeie Balzak! (0 pt)")
+                    SoundManager.shared.playBalzakGood()
                 } else if rondeStatus[safe: i] == .valseBalzak {
                     if i < fouteBalzakken.count {
                         fouteBalzakken[i] += 1
                     }
                     specialEvents.append("⚠️ \(spelers[i].name) had een Valse Balzak! (+25 pt)")
+                    SoundManager.shared.playBalzakFail()
                 }
 
                 // Speciale regel: precies 69 punten -> terug naar 50 punten!

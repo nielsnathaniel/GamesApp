@@ -76,6 +76,14 @@ struct DuizendenGameView: View {
             .padding(.horizontal)
             .padding(.top)
 
+            // Live Inhaalslag & Voorsprong Indicator
+            if huidigeRonde > 1 && scores.count == spelers.count {
+                let pairs = zip(spelers.map { $0.name }, scores).map { (name: $0.0, score: $0.1) }
+                LiveGameLeadIndicatorView(playerScores: pairs, isLowestScoreWins: false)
+                    .padding(.horizontal)
+                    .padding(.top, 4)
+            }
+
             List(spelers.indices, id: \.self) { index in
                 VStack(alignment: .leading) {
                     Button(action: {
