@@ -265,6 +265,37 @@ struct PlayerStatsView: View {
                 .padding(.vertical, 3)
             }
 
+            // MARK: - Badges & Prestaties
+            Section(header: Text("Bordspel Badges")) {
+                let pBadges = AchievementManager.shared.evaluateAchievements(for: playerName, in: scoreManager)
+                let unlocked = pBadges.filter { $0.isUnlocked }
+
+                NavigationLink(destination: AchievementsOverviewView()) {
+                    HStack(spacing: 12) {
+                        if unlocked.isEmpty {
+                            Text("Nog geen badges ontgrendeld")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            HStack(spacing: 6) {
+                                ForEach(unlocked.prefix(5)) { item in
+                                    Text(item.achievement.icon)
+                                        .font(.title3)
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        Text("\(unlocked.count) / \(pBadges.count)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 3)
+                }
+            }
+
             // MARK: - 3. Badges & Prestaties
             if !badges.isEmpty {
                 Section(header: Text("Badges & Prestaties")) {

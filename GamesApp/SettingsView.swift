@@ -2,10 +2,49 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var scoreManager = ScoreManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var soundManager = SoundManager.shared
 
     var body: some View {
         NavigationStack {
             List {
+                // Vormgeving & Beleving
+                Section(header: Label("Vormgeving & Audio", systemImage: "paintpalette.fill")) {
+                    Picker("Thema", selection: $themeManager.selectedTheme) {
+                        ForEach(AppTheme.allCases) { theme in
+                            Label(theme.rawValue, systemImage: theme.icon).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    Toggle(isOn: $soundManager.isSoundEnabled) {
+                        Label("Geluidseffecten & Timers", systemImage: soundManager.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    }
+
+                    NavigationLink(destination: AchievementsOverviewView()) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.yellow.opacity(0.15))
+                                    .frame(width: 40, height: 40)
+                                Text("🏅")
+                                    .font(.system(size: 20))
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Bordspel Badges")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+
+                                Text("Prestaties, medailles & zegereeksen")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+
                 // 1. Gegevensbeheer (Navigeer naar dedicated GegevensbeheerView)
                 Section(header: Label("Gegevensbeheer", systemImage: "cylinder.split.1x2.fill")) {
                     NavigationLink(destination: GegevensbeheerView()) {

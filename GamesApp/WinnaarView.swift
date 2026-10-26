@@ -176,35 +176,40 @@ struct WinnaarView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Spelnaam subtiel bovenaan
-                Text(gameName)
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 4)
+        ZStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Spelnaam subtiel bovenaan
+                    Text(gameName)
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 4)
 
-                // Feestelijke Winnaar Card
-                winnerBanner
+                    // Feestelijke Winnaar Card
+                    winnerBanner
 
-                // Score automatisch opgeslagen badge
-                savedStatusBadge
+                    // Score automatisch opgeslagen badge
+                    savedStatusBadge
 
-                // Eindstand uitslagenlijst
-                rankingsSection
+                    // Eindstand uitslagenlijst
+                    rankingsSection
 
-                // Crokinole Highlights (indien beschikbaar)
-                if let crok = crokinoleStats {
-                    crokinoleHighlightsView(crok)
+                    // Crokinole Highlights (indien beschikbaar)
+                    if let crok = crokinoleStats {
+                        crokinoleHighlightsView(crok)
+                    }
+
+                    // Scoreverloop grafiek (PROMINENT & DUIDELIJK)
+                    scoreProgressionSection
+
+                    // Drie keuzeknoppen
+                    actionButtons
                 }
-
-                // Scoreverloop grafiek (PROMINENT & DUIDELIJK)
-                scoreProgressionSection
-
-                // Drie keuzeknoppen
-                actionButtons
+                .padding(.vertical)
             }
-            .padding(.vertical)
+
+            // Feestelijke confetti partikels
+            ConfettiView()
         }
         .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
@@ -345,6 +350,8 @@ struct WinnaarView: View {
                             Text(rankMedal(rankIdx))
                                 .font(.title3)
                                 .frame(width: 32)
+
+                            PlayerAvatarView(name: speler.name, size: 32)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(speler.name)
