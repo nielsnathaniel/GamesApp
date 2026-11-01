@@ -19,6 +19,8 @@ struct CrokinoleRondeEntry: Identifiable {
 }
 
 struct CrockinoleGameView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var isTeamMode: Bool = false
     var teamWitNaam: String = "Wit"
     var teamWitSpelers: [String] = ["Wit"]
@@ -324,7 +326,13 @@ struct CrockinoleGameView: View {
     private var directeInvoerSectie: some View {
         VStack(spacing: 12) {
             // Statusbalkje met actieve selectie en reset-optie
-            HStack {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(selectedTeamIndex == 0 ? Color.white : Color.black)
+                    .frame(width: 14, height: 14)
+                    .overlay(Circle().stroke(selectedTeamIndex == 0 ? Color.gray : Color.white.opacity(0.7), lineWidth: 1))
+                    .shadow(color: Color.black.opacity(0.15), radius: 1)
+
                 Text("Puntentoewijzing aan: ")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -768,11 +776,16 @@ struct CrockinoleGameView: View {
         let isSelected = selectedTeamIndex == index
         let title = isWit ? teamWitNaam : teamZwartNaam
         let players = isWit ? teamWitSpelers : teamZwartSpelers
+        let isDark = colorScheme == .dark
 
-        // Achtergrond & Randkleuren afgestemd op Wit en Zwart
+        // Achtergrond & Randkleuren perfect afgestemd op lichte en donkere modus
         let cardBg: Color = {
             if isSelected {
-                return isWit ? Color.white : Color(red: 0.10, green: 0.10, blue: 0.12)
+                if isWit {
+                    return isDark ? Color(white: 0.96) : Color.white
+                } else {
+                    return isDark ? Color(red: 0.18, green: 0.18, blue: 0.23) : Color(red: 0.10, green: 0.10, blue: 0.13)
+                }
             } else {
                 return Color(UIColor.secondarySystemBackground)
             }
@@ -780,14 +793,51 @@ struct CrockinoleGameView: View {
 
         let cardBorder: Color = {
             if isSelected {
-                return isWit ? Color(white: 0.75) : Color.black
+                if isWit {
+                    return Color(red: 0.05, green: 0.45, blue: 0.95)
+                } else {
+                    // In donkere modus een opvallende helderwitte rand (3pt) zodat Zwart eruit springt!
+                    return isDark ? Color(white: 0.90) : Color.black
+                }
             } else {
-                return Color.clear
+                return isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
             }
         }()
 
-        let textColor: Color = (isSelected && !isWit) ? Color.white : Color.primary
-        let subtextColor: Color = (isSelected && !isWit) ? Color.white.opacity(0.7) : Color.secondary
+        // Gegarandeerd hoog contrast tekstkleuren
+        let textColor: Color = {
+            if isSelected {
+                // Wit geselecteerd = lichte tegel = ALTIJD diepzwart (geen Color.primary!)
+                // Zwart geselecteerd = donkere tegel = ALTIJD helderwit
+                return isWit ? Color(red: 0.08, green: 0.08, blue: 0.10) : Color.white
+            } else {
+                return Color.primary
+            }
+        }()
+
+        let subtextColor: Color = {
+            if isSelected {
+                return isWit ? Color(white: 0.35) : Color.white.opacity(0.75)
+            } else {
+                return Color.secondary
+            }
+        }()
+
+        let progressColor: Color = {
+            if isSelected {
+                return isWit ? Color(red: 0.05, green: 0.40, blue: 0.85) : Color.white
+            } else {
+                return isWit ? Color.blue : Color.primary
+            }
+        }()
+
+        let setsColor: Color = {
+            if isSelected {
+                return isWit ? Color(red: 0.85, green: 0.40, blue: 0.0) : Color(red: 1.0, green: 0.70, blue: 0.25)
+            } else {
+                return Color.orange
+            }
+        }()
 
         return Button(action: {
             withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
@@ -800,8 +850,8 @@ struct CrockinoleGameView: View {
                     Circle()
                         .fill(isWit ? Color.white : Color.black)
                         .frame(width: 22, height: 22)
-                        .overlay(Circle().stroke(isWit ? Color.gray.opacity(0.6) : Color.white.opacity(0.4), lineWidth: 1.5))
-                        .shadow(color: Color.black.opacity(0.1), radius: 2)
+                        .overlay(Circle().stroke(isWit ? Color.gray.opacity(0.6) : Color.white.opacity(0.7), lineWidth: 1.5))
+                        .shadow(color: Color.black.opacity(0.15), radius: 2)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
@@ -822,12 +872,12 @@ struct CrockinoleGameView: View {
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(isWit ? Color.blue : Color.white)
+                            .foregroundColor(isWit ? (isDark ? Color.blue : Color(red: 0.05, green: 0.45, blue: 0.95)) : Color.white)
                     }
                 }
 
                 Divider()
-                    .overlay(isSelected && !isWit ? Color.white.opacity(0.2) : Color.gray.opacity(0.2))
+                    .overlay(isSelected ? (isWit ? Color.black.opacity(0.12) : Color.white.opacity(0.25)) : Color.gray.opacity(0.2))
 
                 // Ronde score
                 VStack(alignment: .leading, spacing: 2) {
@@ -849,7 +899,7 @@ struct CrockinoleGameView: View {
                         Spacer()
                         Text("\(totaleScores[safe: index] ?? 0) / 100 pt")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(isSelected && !isWit ? Color.white : (isWit ? Color.blue : Color.primary))
+                            .foregroundColor(progressColor)
                             .lineLimit(1)
                     }
 
@@ -861,7 +911,7 @@ struct CrockinoleGameView: View {
                         Spacer()
                         Text("\(setScores[safe: index] ?? 0) / \(targetSets)")
                             .font(.system(size: 12, weight: .heavy))
-                            .foregroundColor(Color.orange)
+                            .foregroundColor(setsColor)
                             .lineLimit(1)
                     }
                 }
@@ -873,13 +923,13 @@ struct CrockinoleGameView: View {
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(cardBorder, lineWidth: isSelected ? 3 : 0)
+                    .stroke(cardBorder, lineWidth: isSelected ? 3 : 1)
             )
             .shadow(
-                color: isSelected ? (isWit ? Color.black.opacity(0.12) : Color.black.opacity(0.35)) : Color.black.opacity(0.04),
-                radius: isSelected ? 8 : 3,
+                color: isSelected ? (isWit ? Color.black.opacity(0.15) : (isDark ? Color.white.opacity(0.15) : Color.black.opacity(0.4))) : Color.black.opacity(0.04),
+                radius: isSelected ? 8 : 2,
                 x: 0,
-                y: isSelected ? 4 : 1
+                y: isSelected ? 3 : 1
             )
         }
         .buttonStyle(.plain)

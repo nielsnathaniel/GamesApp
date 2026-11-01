@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -405,6 +406,8 @@ fun CrockinoleScreen(
 
                     // Team Wit & Zwart Tegels
                     item {
+                        val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -417,9 +420,13 @@ fun CrockinoleScreen(
                                     .clickable { selectedTeamIndex = 0 },
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isWitSelected) Color.White else MaterialTheme.colorScheme.surfaceVariant
+                                    containerColor = if (isWitSelected) (if (isDark) Color(0xFFF5F5F7) else Color.White) else MaterialTheme.colorScheme.surfaceVariant
                                 ),
-                                border = if (isWitSelected) androidx.compose.foundation.BorderStroke(3.dp, Color(0xFFBDBDBD)) else null
+                                border = if (isWitSelected) {
+                                    androidx.compose.foundation.BorderStroke(3.dp, PrimaryBlue)
+                                } else {
+                                    androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = if (isDark) 0.12f else 0.06f))
+                                }
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(
@@ -440,7 +447,7 @@ fun CrockinoleScreen(
                                                 text = teamWitDisplayName,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 14.sp,
-                                                color = Color.Black,
+                                                color = if (isWitSelected) Color(0xFF141416) else MaterialTheme.colorScheme.onSurface,
                                                 maxLines = 1
                                             )
                                         }
@@ -455,15 +462,15 @@ fun CrockinoleScreen(
                                     }
 
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                                    HorizontalDivider(color = if (isWitSelected) Color.Black.copy(alpha = 0.12f) else Color.Gray.copy(alpha = 0.2f))
                                     Spacer(modifier = Modifier.height(6.dp))
 
-                                    Text("Deze ronde", fontSize = 11.sp, color = Color.Gray)
+                                    Text("Deze ronde", fontSize = 11.sp, color = if (isWitSelected) Color(0xFF555555) else Color.Gray)
                                     Text(
                                         text = "$effectiveWitScore pt",
                                         fontSize = 24.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = Color.Black
+                                        color = if (isWitSelected) Color(0xFF141416) else MaterialTheme.colorScheme.onSurface
                                     )
 
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -471,14 +478,14 @@ fun CrockinoleScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("Set-voortgang", fontSize = 11.sp, color = Color.Gray)
+                                        Text("Set-voortgang", fontSize = 11.sp, color = if (isWitSelected) Color(0xFF555555) else Color.Gray)
                                         Text("$setPointsWit / 100 pt", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
                                     }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("Sets gewonnen", fontSize = 11.sp, color = Color.Gray)
+                                        Text("Sets gewonnen", fontSize = 11.sp, color = if (isWitSelected) Color(0xFF555555) else Color.Gray)
                                         Text("$setsWonWit / $targetSets", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentOrange)
                                     }
                                 }
@@ -492,9 +499,17 @@ fun CrockinoleScreen(
                                     .clickable { selectedTeamIndex = 1 },
                                 shape = RoundedCornerShape(16.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (isZwartSelected) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surfaceVariant
+                                    containerColor = if (isZwartSelected) {
+                                        if (isDark) Color(0xFF2C2C34) else Color(0xFF16161A)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    }
                                 ),
-                                border = if (isZwartSelected) androidx.compose.foundation.BorderStroke(3.dp, Color.Black) else null
+                                border = if (isZwartSelected) {
+                                    androidx.compose.foundation.BorderStroke(3.dp, if (isDark) Color(0xFFE5E7EB) else Color.Black)
+                                } else {
+                                    androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = if (isDark) 0.12f else 0.06f))
+                                }
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(
@@ -508,7 +523,7 @@ fun CrockinoleScreen(
                                                     .size(18.dp)
                                                     .clip(CircleShape)
                                                     .background(Color.Black)
-                                                    .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                                    .border(1.5.dp, Color.White.copy(alpha = 0.7f), CircleShape)
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
@@ -530,10 +545,10 @@ fun CrockinoleScreen(
                                     }
 
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    HorizontalDivider(color = if (isZwartSelected) Color.White.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.2f))
+                                    HorizontalDivider(color = if (isZwartSelected) Color.White.copy(alpha = 0.25f) else Color.Gray.copy(alpha = 0.2f))
                                     Spacer(modifier = Modifier.height(6.dp))
 
-                                    Text("Deze ronde", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.7f) else Color.Gray)
+                                    Text("Deze ronde", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.75f) else Color.Gray)
                                     Text(
                                         text = "$effectiveZwartScore pt",
                                         fontSize = 24.sp,
@@ -546,15 +561,15 @@ fun CrockinoleScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("Set-voortgang", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.7f) else Color.Gray)
+                                        Text("Set-voortgang", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.75f) else Color.Gray)
                                         Text("$setPointsZwart / 100 pt", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isZwartSelected) Color.White else AccentOrange)
                                     }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text("Sets gewonnen", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.7f) else Color.Gray)
-                                        Text("$setsWonZwart / $targetSets", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentOrange)
+                                        Text("Sets gewonnen", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.75f) else Color.Gray)
+                                        Text("$setsWonZwart / $targetSets", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isZwartSelected) Color(0xFFFFB74D) else AccentOrange)
                                     }
                                 }
                             }
@@ -565,7 +580,17 @@ fun CrockinoleScreen(
                     item {
                         AppCard {
                             val activeTeamName = if (selectedTeamIndex == 0) teamWitDisplayName else teamZwartDisplayName
-                            Text("Invoer voor $activeTeamName", fontWeight = FontWeight.Bold)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clip(CircleShape)
+                                        .background(if (selectedTeamIndex == 0) Color.White else Color.Black)
+                                        .border(1.dp, if (selectedTeamIndex == 0) Color.Gray else Color.White.copy(alpha = 0.7f), CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Invoer voor $activeTeamName", fontWeight = FontWeight.Bold)
+                            }
                             Spacer(modifier = Modifier.height(8.dp))
 
                             if (!isCalculatedMode) {
