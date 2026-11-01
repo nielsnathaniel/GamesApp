@@ -1,6 +1,7 @@
 package nl.nnbp.gamesapp.ui.screens.settings
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,10 +33,12 @@ import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 @Composable
 fun SettingsScreen(
     onNavigateToPlayers: () -> Unit,
-    onNavigateToSessions: () -> Unit
+    onNavigateToSessions: () -> Unit,
+    onNavigateToDataManagement: () -> Unit
 ) {
-    val scoreManager = remember { ScoreManager.getInstance() }
-    val soundManager = remember { SoundManager.getInstance() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scoreManager = remember { ScoreManager.getInstance(context) }
+    val soundManager = remember { SoundManager.getInstance(context) }
     val players by scoreManager.savedPlayerNames.collectAsState()
     val games by scoreManager.playedGames.collectAsState()
     val currentThemeMode by scoreManager.themeMode.collectAsState()
@@ -116,8 +119,37 @@ fun SettingsScreen(
 
             // Gegevensbeheer Hub
             item {
-                SectionTitle(title = "Gegevensbeheer")
+                SectionTitle(title = "Gegevensbeheer & Back-up")
                 AppCard {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onNavigateToDataManagement)
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryBlue.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Backup, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Back-up & Synchronisatie (JSON)", fontWeight = FontWeight.Bold)
+                                Text("Exporteer, deel of importeer spelgeschiedenis & spelers", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+                        }
+                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

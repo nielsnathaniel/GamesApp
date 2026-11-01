@@ -24,8 +24,10 @@ struct FiftyFiftyGameView: View {
     @State private var totaleStrafkaarten: [Int]
     // Strafkaarten invoer voor de huidige ronde
     @State private var rondeStrafkaarten: [Int]
-    // Vos op hand aan het einde van het spel (automatisch verloren!)
+    // Vos op hand in de huidige ronde
     @State private var heeftVosOpHand: [Bool]
+    // Cumulatief aantal keren vos gehad gedurende het hele spel
+    @State private var totaleVossen: [Int]
 
     @State private var rondeGeschiedenis: [FiftyFiftyWhiteGoblinRondeEntry] = []
     @State private var showWinnaarView: Bool = false
@@ -52,6 +54,7 @@ struct FiftyFiftyGameView: View {
         _totaleStrafkaarten = State(initialValue: Array(repeating: 0, count: spelers.count))
         _rondeStrafkaarten = State(initialValue: Array(repeating: 0, count: spelers.count))
         _heeftVosOpHand = State(initialValue: Array(repeating: false, count: spelers.count))
+        _totaleVossen = State(initialValue: Array(repeating: 0, count: spelers.count))
     }
 
     // MARK: - Berekeningen
@@ -67,21 +70,13 @@ struct FiftyFiftyGameView: View {
 
     private var huidigeLeider: String {
         guard !spelers.isEmpty else { return "" }
-        // Alleen spelers die GEEN vos op hand hebben komen in aanmerking voor de leiding
-        let geldigeSpelers = spelers.indices.filter { !heeftVosOpHand[$0] }
-        if geldigeSpelers.isEmpty {
-            // Als iedereen vos heeft, kijken we puur naar de laagste score
-            let minScore = spelers.indices.map { effectieveScore(voor: $0) }.min() ?? 0
-            if let idx = spelers.indices.first(where: { effectieveScore(voor: $0) == minScore }) {
-                return spelers[idx]
-            }
-            return ""
-        }
-
-        let scores = geldigeSpelers.map { effectieveScore(voor: $0) }
-        let minScore = scores.min() ?? 0
-        if let bestIdx = geldigeSpelers.first(where: { effectieveScore(voor: $0) == minScore }) {
-            return spelers[bestIdx]
+        // Spelers die deze ronde én in totaal GEEN vos hebben gehad komen als eerste in aanmerking
+        let schoneSpelers = spelers.indices.filter { !heeftVosOpHand[$0] && totaleVossen[$0] == 0 }
+        let kandidaten = !schoneSpelers.isEmpty ? schoneSpelers : spelers.indices.filter { !heeftVosOpHand[$0] }
+        let lijst = !kandidaten.isEmpty ? kandidaten : Array(spelers.indices)
+        let minScore = lijst.map { effectieveScore(voor: $0) }.min() ?? 0
+        if let idx = lijst.first(where: { effectieveScore(voor: $0) == minScore }) {
+            return spelers[idx]
         }
         return ""
     }
@@ -302,10 +297,22 @@ struct FiftyFiftyGameView: View {
                     if hasFox {
                         HStack(spacing: 4) {
                             Text("🦊")
-                            Text("Vos op hand (Uitgesloten van winst)")
+                            Text("Vos op hand (+10 pt & verliest ronde)")
                                 .font(.caption2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.red)
+                        }
+                    } else if totaleVossen[index] > 0 {
+                        HStack(spacing: 4) {
+                            Text("🦊 \(totaleVossen[index])x vos gehad")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.red)
+                            if gameMode == .rondes {
+                                Text("• Totaal: \(totalScore)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     } else if gameMode == .rondes {
                         Text("Totaal: \(totalScore) strafkaarten")
@@ -396,6 +403,11 @@ struct FiftyFiftyGameView: View {
                 Button(action: {
                     HapticManager.shared.medium()
                     heeftVosOpHand[index].toggle()
+                    if heeftVosOpHand[index] {
+                        rondeStrafkaarten[index] += 10
+                    } else {
+                        rondeStrafkaarten[index] = max(0, rondeStrafkaarten[index] - 10)
+                    }
                     saveDraft()
                 }) {
                     HStack(spacing: 8) {
@@ -403,7 +415,7 @@ struct FiftyFiftyGameView: View {
                             .foregroundColor(hasFox ? .red : .secondary)
                             .font(.subheadline)
 
-                        Text("🦊 Speler heeft nog een voskaart op hand")
+                        Text("🦊 Vos op hand (+10 strafkaarten & verliest ronde)")
                             .font(.caption)
                             .fontWeight(hasFox ? .bold : .regular)
                             .foregroundColor(hasFox ? .red : .secondary)
@@ -493,9 +505,12 @@ struct FiftyFiftyGameView: View {
     private func volgendeRonde() {
         HapticManager.shared.success()
 
-        // 1. Voeg ronde strafkaarten toe aan totalen
+        // 1. Voeg ronde strafkaarten toe aan totalen en werk vossentelling bij
         for i in spelers.indices {
             totaleStrafkaarten[i] += rondeStrafkaarten[i]
+            if heeftVosOpHand[i] {
+                totaleVossen[i] += 1
+            }
         }
 
         // 2. Sla snapshot op in geschiedenis
@@ -509,6 +524,7 @@ struct FiftyFiftyGameView: View {
 
         // 3. Reset ronde invoervelden
         rondeStrafkaarten = Array(repeating: 0, count: spelers.count)
+        heeftVosOpHand = Array(repeating: false, count: spelers.count)
 
         // 4. Volgende ronde
         huidigeRonde += 1
@@ -537,29 +553,38 @@ struct FiftyFiftyGameView: View {
         if gameMode == .rondes {
             for i in spelers.indices {
                 totaleStrafkaarten[i] += rondeStrafkaarten[i]
+                if heeftVosOpHand[i] {
+                    totaleVossen[i] += 1
+                }
             }
             rondeStrafkaarten = Array(repeating: 0, count: spelers.count)
+            heeftVosOpHand = Array(repeating: false, count: spelers.count)
+        } else {
+            for i in spelers.indices {
+                if heeftVosOpHand[i] {
+                    totaleVossen[i] += 1
+                }
+            }
         }
 
         let eindScores = spelers.indices.map { effectieveScore(voor: $0) }
 
-        // Bepaal winnaar: minste strafkaarten ONDER SPELERS ZONDER VOS OP HAND
-        let geldigeSpelers = spelers.indices.filter { !heeftVosOpHand[$0] }
-        let winnaarIndex: Int
-        if !geldigeSpelers.isEmpty {
-            let minScore = geldigeSpelers.map { eindScores[$0] }.min() ?? 0
-            winnaarIndex = geldigeSpelers.first(where: { eindScores[$0] == minScore }) ?? 0
-        } else {
-            // Als iedereen vos had, laagste strafkaartenscore
-            let minScore = eindScores.min() ?? 0
-            winnaarIndex = eindScores.firstIndex(of: minScore) ?? 0
+        // Bepaal winnaar: spelers met 0 vossen winnen ALTIJD van spelers met 1+ vossen
+        let geordendeIndices = spelers.indices.sorted { i1, i2 in
+            let v1 = totaleVossen[i1]
+            let v2 = totaleVossen[i2]
+            if v1 != v2 {
+                return v1 < v2 // 0 vossen staat altijd boven 1+ vossen
+            }
+            return eindScores[i1] < eindScores[i2] // minste strafkaarten wint
         }
 
+        let winnaarIndex = geordendeIndices.first ?? 0
         winnaarPlayer = Player(name: spelers[winnaarIndex])
 
         // Opslaan in ScoreManager
         let detailedScores: [(name: String, score: Int, juiste: Int, foute: Int)] = spelers.indices.map { i in
-            let vosPenalty = heeftVosOpHand[i] ? 999 : 0
+            let vosPenalty = totaleVossen[i] * 10
             return (name: spelers[i], score: eindScores[i], juiste: eindScores[i], foute: vosPenalty)
         }
 
@@ -575,24 +600,32 @@ struct FiftyFiftyGameView: View {
 
     private var sortedSpelersResultaat: [Player] {
         let eindScores = spelers.indices.map { effectieveScore(voor: $0) }
-        // Spelers zonder vos eerst, gesorteerd op minste strafkaarten; spelers met vos achteraan
-        let geordendIndices = spelers.indices.sorted { i1, i2 in
-            let fox1 = heeftVosOpHand[i1]
-            let fox2 = heeftVosOpHand[i2]
-            if fox1 != fox2 {
-                return !fox1 // speler zonder vos staat voor speler met vos
+        let geordendeIndices = spelers.indices.sorted { i1, i2 in
+            let v1 = totaleVossen[i1]
+            let v2 = totaleVossen[i2]
+            if v1 != v2 {
+                return v1 < v2
             }
             return eindScores[i1] < eindScores[i2]
         }
-        return geordendIndices.map { Player(name: spelers[$0]) }
+        return geordendIndicesToPlayers(geordendeIndices)
+    }
+
+    private func geordendIndicesToPlayers(_ indices: [Int]) -> [Player] {
+        indices.map { Player(name: spelers[$0]) }
     }
 
     private var sortedScoresResultaat: [Int] {
         let eindScores = spelers.indices.map { effectieveScore(voor: $0) }
-        return sortedSpelersResultaat.map { p in
-            guard let idx = spelers.firstIndex(of: p.name) else { return 0 }
-            return eindScores[idx]
+        let geordendeIndices = spelers.indices.sorted { i1, i2 in
+            let v1 = totaleVossen[i1]
+            let v2 = totaleVossen[i2]
+            if v1 != v2 {
+                return v1 < v2
+            }
+            return eindScores[i1] < eindScores[i2]
         }
+        return geordendeIndices.map { eindScores[$0] }
     }
 
     private func resetGame() {

@@ -2,6 +2,7 @@ package nl.nnbp.gamesapp.ui.screens.games.loveletter
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,11 +18,18 @@ import androidx.compose.ui.unit.sp
 import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
+import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.GameModeItem
+import nl.nnbp.gamesapp.ui.components.GameModeSegmentedPicker
+import nl.nnbp.gamesapp.ui.components.GameSetupHeader
+import nl.nnbp.gamesapp.ui.components.LiveGameLeadCard
+import nl.nnbp.gamesapp.ui.components.PlayerCountPicker
 import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -56,6 +64,19 @@ fun LoveLetterScreen(
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Love Letter",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = false,
+            scoreUnit = "❤️",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     LaunchedEffect(selectedPlayerNames.size) {
         targetTokens = when (selectedPlayerNames.size) {
@@ -124,9 +145,17 @@ fun LoveLetterScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
+                        GameSetupHeader(
+                            gameType = GameType.LOVE_LETTER,
+                            subtitle = "Spelregels Love Letter ❤️",
+                            themeColor = Color(0xFFC2185B)
+                        )
+                    }
+
+                    item {
                         AppCard {
                             Text(
-                                text = "Spelregels Love Letter ❤️",
+                                text = "Spelregels & Doel ❤️",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -139,25 +168,61 @@ fun LoveLetterScreen(
                     }
 
                     item {
-                        AppCard {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Doel tokens:", fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(3, 4, 5, 7).forEach { t ->
-                                        FilterChip(
-                                            selected = targetTokens == t,
-                                            onClick = { targetTokens = t },
-                                            label = { Text("$t tokens") },
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem("ronde", "Per Ronde", Icons.Default.Timeline, "Houd fiches van affectie en rondewinnaars live bij"),
+                                GameModeItem("snel", "Snelle Eindscore", Icons.Default.FlashOn, "Direct tokens invoeren en winnaar bepalen")
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "ronde",
+                            onSelect = { isQuickScoreMode = it == "snel" },
+                            themeColor = Color(0xFFC2185B)
+                        )
+                    }
+
+                    if (!isQuickScoreMode) {
+                        item {
+                            AppCard {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Doel tokens:", fontWeight = FontWeight.SemiBold)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        listOf(3, 4, 5, 7).forEach { t ->
+                                            FilterChip(
+                                                selected = targetTokens == t,
+                                                onClick = { targetTokens = t },
+                                                label = { Text("$t tokens") },
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 6,
+                            selectedCount = selectedPlayerNames.size,
+                            onSelect = { count ->
+                                val current = selectedPlayerNames.toMutableList()
+                                if (current.size < count) {
+                                    for (i in (current.size + 1)..count) {
+                                        current.add("Speler $i")
+                                    }
+                                } else if (current.size > count) {
+                                    while (current.size > count) {
+                                        current.removeAt(current.size - 1)
+                                    }
+                                }
+                                selectedPlayerNames = current
+                            },
+                            themeColor = Color(0xFFC2185B)
+                        )
                     }
 
                     item {
@@ -167,6 +232,9 @@ fun LoveLetterScreen(
                                 val list = selectedPlayerNames.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerNames = seated.take(4).toMutableList()
                             }
                         )
                     }
@@ -206,8 +274,12 @@ fun LoveLetterScreen(
 
                 Button(
                     onClick = {
-                        tokens = MutableList(selectedPlayerNames.size) { 0 }
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            tokens = MutableList(selectedPlayerNames.size) { 0 }
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
                     modifier = Modifier
@@ -215,7 +287,10 @@ fun LoveLetterScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel (Doel: $targetTokens tokens)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Spel (Doel: $targetTokens tokens)",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -231,6 +306,16 @@ fun LoveLetterScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item {
+                        LiveGameLeadCard(
+                            playerScores = selectedPlayerNames.indices.map { i ->
+                                selectedPlayerNames[i] to (tokens.getOrElse(i) { 0 })
+                            },
+                            isLowestScoreWins = false,
+                            themeColor = Color(0xFFC2185B)
+                        )
+                    }
+
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),

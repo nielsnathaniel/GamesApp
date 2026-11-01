@@ -18,14 +18,20 @@ import kotlinx.coroutines.delay
 import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.TeamGameInput
+import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.audio.SoundManager
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.GameModeItem
+import nl.nnbp.gamesapp.ui.components.GameModeSegmentedPicker
+import nl.nnbp.gamesapp.ui.components.GameSetupHeader
 import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
+import nl.nnbp.gamesapp.ui.components.LiveGameLeadCard
 import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -74,6 +80,22 @@ fun CraniumScreen(
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerTeamName by remember { mutableStateOf<String?>(null) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Cranium",
+            playerNames = listOf(
+                if (team1Players.isNotEmpty()) team1Players.joinToString(" & ") else "Team 1",
+                if (team2Players.isNotEmpty()) team2Players.joinToString(" & ") else "Team 2"
+            ),
+            isLowestScoreWins = false,
+            scoreUnit = "🧠",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     LaunchedEffect(isTimerRunning) {
         while (isTimerRunning && remainingSeconds > 0) {
@@ -149,9 +171,17 @@ fun CraniumScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
+                        GameSetupHeader(
+                            gameType = GameType.CRANIUM,
+                            subtitle = "Spelregels Cranium 🧠",
+                            themeColor = RoyalPurple
+                        )
+                    }
+
+                    item {
                         AppCard {
                             Text(
-                                text = "Spelregels Cranium 🧠",
+                                text = "Spelregels & Doel 🧠",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -164,6 +194,18 @@ fun CraniumScreen(
                     }
 
                     item {
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem("bord", "Spelbord & Timer", Icons.Default.Casino, "Volledig bord met 4 categorieën, Club Cranium en live timer"),
+                                GameModeItem("snel", "Snelle Eindscore", Icons.Default.FlashOn, "Directe invoer van teamscores en winnaar")
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "bord",
+                            onSelect = { isQuickScoreMode = it == "snel" },
+                            themeColor = RoyalPurple
+                        )
+                    }
+
+                    item {
                         SectionTitle(title = "Team 1 (minimaal 2 spelers)")
                         SavedPlayersQuickChips(
                             selectedPlayers = team1Players,
@@ -171,6 +213,10 @@ fun CraniumScreen(
                                 val list = team1Players.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 team1Players = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                team1Players = seated.filterIndexed { index, _ -> index % 2 == 0 }.toMutableList()
+                                team2Players = seated.filterIndexed { index, _ -> index % 2 != 0 }.toMutableList()
                             }
                         )
                         if (team1Players.isNotEmpty()) {
@@ -186,6 +232,10 @@ fun CraniumScreen(
                                 val list = team2Players.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 team2Players = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                team1Players = seated.filterIndexed { index, _ -> index % 2 == 0 }.toMutableList()
+                                team2Players = seated.filterIndexed { index, _ -> index % 2 != 0 }.toMutableList()
                             }
                         )
                         if (team2Players.isNotEmpty()) {
@@ -196,17 +246,21 @@ fun CraniumScreen(
 
                 Button(
                     onClick = {
-                        teamScores = mutableListOf(0, 0)
-                        turnsPlayedPerTeam = mutableListOf(0, 0)
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            teamScores = mutableListOf(0, 0)
+                            turnsPlayedPerTeam = mutableListOf(0, 0)
+                            isGameStarted = true
+                        }
                     },
-                    enabled = team1Players.size >= 2 && team2Players.size >= 2,
+                    enabled = (isQuickScoreMode && (team1Players.isNotEmpty() || team2Players.isNotEmpty())) || (team1Players.size >= 2 && team2Players.size >= 2),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Cranium", style = MaterialTheme.typography.titleMedium)
+                    Text(if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Cranium", style = MaterialTheme.typography.titleMedium)
                 }
             }
         } else {
@@ -229,10 +283,13 @@ fun CraniumScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
-                        InhaalslagBanner(
-                            playerNames = listOf(team1Name, team2Name),
-                            scores = teamScores,
-                            lowestWins = false
+                        LiveGameLeadCard(
+                            playerScores = listOf(
+                                team1Name to teamScores[0],
+                                team2Name to teamScores[1]
+                            ),
+                            isLowestScoreWins = false,
+                            themeColor = RoyalPurple
                         )
                     }
 

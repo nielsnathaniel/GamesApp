@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import nl.nnbp.gamesapp.data.ScoreManager
+import nl.nnbp.gamesapp.data.model.PlayerBadge
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.CardBackgroundDark
 import nl.nnbp.gamesapp.ui.theme.SurfaceDark
@@ -28,7 +29,7 @@ fun BadgesOverviewDialog(
     onDismiss: () -> Unit
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
-    val sampleBadges = remember { scoreManager.getPlayerBadges("") }
+    val sampleBadges: List<PlayerBadge> = remember { scoreManager.playerBadges("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(

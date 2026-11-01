@@ -24,12 +24,9 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.TeamGameInput
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.audio.SoundManager
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
-import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
-import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.ui.components.*
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -93,11 +90,25 @@ fun ThirtySecondsScreen(
         }
     }
 
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
     val team1Name = remember(team1Players) {
         if (team1Players.isEmpty()) "Team 1" else team1Players.joinToString(" & ")
     }
     val team2Name = remember(team2Players) {
         if (team2Players.isEmpty()) "Team 2" else team2Players.joinToString(" & ")
+    }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "30 Seconds",
+            playerNames = listOf(team1Name, team2Name),
+            isLowestScoreWins = false,
+            scoreUnit = "stappen",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
     }
 
     if (isGameOver && winnerTeamName != null) {
@@ -120,7 +131,13 @@ fun ThirtySecondsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("30 Seconds", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.THIRTY_SECONDS, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("30 Seconds", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
@@ -153,18 +170,33 @@ fun ThirtySecondsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels 30 Seconds ⏱️",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Omschrijf 5 begrippen in 30 seconden. Gooi de dobbelsteen (0, 1 of 2 strafpunten). Aantal verdiende stappen = goede antwoorden minus dobbelsteenworp. Eerste team op $targetScore stappen wint!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.THIRTY_SECONDS,
+                            subtitle = "Razendsnel partyspel in teams • 30-seconden timer ⏱️",
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem(
+                                    id = "live",
+                                    title = "Ronde voor ronde",
+                                    icon = Icons.Default.Casino,
+                                    description = "🎮 Speel met de ingebouwde 30-seconden timer, dobbelsteen en begrippen."
+                                ),
+                                GameModeItem(
+                                    id = "snel",
+                                    title = "Snelle eindscore",
+                                    icon = Icons.Default.Bolt,
+                                    description = "⚡️ Vul direct het aantal behaalde stappen per team in."
+                                )
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "live",
+                            onSelect = { isQuickScoreMode = (it == "snel") },
+                            themeColor = AccentOrange
+                        )
                     }
 
                     item {
@@ -197,6 +229,10 @@ fun ThirtySecondsScreen(
                                 val list = team1Players.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 team1Players = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                team1Players = seated.filterIndexed { index, _ -> index % 2 == 0 }.toMutableList()
+                                team2Players = seated.filterIndexed { index, _ -> index % 2 != 0 }.toMutableList()
                             }
                         )
                         if (team1Players.isNotEmpty()) {
@@ -212,6 +248,10 @@ fun ThirtySecondsScreen(
                                 val list = team2Players.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 team2Players = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                team1Players = seated.filterIndexed { index, _ -> index % 2 == 0 }.toMutableList()
+                                team2Players = seated.filterIndexed { index, _ -> index % 2 != 0 }.toMutableList()
                             }
                         )
                         if (team2Players.isNotEmpty()) {
@@ -222,17 +262,25 @@ fun ThirtySecondsScreen(
 
                 Button(
                     onClick = {
-                        teamScores = mutableListOf(0, 0)
-                        turnsPlayedPerTeam = mutableListOf(0, 0)
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            teamScores = mutableListOf(0, 0)
+                            turnsPlayedPerTeam = mutableListOf(0, 0)
+                            isGameStarted = true
+                        }
                     },
                     enabled = team1Players.size >= 2 && team2Players.size >= 2,
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel (Doel: $targetScore)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "⚡️ Snelle Eindscore Starten" else "Start 30 Seconds (Doel: $targetScore)",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
                 }
             }
         } else {
@@ -255,10 +303,13 @@ fun ThirtySecondsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
-                        InhaalslagBanner(
-                            playerNames = listOf(team1Name, team2Name),
-                            scores = teamScores,
-                            lowestWins = false
+                        LiveGameLeadCard(
+                            playerScores = listOf(
+                                Pair(team1Name, teamScores.getOrElse(0) { 0 }),
+                                Pair(team2Name, teamScores.getOrElse(1) { 0 })
+                            ),
+                            isLowestScoreWins = false,
+                            themeColor = AccentOrange
                         )
                     }
 

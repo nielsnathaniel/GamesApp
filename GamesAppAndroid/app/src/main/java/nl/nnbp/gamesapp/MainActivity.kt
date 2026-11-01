@@ -28,6 +28,7 @@ import nl.nnbp.gamesapp.ui.screens.games.qwixx.QwixxScreen
 import nl.nnbp.gamesapp.ui.screens.games.regenwormen.RegenwormenScreen
 import nl.nnbp.gamesapp.ui.screens.games.thirtyseconds.ThirtySecondsScreen
 import nl.nnbp.gamesapp.ui.screens.games.tickettoride.TicketToRideScreen
+import nl.nnbp.gamesapp.ui.screens.settings.GegevensbeheerScreen
 import nl.nnbp.gamesapp.ui.screens.settings.OpgeslagenSpelersScreen
 import nl.nnbp.gamesapp.ui.screens.settings.SettingsScreen
 import nl.nnbp.gamesapp.ui.screens.settings.SpelsessiesBeheerScreen
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val scoreManager = remember { nl.nnbp.gamesapp.data.ScoreManager.getInstance() }
+            val scoreManager = remember { nl.nnbp.gamesapp.data.ScoreManager.getInstance(applicationContext) }
             val themeMode by scoreManager.themeMode.collectAsState()
             val isDark = when (themeMode) {
                 "LIGHT" -> false
@@ -74,7 +75,7 @@ fun GamesAppMainShell() {
         bottomBar = {
             if (isTopLevelRoute) {
                 NavigationBar {
-                    Screen.bottomNavItems.forEach { screen ->
+                    Screen.bottomNavItems.filterNotNull().forEach { screen ->
                         NavigationBarItem(
                             icon = { screen.icon?.let { Icon(it, contentDescription = screen.title) } },
                             label = { Text(screen.title) },
@@ -125,7 +126,18 @@ fun GamesAppMainShell() {
                     },
                     onNavigateToSessions = {
                         navController.navigate(Screen.SpelsessiesBeheer.route)
+                    },
+                    onNavigateToDataManagement = {
+                        navController.navigate(Screen.Gegevensbeheer.route)
                     }
+                )
+            }
+
+            composable(Screen.Gegevensbeheer.route) {
+                GegevensbeheerScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToPlayers = { navController.navigate(Screen.OpgeslagenSpelers.route) },
+                    onNavigateToSessions = { navController.navigate(Screen.SpelsessiesBeheer.route) }
                 )
             }
 

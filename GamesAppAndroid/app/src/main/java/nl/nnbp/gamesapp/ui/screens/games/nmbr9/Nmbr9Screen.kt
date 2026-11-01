@@ -7,9 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,11 +20,8 @@ import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.PlayerScore
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
-import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.ui.components.*
 import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
@@ -99,7 +94,13 @@ fun Nmbr9Screen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Nmbr9", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.NMBR9, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Nmbr9", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
@@ -129,42 +130,43 @@ fun Nmbr9Screen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels Nmbr9 🧩",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Puzzel met cijfertegels in lagen. Cijfers op de begane grond (Laag 0) leveren 0 pt op. Op Laag 1 tellen ze 1x, op Laag 2 tellen ze 2x, op Laag 3 tellen ze 3x, etc. De hoogste totaalscore wint!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.NMBR9,
+                            subtitle = "Puzzel- en cijferspel met lagenvermenigvuldigers 🧩",
+                            themeColor = PrimaryBlue
+                        )
                     }
 
                     item {
-                        AppCard {
-                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = !isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = false },
-                                    label = { Text("Lagen tellen") },
-                                    modifier = Modifier.weight(1f)
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem(
+                                    id = "live",
+                                    title = "Lagen tellen",
+                                    icon = Icons.Default.Layers,
+                                    description = "🎮 Bereken scores per verdieping: Laag 1 (1x), Laag 2 (2x), Laag 3 (3x), Laag 4 (4x)."
+                                ),
+                                GameModeItem(
+                                    id = "snel",
+                                    title = "Snelle eindscore",
+                                    icon = Icons.Default.Bolt,
+                                    description = "⚡️ Vul direct de uiteindelijke totaalscore per speler in."
                                 )
-                                FilterChip(
-                                    selected = isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = true },
-                                    label = { Text("⚡️ Alleen eindscore") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "live",
+                            onSelect = { isQuickScoreMode = (it == "snel") },
+                            themeColor = PrimaryBlue
+                        )
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 1,
+                            maxPlayers = 6,
+                            selectedCount = selectedPlayerNames.size.coerceIn(1, 6),
+                            onSelect = { /* matches list */ },
+                            themeColor = PrimaryBlue
+                        )
                     }
 
                     item {
@@ -174,6 +176,9 @@ fun Nmbr9Screen(
                                 val list = selectedPlayerNames.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerNames = seated.take(8).toMutableList()
                             }
                         )
                     }
@@ -245,6 +250,16 @@ fun Nmbr9Screen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    item {
+                        val pairs = selectedPlayerNames.indices.map { i ->
+                            Pair(selectedPlayerNames[i], computedScores.getOrElse(i) { 0 })
+                        }
+                        LiveGameLeadCard(
+                            playerScores = pairs,
+                            isLowestScoreWins = false,
+                            themeColor = PrimaryBlue
+                        )
+                    }
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),

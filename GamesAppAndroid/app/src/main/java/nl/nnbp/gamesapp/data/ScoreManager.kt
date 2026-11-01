@@ -21,6 +21,7 @@ class ScoreManager private constructor(context: Context) {
     private val gamesKey = "saved_played_games"
     private val playersKey = "saved_player_names"
     private val profilesKey = "saved_player_profiles"
+    private val tafelschikkingKey = "saved_tafelschikking"
 
     private val _scores = MutableStateFlow<List<Score>>(emptyList())
     val scores: StateFlow<List<Score>> = _scores.asStateFlow()
@@ -33,6 +34,9 @@ class ScoreManager private constructor(context: Context) {
 
     private val _playerProfiles = MutableStateFlow<Map<String, PlayerProfile>>(emptyMap())
     val playerProfiles: StateFlow<Map<String, PlayerProfile>> = _playerProfiles.asStateFlow()
+
+    private val _savedTafelschikking = MutableStateFlow<List<String>>(emptyList())
+    val savedTafelschikking: StateFlow<List<String>> = _savedTafelschikking.asStateFlow()
 
     private val themeKey = "app_theme_mode"
     private val _themeMode = MutableStateFlow(prefs.getString(themeKey, "DARK_AMOLED") ?: "DARK_AMOLED")
@@ -54,6 +58,7 @@ class ScoreManager private constructor(context: Context) {
         _playedGames.value = loadedGames
         _savedPlayerNames.value = fetchPlayerNames(loadedGames, loadedScores)
         _playerProfiles.value = fetchPlayerProfiles()
+        _savedTafelschikking.value = fetchTafelschikking()
     }
 
     // MARK: - Spelersbeheer
@@ -176,9 +181,36 @@ class ScoreManager private constructor(context: Context) {
     }
 
     fun clearAllPlayers() {
-        prefs.edit().remove(playersKey).remove(profilesKey).apply()
+        prefs.edit().remove(playersKey).remove(profilesKey).remove(tafelschikkingKey).apply()
         _savedPlayerNames.value = emptyList()
         _playerProfiles.value = emptyMap()
+        _savedTafelschikking.value = emptyList()
+    }
+
+    // MARK: - Tafelschikking
+
+    fun fetchTafelschikking(): List<String> {
+        val raw = prefs.getString(tafelschikkingKey, null) ?: return emptyList()
+        return try {
+            json.decodeFromString<List<String>>(raw)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getSavedTafelschikking(): List<String> {
+        return _savedTafelschikking.value.ifEmpty { fetchTafelschikking() }
+    }
+
+    fun saveTafelschikking(players: List<String>) {
+        val cleaned = players.map { it.trim() }.filter { it.isNotEmpty() }
+        try {
+            prefs.edit().putString(tafelschikkingKey, json.encodeToString(cleaned)).apply()
+            _savedTafelschikking.value = cleaned
+            savePlayerNames(cleaned)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // MARK: - Spelersprofielen (Kleuren & Avatars)
@@ -262,6 +294,26 @@ class ScoreManager private constructor(context: Context) {
         )
         existing.add(newScore)
         persistScores(existing)
+    }
+
+    fun saveGame(
+        gameName: String,
+        winner: String,
+        playerScores: List<PlayerScore>
+    ) {
+        val details = playerScores.map {
+            PlayerScoreDetail(
+                name = it.playerName,
+                score = it.score,
+                juisteBalzakken = it.juisteBalzakken,
+                fouteBalzakken = it.fouteBalzakken
+            )
+        }
+        saveGame(
+            gameName = gameName,
+            playerDetailedScores = details,
+            winnerName = winner
+        )
     }
 
     fun saveGame(
@@ -499,6 +551,27 @@ class ScoreManager private constructor(context: Context) {
         _scores.value = emptyList()
         _playedGames.value = emptyList()
         _savedPlayerNames.value = emptyList()
+    }
+
+    fun saveAllGames(games: List<PlayedGame>) {
+        persistGames(games)
+    }
+
+    fun saveAllScores(scores: List<Score>) {
+        persistScores(scores)
+    }
+
+    fun saveAllPlayerNames(names: List<String>) {
+        persistPlayerNames(names)
+    }
+
+    fun saveAllPlayerProfiles(profiles: Map<String, PlayerProfile>) {
+        try {
+            prefs.edit().putString(profilesKey, json.encodeToString(profiles.values.toList())).apply()
+            _playerProfiles.value = profiles
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun persistScores(scores: List<Score>) {
@@ -1103,8 +1176,13 @@ class ScoreManager private constructor(context: Context) {
             }
         }
 
-        fun getInstance(): ScoreManager {
-            return INSTANCE ?: throw IllegalStateException("ScoreManager must be initialized in Application.onCreate")
+        fun getInstance(context: Context? = null): ScoreManager {
+            return INSTANCE ?: synchronized(this) {
+                if (INSTANCE == null && context != null) {
+                    INSTANCE = ScoreManager(context.applicationContext)
+                }
+                INSTANCE ?: throw IllegalStateException("ScoreManager must be initialized in Application.onCreate")
+            }
         }
     }
 }

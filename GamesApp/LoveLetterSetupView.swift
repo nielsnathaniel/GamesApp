@@ -147,6 +147,7 @@ struct LoveLetterSetupView: View {
                 SavedPlayersQuickChipsView(
                     spelers: $spelers,
                     aantalSpelers: aantalSpelers,
+                    aantalSpelersBinding: $aantalSpelers,
                     tintColor: .pink
                 )
 

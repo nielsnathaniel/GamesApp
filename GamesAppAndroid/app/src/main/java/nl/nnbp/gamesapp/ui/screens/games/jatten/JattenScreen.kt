@@ -16,11 +16,18 @@ import androidx.compose.ui.unit.dp
 import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
+import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.GameModeItem
+import nl.nnbp.gamesapp.ui.components.GameModeSegmentedPicker
+import nl.nnbp.gamesapp.ui.components.GameSetupHeader
+import nl.nnbp.gamesapp.ui.components.PlayerCountPicker
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.components.StartPlayerCard
 import nl.nnbp.gamesapp.ui.components.StartspelerKiezerDialog
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -43,6 +50,19 @@ fun JattenScreen(
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showSixSameConfirm by remember { mutableStateOf<String?>(null) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Jatten",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = false,
+            scoreUnit = "🏆",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     val currentStarterIndex = remember(startPlayerIndex, currentRound, selectedPlayerNames) {
         if (selectedPlayerNames.isEmpty()) 0 else (startPlayerIndex + (currentRound - 1)) % selectedPlayerNames.size
@@ -94,9 +114,17 @@ fun JattenScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
+                        GameSetupHeader(
+                            gameType = GameType.JATTEN,
+                            subtitle = "Spelregels Jatten 🦝",
+                            themeColor = RoyalPurple
+                        )
+                    }
+
+                    item {
                         AppCard {
                             Text(
-                                text = "Spelregels Jatten 🦝",
+                                text = "Spelregels & Doel 🦝",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -109,12 +137,49 @@ fun JattenScreen(
                     }
 
                     item {
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem("beurt", "Rondebegeleider", Icons.Default.PanTool, "Houd beurten bij en meld direct wanneer iemand 6 dezelfde kaarten heeft"),
+                                GameModeItem("snel", "Snelle Eindscore", Icons.Default.FlashOn, "Kies meteen wie er gewonnen heeft")
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "beurt",
+                            onSelect = { isQuickScoreMode = it == "snel" },
+                            themeColor = RoyalPurple
+                        )
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 6,
+                            selectedCount = selectedPlayerNames.size,
+                            onSelect = { count ->
+                                val current = selectedPlayerNames.toMutableList()
+                                if (current.size < count) {
+                                    for (i in (current.size + 1)..count) {
+                                        current.add("Speler $i")
+                                    }
+                                } else if (current.size > count) {
+                                    while (current.size > count) {
+                                        current.removeAt(current.size - 1)
+                                    }
+                                }
+                                selectedPlayerNames = current
+                            },
+                            themeColor = RoyalPurple
+                        )
+                    }
+
+                    item {
                         SavedPlayersQuickChips(
                             selectedPlayers = selectedPlayerNames,
                             onTogglePlayer = { name ->
                                 val list = selectedPlayerNames.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerNames = seated.take(8).toMutableList()
                             }
                         )
                     }
@@ -154,8 +219,12 @@ fun JattenScreen(
 
                 Button(
                     onClick = {
-                        startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
                     modifier = Modifier
@@ -163,7 +232,7 @@ fun JattenScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel", style = MaterialTheme.typography.titleMedium)
+                    Text(if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Spel", style = MaterialTheme.typography.titleMedium)
                 }
             }
         } else {

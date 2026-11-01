@@ -25,6 +25,7 @@ import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.audio.SoundManager
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.ConfettiEffect
+import nl.nnbp.gamesapp.ui.components.GameLogoImageByName
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 import nl.nnbp.gamesapp.ui.theme.SurfaceDark
@@ -118,14 +119,21 @@ fun WinnaarScreen(
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                Text(
-                    text = "$winnerName pakt de overwinning in $gameName!",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = Color.White.copy(alpha = 0.85f),
-                    textAlign = TextAlign.Center
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    GameLogoImageByName(gameName = gameName, size = 26.dp, cornerRadius = 6.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "$winnerName pakt de overwinning in $gameName!",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White.copy(alpha = 0.85f),
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 

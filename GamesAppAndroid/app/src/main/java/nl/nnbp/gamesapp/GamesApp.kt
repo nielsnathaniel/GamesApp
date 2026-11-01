@@ -8,8 +8,20 @@ import nl.nnbp.gamesapp.ui.audio.SoundManager
 class GamesApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        ScoreManager.initialize(this)
-        ActiveGameManager.initialize(this)
-        SoundManager.initialize(this)
+        try {
+            ScoreManager.initialize(this)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        try {
+            ActiveGameManager.initialize(this)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        try {
+            SoundManager.initialize(this)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
     }
 }

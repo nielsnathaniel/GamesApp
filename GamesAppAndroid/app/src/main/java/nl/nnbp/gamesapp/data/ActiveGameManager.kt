@@ -81,8 +81,13 @@ class ActiveGameManager private constructor(context: Context) {
             }
         }
 
-        fun getInstance(): ActiveGameManager {
-            return INSTANCE ?: throw IllegalStateException("ActiveGameManager must be initialized in Application.onCreate")
+        fun getInstance(context: Context? = null): ActiveGameManager {
+            return INSTANCE ?: synchronized(this) {
+                if (INSTANCE == null && context != null) {
+                    INSTANCE = ActiveGameManager(context.applicationContext)
+                }
+                INSTANCE ?: throw IllegalStateException("ActiveGameManager must be initialized in Application.onCreate")
+            }
         }
     }
 }

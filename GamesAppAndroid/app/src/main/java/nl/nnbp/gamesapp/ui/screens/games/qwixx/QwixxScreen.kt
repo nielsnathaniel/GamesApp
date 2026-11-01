@@ -1,54 +1,53 @@
 package nl.nnbp.gamesapp.ui.screens.games.qwixx
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.nnbp.gamesapp.data.ActiveGameManager
-import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
+import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.data.model.Player
 import nl.nnbp.gamesapp.data.model.PlayerScore
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.components.*
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 import nl.nnbp.gamesapp.ui.theme.SuccessGreen
 import nl.nnbp.gamesapp.ui.theme.WarningRed
 
-data class QwixxSheet(
+data class QwixxPlayerSheet(
     var redCrosses: Int = 0,
     var yellowCrosses: Int = 0,
     var greenCrosses: Int = 0,
     var blueCrosses: Int = 0,
-    var misworpen: Int = 0,
-    var directScore: Int = 0
+    var misworpen: Int = 0
 ) {
-    private fun points(crosses: Int): Int = if (crosses > 0) (crosses * (crosses + 1)) / 2 else 0
+    fun colorPoints(crosses: Int): Int = if (crosses > 0) (crosses * (crosses + 1)) / 2 else 0
 
-    fun total(isDirectMode: Boolean): Int {
-        if (isDirectMode) return directScore
-        val r = points(redCrosses)
-        val y = points(yellowCrosses)
-        val g = points(greenCrosses)
-        val b = points(blueCrosses)
+    fun total(): Int {
+        val r = colorPoints(redCrosses)
+        val y = colorPoints(yellowCrosses)
+        val g = colorPoints(greenCrosses)
+        val b = colorPoints(blueCrosses)
         return r + y + g + b - (misworpen * 5)
     }
 }
@@ -63,16 +62,32 @@ fun QwixxScreen(
 
     var isGameStarted by remember { mutableStateOf(false) }
     var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
-    var isDirectMode by remember { mutableStateOf(false) }
+    var selectedPlayerCount by remember { mutableIntStateOf(3) }
+    var gameMode by remember { mutableStateOf("formulier") } // "formulier", "snel"
+    var showTafelschikkingDialog by remember { mutableStateOf(false) }
 
-    var sheets by remember { mutableStateOf(mutableListOf<QwixxSheet>()) }
-    var expandedPlayerIndex by remember { mutableStateOf<Int?>(0) }
+    // Quick score screen navigation
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Qwixx",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = false,
+            scoreUnit = "pt",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
+
+    // In-game states
+    var sheets by remember { mutableStateOf(mutableListOf<QwixxPlayerSheet>()) }
+    var selectedPlayerTab by remember { mutableIntStateOf(0) }
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
 
-    val calculatedTotals = remember(sheets, isDirectMode) {
-        sheets.map { it.total(isDirectMode) }
+    val calculatedTotals = remember(sheets) {
+        sheets.map { it.total() }
     }
 
     if (isGameOver && winnerPlayer != null) {
@@ -95,10 +110,31 @@ fun QwixxScreen(
         return
     }
 
+    val modeOptions = listOf(
+        GameModeItem(
+            id = "formulier",
+            title = "Digitaal Formulier",
+            icon = Icons.Default.Casino,
+            description = "📝 Speel met het officiële digitale scoreblad. Vul kruisjes in per kleurrij en bereken automatisch de score."
+        ),
+        GameModeItem(
+            id = "snel",
+            title = "Direct Totaal",
+            icon = Icons.Default.Bolt,
+            description = "⚡️ Vul direct het totale puntenaantal per speler in zonder rijen bij te houden."
+        )
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Qwixx", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.QWIXX, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Qwixx", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
@@ -108,7 +144,7 @@ fun QwixxScreen(
         }
     ) { padding ->
         if (!isGameStarted) {
-            // SETUP
+            // SETUP FASE
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -121,44 +157,35 @@ fun QwixxScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels Qwixx 🎲",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Kruis zoveel mogelijk getallen aan in 4 kleuren (Rood, Geel, Groen, Blauw). Elk kruisje meer levert steeds meer punten op volgens n*(n+1)/2. Elke misworp kost -5 punten. De hoogste score wint!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.QWIXX,
+                            subtitle = "Klassiek dobbelspel • Rood, Geel, Groen & Blauw 🎲",
+                            themeColor = AccentOrange
+                        )
                     }
 
                     item {
-                        AppCard {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Invoermethode:", fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilterChip(
-                                        selected = !isDirectMode,
-                                        onClick = { isDirectMode = false },
-                                        label = { Text("Kleurrijen") },
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    FilterChip(
-                                        selected = isDirectMode,
-                                        onClick = { isDirectMode = true },
-                                        label = { Text("Direct Totaal") },
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
+                        GameModeSegmentedPicker(
+                            options = modeOptions,
+                            selectedId = gameMode,
+                            onSelect = { gameMode = it },
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 5,
+                            selectedCount = selectedPlayerCount,
+                            onSelect = { count ->
+                                selectedPlayerCount = count
+                                while (selectedPlayerNames.size > count) {
+                                    selectedPlayerNames.removeAt(selectedPlayerNames.lastIndex)
                                 }
-                            }
-                        }
+                            },
+                            themeColor = AccentOrange
+                        )
                     }
 
                     item {
@@ -166,16 +193,28 @@ fun QwixxScreen(
                             selectedPlayers = selectedPlayerNames,
                             onTogglePlayer = { name ->
                                 val list = selectedPlayerNames.toMutableList()
-                                if (list.contains(name)) list.remove(name) else list.add(name)
+                                if (list.contains(name)) {
+                                    list.remove(name)
+                                } else if (list.size < selectedPlayerCount) {
+                                    list.add(name)
+                                }
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerCount = seated.size.coerceIn(2, 5)
+                                selectedPlayerNames = seated.take(selectedPlayerCount).toMutableList()
                             }
                         )
                     }
 
                     item {
-                        SectionTitle(title = "Spelers (${selectedPlayerNames.size})")
+                        SectionTitle(title = "Deelnemers (${selectedPlayerNames.size} / $selectedPlayerCount)")
                         if (selectedPlayerNames.isEmpty()) {
-                            Text("Selecteer minimaal 2 spelers.", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = "Selecteer minimaal 2 spelers.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
                         } else {
                             AppCard {
                                 selectedPlayerNames.forEachIndexed { idx, name ->
@@ -201,247 +240,352 @@ fun QwixxScreen(
                     }
                 }
 
-                Button(
-                    onClick = {
-                        sheets = MutableList(selectedPlayerNames.size) { QwixxSheet() }
-                        isGameStarted = true
-                    },
-                    enabled = selectedPlayerNames.size >= 2,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Start Qwixx Formulier", style = MaterialTheme.typography.titleMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (selectedPlayerNames.size >= 2) {
+                        OutlinedButton(
+                            onClick = { showTafelschikkingDialog = true },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Tafelschikking (Wie zit waar?)")
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            if (gameMode == "snel") {
+                                startQuickScoreGame = true
+                            } else {
+                                sheets = MutableList(selectedPlayerNames.size) { QwixxPlayerSheet() }
+                                selectedPlayerTab = 0
+                                isGameStarted = true
+                            }
+                        },
+                        enabled = selectedPlayerNames.size >= 2,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            if (gameMode == "snel") "⚡️ Snelle Eindscore Starten" else "Start Digitaal Scoreblad (${selectedPlayerNames.size} spelers)",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
             }
         } else {
-            // SCORING
+            // IN-GAME SCOREBLAD
+            val scoresPairList = selectedPlayerNames.indices.map { i ->
+                Pair(selectedPlayerNames[i], calculatedTotals.getOrElse(i) { 0 })
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 16.dp),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // Live Lead Indicator
                     item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Scoreoverzicht", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                                val leader = selectedPlayerNames.indices.maxByOrNull { calculatedTotals.getOrElse(it) { 0 } }
-                                if (leader != null) {
-                                    Text(
-                                        text = "Leider: ${selectedPlayerNames[leader]} (${calculatedTotals[leader]} pt)",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = PrimaryBlue)
-                                    )
-                                }
-                            }
-                        }
+                        LiveGameLeadCard(
+                            playerScores = scoresPairList,
+                            isLowestScoreWins = false,
+                            themeColor = AccentOrange
+                        )
                     }
 
-                    itemsIndexed(selectedPlayerNames) { index, playerName ->
-                        val isExpanded = expandedPlayerIndex == index
-                        val sheet = sheets.getOrElse(index) { QwixxSheet() }
-                        val total = calculatedTotals.getOrElse(index) { 0 }
+                    // Speler Selector Tabs
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            itemsIndexed(selectedPlayerNames) { idx, name ->
+                                val isSel = selectedPlayerTab == idx
+                                val total = calculatedTotals.getOrElse(idx) { 0 }
 
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    expandedPlayerIndex = if (isExpanded) null else index
-                                },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSel) AccentOrange else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        width = if (isSel) 2.dp else 1.dp,
+                                        color = if (isSel) AccentOrange else Color.Gray.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier.clickable { selectedPlayerTab = idx }
                                 ) {
-                                    Text(playerName, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                                    Text(
-                                        text = "$total pt",
-                                        style = MaterialTheme.typography.headlineSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = PrimaryBlue
-                                        )
-                                    )
-                                }
-
-                                AnimatedVisibility(visible = isExpanded) {
                                     Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-
-                                        if (!isDirectMode) {
-                                            // 4 Kleurenrijen + Misworpen
-                                            QwixxRowStepper(
-                                                title = "🔴 Rood (2 ➔ 12)",
-                                                count = sheet.redCrosses,
-                                                color = Color(0xFFE53935),
-                                                onCountChange = {
-                                                    val list = sheets.toMutableList()
-                                                    list[index] = list[index].copy(redCrosses = it)
-                                                    sheets = list
-                                                }
-                                            )
-
-                                            QwixxRowStepper(
-                                                title = "🟡 Geel (2 ➔ 12)",
-                                                count = sheet.yellowCrosses,
-                                                color = Color(0xFFFDD835),
-                                                onCountChange = {
-                                                    val list = sheets.toMutableList()
-                                                    list[index] = list[index].copy(yellowCrosses = it)
-                                                    sheets = list
-                                                }
-                                            )
-
-                                            QwixxRowStepper(
-                                                title = "🟢 Groen (12 ➔ 2)",
-                                                count = sheet.greenCrosses,
-                                                color = Color(0xFF43A047),
-                                                onCountChange = {
-                                                    val list = sheets.toMutableList()
-                                                    list[index] = list[index].copy(greenCrosses = it)
-                                                    sheets = list
-                                                }
-                                            )
-
-                                            QwixxRowStepper(
-                                                title = "🔵 Blauw (12 ➔ 2)",
-                                                count = sheet.blueCrosses,
-                                                color = Color(0xFF1E88E5),
-                                                onCountChange = {
-                                                    val list = sheets.toMutableList()
-                                                    list[index] = list[index].copy(blueCrosses = it)
-                                                    sheets = list
-                                                }
-                                            )
-
-                                            QwixxRowStepper(
-                                                title = "⚠️ Misworpen (-5 pt elk)",
-                                                count = sheet.misworpen,
-                                                maxCount = 4,
-                                                color = WarningRed,
-                                                onCountChange = {
-                                                    val list = sheets.toMutableList()
-                                                    list[index] = list[index].copy(misworpen = it)
-                                                    sheets = list
-                                                }
-                                            )
-                                        } else {
-                                            NumericScoreStepper(
-                                                score = sheet.directScore,
-                                                onScoreChange = {
-                                                    val list = sheets.toMutableList()
-                                                    list[index] = list[index].copy(directScore = it)
-                                                    sheets = list
-                                                },
-                                                enableLargeStep = true
-                                            )
-                                        }
+                                        Text(
+                                            text = name,
+                                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = "$total pt",
+                                            fontWeight = FontWeight.Black,
+                                            color = if (isSel) Color.White else AccentOrange,
+                                            fontSize = 12.sp
+                                        )
                                     }
                                 }
                             }
                         }
                     }
+
+                    // Scoreblad van geselecteerde speler
+                    val activePlayerName = selectedPlayerNames.getOrElse(selectedPlayerTab) { "" }
+                    val activeSheet = sheets.getOrElse(selectedPlayerTab) { QwixxPlayerSheet() }
+
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Scoreblad van $activePlayerName", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text("1x=1pt, 2x=3pt, 3x=6pt, ..., 12x=78pt", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                    }
+                                    Text(
+                                        text = "${activeSheet.total()} pt",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 22.sp,
+                                        color = AccentOrange
+                                    )
+                                }
+
+                                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+
+                                // Rood (2 -> 12)
+                                QwixxColorRow(
+                                    title = "🔴 Rood (2 ➔ 12)",
+                                    count = activeSheet.redCrosses,
+                                    color = Color(0xFFE53935),
+                                    onCountChange = {
+                                        val list = sheets.toMutableList()
+                                        list[selectedPlayerTab] = list[selectedPlayerTab].copy(redCrosses = it)
+                                        sheets = list
+                                    }
+                                )
+
+                                // Geel (2 -> 12)
+                                QwixxColorRow(
+                                    title = "🟡 Geel (2 ➔ 12)",
+                                    count = activeSheet.yellowCrosses,
+                                    color = Color(0xFFFDD835),
+                                    onCountChange = {
+                                        val list = sheets.toMutableList()
+                                        list[selectedPlayerTab] = list[selectedPlayerTab].copy(yellowCrosses = it)
+                                        sheets = list
+                                    }
+                                )
+
+                                // Groen (12 -> 2)
+                                QwixxColorRow(
+                                    title = "🟢 Groen (12 ➔ 2)",
+                                    count = activeSheet.greenCrosses,
+                                    color = Color(0xFF43A047),
+                                    onCountChange = {
+                                        val list = sheets.toMutableList()
+                                        list[selectedPlayerTab] = list[selectedPlayerTab].copy(greenCrosses = it)
+                                        sheets = list
+                                    }
+                                )
+
+                                // Blauw (12 -> 2)
+                                QwixxColorRow(
+                                    title = "🔵 Blauw (12 ➔ 2)",
+                                    count = activeSheet.blueCrosses,
+                                    color = Color(0xFF1E88E5),
+                                    onCountChange = {
+                                        val list = sheets.toMutableList()
+                                        list[selectedPlayerTab] = list[selectedPlayerTab].copy(blueCrosses = it)
+                                        sheets = list
+                                    }
+                                )
+
+                                // Misworpen (-5 pt elk)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(WarningRed.copy(alpha = 0.12f))
+                                        .border(1.dp, WarningRed.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("⚠️ Misworpen (-5 pt elk)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = WarningRed)
+                                        Text("Aantal: ${activeSheet.misworpen} (-${activeSheet.misworpen * 5} pt)", fontSize = 11.sp, color = WarningRed.copy(alpha = 0.8f))
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        for (i in 0..4) {
+                                            val isChecked = i <= activeSheet.misworpen && i > 0
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isChecked) WarningRed else Color.Transparent)
+                                                    .border(1.dp, WarningRed, RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        val list = sheets.toMutableList()
+                                                        val newCount = if (activeSheet.misworpen == i) i - 1 else i
+                                                        list[selectedPlayerTab] = list[selectedPlayerTab].copy(misworpen = newCount.coerceIn(0, 4))
+                                                        sheets = list
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    if (i == 0) "0" else "$i",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isChecked) Color.White else WarningRed
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Score breakdown banner
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceAround
+                                ) {
+                                    val rPts = activeSheet.colorPoints(activeSheet.redCrosses)
+                                    val yPts = activeSheet.colorPoints(activeSheet.yellowCrosses)
+                                    val gPts = activeSheet.colorPoints(activeSheet.greenCrosses)
+                                    val bPts = activeSheet.colorPoints(activeSheet.blueCrosses)
+                                    val misPts = activeSheet.misworpen * 5
+
+                                    Text("🔴 $rPts", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("+", fontSize = 11.sp)
+                                    Text("🟡 $yPts", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("+", fontSize = 11.sp)
+                                    Text("🟢 $gPts", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("+", fontSize = 11.sp)
+                                    Text("🔵 $bPts", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("-", fontSize = 11.sp)
+                                    Text("⚠️ $misPts", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = WarningRed)
+                                    Text("=", fontSize = 11.sp)
+                                    Text("${activeSheet.total()} pt", fontSize = 12.sp, fontWeight = FontWeight.Black, color = AccentOrange)
+                                }
+                            }
+                        }
+                    }
                 }
 
+                // Afrondknop
                 Button(
                     onClick = {
                         val maxScore = calculatedTotals.maxOrNull() ?: 0
-                        val winnerIdx = calculatedTotals.indexOf(maxScore)
-                        val winner = selectedPlayerNames.getOrElse(winnerIdx) { "" }
-                        winnerPlayer = winner
-
-                        val detailed = selectedPlayerNames.indices.map { idx ->
-                            PlayerScoreDetail(name = selectedPlayerNames[idx], score = calculatedTotals[idx])
-                        }
-                        scoreManager.saveGame(
-                            gameName = "Qwixx",
-                            playerDetailedScores = detailed,
-                            winnerName = winner
-                        )
+                        val winnerIdx = calculatedTotals.indexOfFirst { it == maxScore }
+                        winnerPlayer = selectedPlayerNames.getOrElse(winnerIdx) { selectedPlayerNames.first() }
                         isGameOver = true
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp)
-                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Spel Voltooien & Opslaan", style = MaterialTheme.typography.titleMedium)
+                    Text("Spel Afronden & Uitslag Bekijken 🏆", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
     }
+
+    if (showTafelschikkingDialog) {
+        val playerObjects = selectedPlayerNames.map { name ->
+            val prof = scoreManager.getPlayerProfile(name)
+            Player(name = name, colorHex = prof.colorHex, avatarEmoji = prof.avatarEmoji)
+        }
+        TafelschikkingDialog(
+            players = playerObjects,
+            onDismiss = { showTafelschikkingDialog = false },
+            onApplyOrder = { newOrdered ->
+                selectedPlayerNames = newOrdered.map { it.name }.toMutableList()
+            }
+        )
+    }
 }
 
 @Composable
-fun QwixxRowStepper(
+fun QwixxColorRow(
     title: String,
     count: Int,
     color: Color,
-    maxCount: Int = 12,
     onCountChange: (Int) -> Unit
 ) {
-    val points = if (maxCount == 4) count * -5 else (count * (count + 1)) / 2
+    val pts = if (count > 0) (count * (count + 1)) / 2 else 0
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column {
-            Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-            Text("$count kruisjes = ${if (points >= 0) "+" else ""}$points pt", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color)
+            Text("$count kruisjes = $pts pt", fontSize = 11.sp, color = color.copy(alpha = 0.85f), fontWeight = FontWeight.SemiBold)
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             FilledTonalButton(
                 onClick = { if (count > 0) onCountChange(count - 1) },
-                modifier = Modifier.size(32.dp),
                 contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.size(32.dp),
                 shape = CircleShape
             ) {
-                Text("-", fontWeight = FontWeight.Bold)
+                Text("-", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
 
-            Text(
-                text = "$count",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.width(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(color)
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "$count",
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+            }
 
             FilledTonalButton(
-                onClick = { if (count < maxCount) onCountChange(count + 1) },
-                modifier = Modifier.size(32.dp),
+                onClick = { if (count < 12) onCountChange(count + 1) },
                 contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.size(32.dp),
                 shape = CircleShape
             ) {
-                Text("+", fontWeight = FontWeight.Bold)
+                Text("+", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }

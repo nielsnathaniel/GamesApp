@@ -23,8 +23,10 @@ import androidx.compose.ui.unit.sp
 import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.GameLogoImageByName
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.components.SpelerspaspoortDialog
+import nl.nnbp.gamesapp.ui.components.StatCard
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 import nl.nnbp.gamesapp.ui.theme.RoyalPurple
@@ -192,6 +194,8 @@ fun OverviewTabContent(scoreManager: ScoreManager) {
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                 modifier = Modifier.width(24.dp)
                             )
+                            GameLogoImageByName(gameName = gameName, size = 32.dp, cornerRadius = 8.dp)
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = gameName,
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
@@ -310,7 +314,6 @@ fun PlayersTabContent(scoreManager: ScoreManager) {
             onDismiss = { selectedPlayerPassport = null }
         )
     }
-}
 }
 
 @Composable

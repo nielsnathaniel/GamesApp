@@ -2,17 +2,16 @@ package nl.nnbp.gamesapp.ui.screens.games.tickettoride
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Train
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,32 +22,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.nnbp.gamesapp.data.ActiveGameManager
-import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
+import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.Player
 import nl.nnbp.gamesapp.data.model.PlayerScore
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
-import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
-import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
-import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
-import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.ui.components.*
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.*
 
-data class TTRScore(
+val ttrTrainColors = listOf(
+    Pair("Rood", TrainRed),
+    Pair("Blauw", TrainBlue),
+    Pair("Groen", TrainGreen),
+    Pair("Geel", TrainYellow),
+    Pair("Zwart", TrainBlack),
+    Pair("Paars", TrainPurple)
+)
+
+data class TTRPlayerData(
     var routePoints: Int = 0,
     var completedTickets: Int = 0,
     var failedTickets: Int = 0,
     var hasLongestRoute: Boolean = false,
     var hasGlobetrotter: Boolean = false,
-    var unusedStations: Int = 0, // 4 pt elk
-    var directScore: Int = 0
+    var unusedStations: Int = 0 // 0..3 (4 pt elk)
 ) {
-    fun calculatedTotal(isDirectMode: Boolean): Int {
-        if (isDirectMode) return directScore
+    fun calculatedTotal(): Int {
         val longest = if (hasLongestRoute) 10 else 0
         val globe = if (hasGlobetrotter) 10 else 0
         val stations = unusedStations * 4
@@ -56,13 +56,10 @@ data class TTRScore(
     }
 }
 
-val defaultTrainColors = listOf(
-    Pair("Rood", TrainRed),
-    Pair("Blauw", TrainBlue),
-    Pair("Groen", TrainGreen),
-    Pair("Geel", TrainYellow),
-    Pair("Zwart", TrainBlack),
-    Pair("Paars", TrainPurple)
+data class TTRLiveTurn(
+    val player: String,
+    val points: Int,
+    val description: String
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,19 +72,34 @@ fun TicketToRideScreen(
 
     var isGameStarted by remember { mutableStateOf(false) }
     var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
-    var isDirectMode by remember { mutableStateOf(false) }
+    var selectedPlayerCount by remember { mutableIntStateOf(4) }
+    var gameMode by remember { mutableStateOf("categorieen") } // "categorieen", "live", "snel"
+    var showTafelschikkingDialog by remember { mutableStateOf(false) }
 
-    var playerScores by remember { mutableStateOf(mutableListOf<TTRScore>()) }
-    var expandedPlayerIndex by remember { mutableStateOf<Int?>(0) }
+    // Quick score screen navigation
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Ticket to Ride",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = false,
+            scoreUnit = "pt",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
+
+    // In-game states
+    var playerScores by remember { mutableStateOf(mutableListOf<TTRPlayerData>()) }
+    var selectedPlayerTab by remember { mutableIntStateOf(0) }
+    var liveTurnHistory by remember { mutableStateOf(mutableListOf<TTRLiveTurn>()) }
+    var showHistoryDialog by remember { mutableStateOf(false) }
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
-    var showTafelschikkingDialog by remember { mutableStateOf(false) }
-    var showDisputeDialog by remember { mutableStateOf(false) }
-    var showEditScoresDialog by remember { mutableStateOf(false) }
 
-    val calculatedTotals = remember(playerScores, isDirectMode) {
-        playerScores.map { it.calculatedTotal(isDirectMode) }
+    val calculatedTotals = remember(playerScores) {
+        playerScores.map { it.calculatedTotal() }
     }
 
     if (isGameOver && winnerPlayer != null) {
@@ -110,30 +122,54 @@ fun TicketToRideScreen(
         return
     }
 
+    val modeOptions = listOf(
+        GameModeItem(
+            id = "categorieen",
+            title = "Categorieën",
+            icon = Icons.Default.Train,
+            description = "🚂 Eindtelling: routes op basis van treinlengtes, bestemmingskaarten, langste route en stations."
+        ),
+        GameModeItem(
+            id = "live",
+            title = "Ronde per Ronde",
+            icon = Icons.Default.PlayCircle,
+            description = "🎮 Registreer tijdens het spelen elke gelegde treinroute beurt voor beurt met live tussenstand."
+        ),
+        GameModeItem(
+            id = "snel",
+            title = "Direct Totaal",
+            icon = Icons.Default.Bolt,
+            description = "⚡️ Vul direct het totale puntenaantal per speler in."
+        )
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ticket to Ride", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.TICKET_TO_RIDE, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Ticket to Ride", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
                     }
                 },
                 actions = {
-                    if (isGameStarted) {
-                        IconButton(onClick = { showEditScoresDialog = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                    if (isGameStarted && gameMode == "live") {
+                        IconButton(onClick = { showHistoryDialog = true }) {
+                            Icon(Icons.Default.History, contentDescription = "Historie", tint = TrainBlue)
                         }
-                    }
-                    IconButton(onClick = { showDisputeDialog = true }) {
-                        Text("⚖️", fontSize = 18.sp)
                     }
                 }
             )
         }
     ) { padding ->
         if (!isGameStarted) {
-            // SETUP
+            // SETUP FASE
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -146,44 +182,35 @@ fun TicketToRideScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels Ticket to Ride 🚂",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Bouw routes tussen steden en voltooi bestemmingskaarten. Voer per speler routepunten in, voltooide tickets, mislukte tickets en bonussen (Langste route +10 pt, Globetrotter +10 pt, Stations 4 pt).",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.TICKET_TO_RIDE,
+                            subtitle = "Treinavontuur • Europa & USA 🚂",
+                            themeColor = TrainBlue
+                        )
                     }
 
                     item {
-                        AppCard {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Telmethode:", fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    FilterChip(
-                                        selected = !isDirectMode,
-                                        onClick = { isDirectMode = false },
-                                        label = { Text("Eindtelling (Bonussen)") },
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                    FilterChip(
-                                        selected = isDirectMode,
-                                        onClick = { isDirectMode = true },
-                                        label = { Text("Direct Totaal") },
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
+                        GameModeSegmentedPicker(
+                            options = modeOptions,
+                            selectedId = gameMode,
+                            onSelect = { gameMode = it },
+                            themeColor = TrainBlue
+                        )
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 5,
+                            selectedCount = selectedPlayerCount,
+                            onSelect = { count ->
+                                selectedPlayerCount = count
+                                while (selectedPlayerNames.size > count) {
+                                    selectedPlayerNames.removeAt(selectedPlayerNames.lastIndex)
                                 }
-                            }
-                        }
+                            },
+                            themeColor = TrainBlue
+                        )
                     }
 
                     item {
@@ -191,20 +218,32 @@ fun TicketToRideScreen(
                             selectedPlayers = selectedPlayerNames,
                             onTogglePlayer = { name ->
                                 val list = selectedPlayerNames.toMutableList()
-                                if (list.contains(name)) list.remove(name) else if (list.size < 5) list.add(name)
+                                if (list.contains(name)) {
+                                    list.remove(name)
+                                } else if (list.size < selectedPlayerCount) {
+                                    list.add(name)
+                                }
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerCount = seated.size.coerceIn(2, 5)
+                                selectedPlayerNames = seated.take(selectedPlayerCount).toMutableList()
                             }
                         )
                     }
 
                     item {
-                        SectionTitle(title = "Spelers & Treinkleuren (${selectedPlayerNames.size}/5)")
+                        SectionTitle(title = "Deelnemers (${selectedPlayerNames.size} / $selectedPlayerCount)")
                         if (selectedPlayerNames.isEmpty()) {
-                            Text("Selecteer 2 tot 5 spelers.", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = "Selecteer minimaal 2 spelers.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
                         } else {
                             AppCard {
                                 selectedPlayerNames.forEachIndexed { idx, name ->
-                                    val colorPair = defaultTrainColors.getOrElse(idx) { defaultTrainColors.first() }
+                                    val (colorName, trainColor) = ttrTrainColors[idx % ttrTrainColors.size]
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -215,12 +254,14 @@ fun TicketToRideScreen(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(20.dp)
+                                                    .size(16.dp)
                                                     .clip(CircleShape)
-                                                    .background(colorPair.second)
+                                                    .background(trainColor)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("${idx + 1}. $name (${colorPair.first})", fontWeight = FontWeight.SemiBold)
+                                            Text(name, fontWeight = FontWeight.SemiBold)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("($colorName)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                                         }
                                         IconButton(onClick = {
                                             val list = selectedPlayerNames.toMutableList()
@@ -236,246 +277,373 @@ fun TicketToRideScreen(
                     }
                 }
 
-                if (selectedPlayerNames.size >= 2) {
-                    OutlinedButton(
-                        onClick = { showTafelschikkingDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Tafelschikking (Wie zit waar?)")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (selectedPlayerNames.size >= 2) {
+                        OutlinedButton(
+                            onClick = { showTafelschikkingDialog = true },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Tafelschikking (Wie zit waar?)")
+                        }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
 
-                Button(
-                    onClick = {
-                        playerScores = MutableList(selectedPlayerNames.size) { TTRScore() }
-                        isGameStarted = true
-                    },
-                    enabled = selectedPlayerNames.size in 2..5,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Start Puntentelling", style = MaterialTheme.typography.titleMedium)
+                    Button(
+                        onClick = {
+                            if (gameMode == "snel") {
+                                startQuickScoreGame = true
+                            } else {
+                                playerScores = MutableList(selectedPlayerNames.size) { TTRPlayerData() }
+                                selectedPlayerTab = 0
+                                liveTurnHistory.clear()
+                                isGameStarted = true
+                            }
+                        },
+                        enabled = selectedPlayerNames.size >= 2,
+                        colors = ButtonDefaults.buttonColors(containerColor = TrainBlue),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            when (gameMode) {
+                                "snel" -> "⚡️ Snelle Eindscore Starten"
+                                "live" -> "🎮 Start Live Rondetracking (${selectedPlayerNames.size} spelers)"
+                                else -> "Start Categorieëntelling (${selectedPlayerNames.size} spelers)"
+                            },
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
             }
         } else {
-            // SCORING
+            // IN-GAME FASE
+            val scoresPairList = selectedPlayerNames.indices.map { i ->
+                Pair(selectedPlayerNames[i], calculatedTotals.getOrElse(i) { 0 })
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 16.dp),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // Live Lead Indicator
                     item {
-                        InhaalslagBanner(
-                            playerNames = selectedPlayerNames,
-                            scores = calculatedTotals,
-                            lowestWins = false
+                        LiveGameLeadCard(
+                            playerScores = scoresPairList,
+                            isLowestScoreWins = false,
+                            themeColor = TrainBlue
                         )
                     }
 
+                    // Speler Selector Tabs met treinkleuren
                     item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Ticket to Ride Uitslag", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                                val leader = selectedPlayerNames.indices.maxByOrNull { calculatedTotals.getOrElse(it) { 0 } }
-                                if (leader != null) {
-                                    Text(
-                                        text = "Leider: ${selectedPlayerNames[leader]} (${calculatedTotals[leader]} pt)",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = PrimaryBlue)
-                                    )
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            itemsIndexed(selectedPlayerNames) { idx, name ->
+                                val isSel = selectedPlayerTab == idx
+                                val (_, trainCol) = ttrTrainColors[idx % ttrTrainColors.size]
+                                val total = calculatedTotals.getOrElse(idx) { 0 }
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSel) trainCol else trainCol.copy(alpha = 0.12f),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        width = if (isSel) 2.5.dp else 1.dp,
+                                        color = trainCol
+                                    ),
+                                    modifier = Modifier.clickable { selectedPlayerTab = idx }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isSel) Color.White else trainCol)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = name,
+                                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface,
+                                                fontSize = 13.sp
+                                            )
+                                            Text(
+                                                text = "$total pt",
+                                                fontWeight = FontWeight.Black,
+                                                color = if (isSel) Color.White else trainCol,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
-                    itemsIndexed(selectedPlayerNames) { index, playerName ->
-                        val isExpanded = expandedPlayerIndex == index
-                        val colorPair = defaultTrainColors.getOrElse(index) { defaultTrainColors.first() }
-                        val score = playerScores.getOrElse(index) { TTRScore() }
-                        val total = calculatedTotals.getOrElse(index) { 0 }
+                    val activePlayerName = selectedPlayerNames.getOrElse(selectedPlayerTab) { "" }
+                    val activeScore = playerScores.getOrElse(selectedPlayerTab) { TTRPlayerData() }
+                    val (_, activeTrainColor) = ttrTrainColors[selectedPlayerTab % ttrTrainColors.size]
 
+                    // Header kaart van actieve speler
+                    item {
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    expandedPlayerIndex = if (isExpanded) null else index
-                                },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = activeTrainColor.copy(alpha = 0.14f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.5.dp, activeTrainColor.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Train, contentDescription = null, tint = activeTrainColor, modifier = Modifier.size(28.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("PUNTEN VOOR:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = activeTrainColor)
+                                        Text(activePlayerName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Text(
+                                    text = "${activeScore.calculatedTotal()} pt",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = activeTrainColor
+                                )
+                            }
+                        }
+                    }
+
+                    // 1. Routepunten (Treintrajecten) met presets
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(16.dp)
-                                                .clip(CircleShape)
-                                                .background(colorPair.second)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(playerName, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                                    }
+                                    Text("1. Routepunten (Treintrajecten)", fontWeight = FontWeight.Bold, color = activeTrainColor)
+                                    Text("${activeScore.routePoints} pt", fontWeight = FontWeight.Black, fontSize = 16.sp, color = activeTrainColor)
+                                }
 
-                                    Text(
-                                        text = "$total pt",
-                                        style = MaterialTheme.typography.headlineSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = colorPair.second
-                                        )
+                                Text("Snelle treinlengte presets:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+
+                                val presets = listOf(
+                                    1 to 1,
+                                    2 to 2,
+                                    3 to 4,
+                                    4 to 7,
+                                    5 to 10,
+                                    6 to 15,
+                                    8 to 21
+                                )
+
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(presets.size) { i ->
+                                        val (length, pts) = presets[i]
+                                        FilledTonalButton(
+                                            onClick = {
+                                                val list = playerScores.toMutableList()
+                                                list[selectedPlayerTab] = list[selectedPlayerTab].copy(
+                                                    routePoints = list[selectedPlayerTab].routePoints + pts
+                                                )
+                                                playerScores = list
+                                                if (gameMode == "live") {
+                                                    liveTurnHistory.add(
+                                                        TTRLiveTurn(
+                                                            player = activePlayerName,
+                                                            points = pts,
+                                                            description = "Legt route van $length wagons (+$pts pt)"
+                                                        )
+                                                    )
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Text("${length}w (+$pts)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(onClick = {
+                                        val list = playerScores.toMutableList()
+                                        list[selectedPlayerTab] = list[selectedPlayerTab].copy(routePoints = 0)
+                                        playerScores = list
+                                    }) {
+                                        Text("Routes wissen (0)", fontSize = 11.sp, color = WarningRed)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Bestemmingskaarten (Tickets)
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("2. Bestemmingskaarten (Tickets)", fontWeight = FontWeight.Bold, color = activeTrainColor)
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Behaalde tickets (+)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        Text("+${activeScore.completedTickets} pt", fontSize = 12.sp, color = SuccessGreen, fontWeight = FontWeight.Bold)
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(5, 10, 20).forEach { add ->
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    val list = playerScores.toMutableList()
+                                                    list[selectedPlayerTab] = list[selectedPlayerTab].copy(
+                                                        completedTickets = list[selectedPlayerTab].completedTickets + add
+                                                    )
+                                                    playerScores = list
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text("+$add", fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Mislukte tickets (-)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        Text("-${activeScore.failedTickets} pt", fontSize = 12.sp, color = WarningRed, fontWeight = FontWeight.Bold)
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(5, 10, 20).forEach { add ->
+                                            FilledTonalButton(
+                                                onClick = {
+                                                    val list = playerScores.toMutableList()
+                                                    list[selectedPlayerTab] = list[selectedPlayerTab].copy(
+                                                        failedTickets = list[selectedPlayerTab].failedTickets + add
+                                                    )
+                                                    playerScores = list
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text("-$add", fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Bonussen & Stations
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("3. Bonussen & Stations", fontWeight = FontWeight.Bold, color = activeTrainColor)
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Langste Route (+10 pt)", fontSize = 13.sp)
+                                    Switch(
+                                        checked = activeScore.hasLongestRoute,
+                                        onCheckedChange = { checked ->
+                                            val list = playerScores.toMutableList()
+                                            list[selectedPlayerTab] = list[selectedPlayerTab].copy(hasLongestRoute = checked)
+                                            playerScores = list
+                                        }
                                     )
                                 }
 
-                                AnimatedVisibility(visible = isExpanded) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Globetrotter (+10 pt)", fontSize = 13.sp)
+                                    Switch(
+                                        checked = activeScore.hasGlobetrotter,
+                                        onCheckedChange = { checked ->
+                                            val list = playerScores.toMutableList()
+                                            list[selectedPlayerTab] = list[selectedPlayerTab].copy(hasGlobetrotter = checked)
+                                            playerScores = list
+                                        }
+                                    )
+                                }
 
-                                        if (!isDirectMode) {
-                                            // Routepunten presets (wagonlengtes: 1=1, 2=2, 3=4, 4=7, 5=10, 6=15, 7=18, 8=21)
-                                            Text("Routepunten toevoegen via wagonlengte:", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                listOf(
-                                                    Pair(1, 1),
-                                                    Pair(2, 2),
-                                                    Pair(3, 4),
-                                                    Pair(4, 7),
-                                                    Pair(5, 10),
-                                                    Pair(6, 15)
-                                                ).forEach { (wagons, pts) ->
-                                                    FilledTonalButton(
-                                                        onClick = {
-                                                            val list = playerScores.toMutableList()
-                                                            list[index] = list[index].copy(routePoints = list[index].routePoints + pts)
-                                                            playerScores = list
-                                                        },
-                                                        modifier = Modifier.weight(1f),
-                                                        contentPadding = PaddingValues(0.dp)
-                                                    ) {
-                                                        Text("${wagons}w (+$pts)", fontSize = 10.sp)
-                                                    }
-                                                }
-                                            }
-
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text("Totale routepunten:", fontWeight = FontWeight.SemiBold)
-                                                NumericScoreStepper(
-                                                    score = score.routePoints,
-                                                    onScoreChange = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("Overgebleven stations (4 pt elk)", fontSize = 13.sp)
+                                        Text("${activeScore.unusedStations} stations = ${activeScore.unusedStations * 4} pt", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        (0..3).forEach { st ->
+                                            val isSelected = activeScore.unusedStations == st
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(if (isSelected) TrainBlue else Color.Transparent)
+                                                    .border(1.dp, TrainBlue, RoundedCornerShape(6.dp))
+                                                    .clickable {
                                                         val list = playerScores.toMutableList()
-                                                        list[index] = list[index].copy(routePoints = maxOf(0, it))
-                                                        playerScores = list
-                                                    }
-                                                )
-                                            }
-
-                                            // Voltooide bestemmingskaarten
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text("Voltooide tickets (+):", fontWeight = FontWeight.SemiBold)
-                                                NumericScoreStepper(
-                                                    score = score.completedTickets,
-                                                    onScoreChange = {
-                                                        val list = playerScores.toMutableList()
-                                                        list[index] = list[index].copy(completedTickets = maxOf(0, it))
-                                                        playerScores = list
-                                                    }
-                                                )
-                                            }
-
-                                            // Mislukte tickets (aftrek)
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text("Mislukte tickets (-):", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.error)
-                                                NumericScoreStepper(
-                                                    score = score.failedTickets,
-                                                    onScoreChange = {
-                                                        val list = playerScores.toMutableList()
-                                                        list[index] = list[index].copy(failedTickets = maxOf(0, it))
-                                                        playerScores = list
-                                                    }
-                                                )
-                                            }
-
-                                            // Bonussen: Langste route, Globetrotter
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                FilterChip(
-                                                    selected = score.hasLongestRoute,
-                                                    onClick = {
-                                                        val list = playerScores.toMutableList()
-                                                        list[index] = list[index].copy(hasLongestRoute = !score.hasLongestRoute)
+                                                        list[selectedPlayerTab] = list[selectedPlayerTab].copy(unusedStations = st)
                                                         playerScores = list
                                                     },
-                                                    label = { Text("Langste Route (+10)") },
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    modifier = Modifier.weight(1f)
-                                                )
-
-                                                FilterChip(
-                                                    selected = score.hasGlobetrotter,
-                                                    onClick = {
-                                                        val list = playerScores.toMutableList()
-                                                        list[index] = list[index].copy(hasGlobetrotter = !score.hasGlobetrotter)
-                                                        playerScores = list
-                                                    },
-                                                    label = { Text("Globetrotter (+10)") },
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    modifier = Modifier.weight(1f)
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    "$st",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSelected) Color.White else TrainBlue
                                                 )
                                             }
-                                        } else {
-                                            NumericScoreStepper(
-                                                score = score.directScore,
-                                                onScoreChange = {
-                                                    val list = playerScores.toMutableList()
-                                                    list[index] = list[index].copy(directScore = it)
-                                                    playerScores = list
-                                                },
-                                                enableLargeStep = true
-                                            )
                                         }
                                     }
                                 }
@@ -484,35 +652,49 @@ fun TicketToRideScreen(
                     }
                 }
 
+                // Afrondknop
                 Button(
                     onClick = {
                         val maxScore = calculatedTotals.maxOrNull() ?: 0
-                        val winnerIdx = calculatedTotals.indexOf(maxScore)
-                        val winner = selectedPlayerNames.getOrElse(winnerIdx) { "" }
-                        winnerPlayer = winner
-
-                        val detailed = selectedPlayerNames.indices.map { idx ->
-                            PlayerScoreDetail(name = selectedPlayerNames[idx], score = calculatedTotals[idx])
-                        }
-                        scoreManager.saveGame(
-                            gameName = "Ticket to Ride",
-                            playerDetailedScores = detailed,
-                            winnerName = winner
-                        )
+                        val winnerIdx = calculatedTotals.indexOfFirst { it == maxScore }
+                        winnerPlayer = selectedPlayerNames.getOrElse(winnerIdx) { selectedPlayerNames.first() }
                         isGameOver = true
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp)
-                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = TrainBlue),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Uitslag Opslaan", style = MaterialTheme.typography.titleMedium)
+                    Text("Spel Afronden & Uitslag Bekijken 🏆", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
+    }
+
+    if (showHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showHistoryDialog = false },
+            title = { Text("Gelegde Routes Historie (${liveTurnHistory.size})") },
+            text = {
+                if (liveTurnHistory.isEmpty()) {
+                    Text("Nog geen geregistreerde routes.")
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
+                        items(liveTurnHistory.reversed().size) { idx ->
+                            val item = liveTurnHistory.reversed()[idx]
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Text("${item.player}: ${item.description}", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHistoryDialog = false }) {
+                    Text("Sluiten")
+                }
+            }
+        )
     }
 
     if (showTafelschikkingDialog) {
@@ -525,34 +707,6 @@ fun TicketToRideScreen(
             onDismiss = { showTafelschikkingDialog = false },
             onApplyOrder = { newOrdered ->
                 selectedPlayerNames = newOrdered.map { it.name }.toMutableList()
-            }
-        )
-    }
-
-    if (showDisputeDialog) {
-        WieHeeftGelijkDialog(
-            initialGameFilter = "Ticket to Ride",
-            onDismiss = { showDisputeDialog = false }
-        )
-    }
-
-    if (showEditScoresDialog) {
-        PuntenWijzigenDialog(
-            playerNames = selectedPlayerNames,
-            currentScores = calculatedTotals,
-            isLowestScoreWins = false,
-            onDismiss = { showEditScoresDialog = false },
-            onSave = { newScores ->
-                playerScores = playerScores.indices.map { i ->
-                    val item = playerScores[i]
-                    val target = newScores.getOrElse(i) { 0 }
-                    if (isDirectMode) {
-                        item.copy(directScore = target)
-                    } else {
-                        val other = item.calculatedTotal(false) - item.routePoints
-                        item.copy(routePoints = target - other)
-                    }
-                }.toMutableList()
             }
         )
     }

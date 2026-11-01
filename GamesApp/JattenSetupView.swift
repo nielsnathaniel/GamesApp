@@ -114,6 +114,7 @@ struct JattenSetupView: View {
                 SavedPlayersQuickChipsView(
                     spelers: $spelers,
                     aantalSpelers: aantalSpelers,
+                    aantalSpelersBinding: $aantalSpelers,
                     tintColor: .purple
                 )
 

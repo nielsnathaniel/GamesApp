@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -19,9 +20,15 @@ import androidx.compose.ui.unit.sp
 import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
+import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.GameModeItem
+import nl.nnbp.gamesapp.ui.components.GameModeSegmentedPicker
+import nl.nnbp.gamesapp.ui.components.GameSetupHeader
+import nl.nnbp.gamesapp.ui.components.LiveGameLeadCard
 import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
+import nl.nnbp.gamesapp.ui.components.PlayerCountPicker
 import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
@@ -169,9 +176,17 @@ fun QuickstopScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
+                        GameSetupHeader(
+                            gameType = GameType.QUICKSTOP,
+                            subtitle = "Spelregels Quickstop ⚡️",
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
                         AppCard {
                             Text(
-                                text = "Spelregels Quickstop ⚡️",
+                                text = "Spelregels & Doel",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -190,27 +205,15 @@ fun QuickstopScreen(
                     }
 
                     item {
-                        AppCard {
-                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = !isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = false },
-                                    label = { Text("Rondes bijhouden") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                FilterChip(
-                                    selected = isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = true },
-                                    label = { Text("⚡️ Alleen eindscore") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem("ronde", "Per Ronde", Icons.Default.Timeline, "Houd elke ronde live strafpunten en thema's bij"),
+                                GameModeItem("snel", "Snelle Eindscore", Icons.Default.FlashOn, "Directe invoer van de behaalde eindstand")
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "ronde",
+                            onSelect = { isQuickScoreMode = it == "snel" },
+                            themeColor = AccentOrange
+                        )
                     }
 
                     if (!isQuickScoreMode) {
@@ -238,12 +241,37 @@ fun QuickstopScreen(
                     }
 
                     item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 7,
+                            selectedCount = selectedPlayerNames.size,
+                            onSelect = { count ->
+                                val current = selectedPlayerNames.toMutableList()
+                                if (current.size < count) {
+                                    for (i in (current.size + 1)..count) {
+                                        current.add("Speler $i")
+                                    }
+                                } else if (current.size > count) {
+                                    while (current.size > count) {
+                                        current.removeAt(current.size - 1)
+                                    }
+                                }
+                                selectedPlayerNames = current
+                            },
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
                         SavedPlayersQuickChips(
                             selectedPlayers = selectedPlayerNames,
                             onTogglePlayer = { name ->
                                 val list = selectedPlayerNames.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerNames = seated.take(8).toMutableList()
                             }
                         )
                     }
@@ -313,6 +341,16 @@ fun QuickstopScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item {
+                        LiveGameLeadCard(
+                            playerScores = selectedPlayerNames.indices.map { i ->
+                                selectedPlayerNames[i] to (totalScores.getOrElse(i) { 0 })
+                            },
+                            isLowestScoreWins = true,
+                            themeColor = AccentOrange
+                        )
+                    }
+
                     // Thema Generator Kaart
                     item {
                         Card(

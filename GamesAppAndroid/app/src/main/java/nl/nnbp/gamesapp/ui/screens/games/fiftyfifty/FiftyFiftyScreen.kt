@@ -1,36 +1,36 @@
 package nl.nnbp.gamesapp.ui.screens.games.fiftyfifty
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.nnbp.gamesapp.data.ActiveGameManager
-import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
+import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.data.model.Player
 import nl.nnbp.gamesapp.data.model.PlayerScore
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.NumericScoreStepper
-import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.components.*
 import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
+import nl.nnbp.gamesapp.ui.theme.SuccessGreen
 import nl.nnbp.gamesapp.ui.theme.WarningRed
 
 data class FiftyFiftyRoundRecord(
@@ -50,19 +50,22 @@ fun FiftyFiftyScreen(
 
     var isGameStarted by remember { mutableStateOf(false) }
     var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    var selectedPlayerCount by remember { mutableIntStateOf(4) }
+    var gameMode by remember { mutableStateOf("rondes") } // "rondes", "enkelePot", "snel"
     var targetRounds by remember { mutableIntStateOf(3) }
+    var showTafelschikkingDialog by remember { mutableStateOf(false) }
 
     var currentRound by remember { mutableIntStateOf(1) }
     var roundPenalties by remember { mutableStateOf(mutableListOf<Int>()) }
     var hasFoxInHand by remember { mutableStateOf(mutableListOf<Boolean>()) }
+    var totalFoxCount by remember { mutableStateOf(mutableListOf<Int>()) }
     var totalPenalties by remember { mutableStateOf(mutableListOf<Int>()) }
-    var expandedPlayerIndex by remember { mutableStateOf<Int?>(0) }
     var history by remember { mutableStateOf(mutableListOf<FiftyFiftyRoundRecord>()) }
+    var showHistoryDialog by remember { mutableStateOf(false) }
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showEditScoresDialog by remember { mutableStateOf(false) }
-    var isQuickScoreMode by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
 
     if (startQuickScoreGame) {
@@ -96,10 +99,37 @@ fun FiftyFiftyScreen(
         return
     }
 
+    val modeOptions = listOf(
+        GameModeItem(
+            id = "rondes",
+            title = "Ronde per ronde",
+            icon = Icons.Default.Casino,
+            description = "🎮 Meerdere rondes spelen met cumulatieve strafkaarten. Pas op voor de vos!"
+        ),
+        GameModeItem(
+            id = "enkelePot",
+            title = "Enkele pot",
+            icon = Icons.Default.LooksOne,
+            description = "🃏 Eén enkele pot spelen en direct uitslag bepalen."
+        ),
+        GameModeItem(
+            id = "snel",
+            title = "Snelle eindscore",
+            icon = Icons.Default.Bolt,
+            description = "⚡️ Vul direct het totale aantal strafkaarten per speler in."
+        )
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fifty Fifty", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.FIFTY_FIFTY, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Fifty Fifty", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
@@ -107,8 +137,8 @@ fun FiftyFiftyScreen(
                 },
                 actions = {
                     if (isGameStarted) {
-                        IconButton(onClick = { showEditScoresDialog = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
+                        IconButton(onClick = { showHistoryDialog = true }) {
+                            Icon(Icons.Default.History, contentDescription = "Historie", tint = AccentOrange)
                         }
                     }
                 }
@@ -116,7 +146,7 @@ fun FiftyFiftyScreen(
         }
     ) { padding ->
         if (!isGameStarted) {
-            // SETUP
+            // SETUP FASE
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -129,61 +159,57 @@ fun FiftyFiftyScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels Fifty Fifty 🦊",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Kaartspel van White Goblin Games. Ontwijk strafkaarten en zorg dat je aan het einde van het spel NOOIT de vos op hand hebt (automatisch verloren!). De speler met de minste strafkaarten (zonder vos) wint!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.FIFTY_FIFTY,
+                            subtitle = "White Goblin Games • Minste strafkaarten wint! 🦊🃏",
+                            themeColor = AccentOrange
+                        )
                     }
 
                     item {
-                        AppCard {
-                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = !isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = false },
-                                    label = { Text("Rondes bijhouden") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                FilterChip(
-                                    selected = isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = true },
-                                    label = { Text("⚡️ Alleen eindscore") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
+                        GameModeSegmentedPicker(
+                            options = modeOptions,
+                            selectedId = gameMode,
+                            onSelect = { gameMode = it },
+                            themeColor = AccentOrange
+                        )
                     }
 
-                    if (!isQuickScoreMode) {
+                    if (gameMode == "rondes") {
                         item {
-                            AppCard {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Aantal rondes:", fontWeight = FontWeight.SemiBold)
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        listOf(3, 5, 7).forEach { r ->
-                                            FilterChip(
-                                                selected = targetRounds == r,
-                                                onClick = { targetRounds = r },
-                                                label = { Text("$r rondes") },
-                                                shape = RoundedCornerShape(10.dp)
-                                            )
+                                    Text("Doelaantal rondes:", fontWeight = FontWeight.SemiBold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        FilledTonalButton(
+                                            onClick = { if (targetRounds > 1) targetRounds-- },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(34.dp),
+                                            shape = CircleShape
+                                        ) {
+                                            Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Text("$targetRounds", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        FilledTonalButton(
+                                            onClick = { if (targetRounds < 10) targetRounds++ },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(34.dp),
+                                            shape = CircleShape
+                                        ) {
+                                            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -192,20 +218,47 @@ fun FiftyFiftyScreen(
                     }
 
                     item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 6,
+                            selectedCount = selectedPlayerCount,
+                            onSelect = { count ->
+                                selectedPlayerCount = count
+                                while (selectedPlayerNames.size > count) {
+                                    selectedPlayerNames.removeAt(selectedPlayerNames.lastIndex)
+                                }
+                            },
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
                         SavedPlayersQuickChips(
                             selectedPlayers = selectedPlayerNames,
                             onTogglePlayer = { name ->
                                 val list = selectedPlayerNames.toMutableList()
-                                if (list.contains(name)) list.remove(name) else list.add(name)
+                                if (list.contains(name)) {
+                                    list.remove(name)
+                                } else if (list.size < selectedPlayerCount) {
+                                    list.add(name)
+                                }
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerCount = seated.size.coerceIn(2, 6)
+                                selectedPlayerNames = seated.take(selectedPlayerCount).toMutableList()
                             }
                         )
                     }
 
                     item {
-                        SectionTitle(title = "Spelers (${selectedPlayerNames.size})")
+                        SectionTitle(title = "Deelnemers (${selectedPlayerNames.size} / $selectedPlayerCount)")
                         if (selectedPlayerNames.isEmpty()) {
-                            Text("Selecteer minimaal 2 spelers.", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                text = "Selecteer minimaal 2 spelers.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
                         } else {
                             AppCard {
                                 selectedPlayerNames.forEachIndexed { idx, name ->
@@ -231,221 +284,310 @@ fun FiftyFiftyScreen(
                     }
                 }
 
-                Button(
-                    onClick = {
-                        if (isQuickScoreMode) {
-                            startQuickScoreGame = true
-                        } else {
-                            roundPenalties = MutableList(selectedPlayerNames.size) { 0 }
-                            hasFoxInHand = MutableList(selectedPlayerNames.size) { false }
-                            totalPenalties = MutableList(selectedPlayerNames.size) { 0 }
-                            isGameStarted = true
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (selectedPlayerNames.size >= 2) {
+                        OutlinedButton(
+                            onClick = { showTafelschikkingDialog = true },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Tafelschikking (Wie zit waar?)")
                         }
-                    },
-                    enabled = selectedPlayerNames.size >= 2,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text(
-                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Spel ($targetRounds rondes)",
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    }
+
+                    Button(
+                        onClick = {
+                            if (gameMode == "snel") {
+                                startQuickScoreGame = true
+                            } else {
+                                roundPenalties = MutableList(selectedPlayerNames.size) { 0 }
+                                hasFoxInHand = MutableList(selectedPlayerNames.size) { false }
+                                totalFoxCount = MutableList(selectedPlayerNames.size) { 0 }
+                                totalPenalties = MutableList(selectedPlayerNames.size) { 0 }
+                                currentRound = 1
+                                history.clear()
+                                isGameStarted = true
+                            }
+                        },
+                        enabled = selectedPlayerNames.size >= 2,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            when (gameMode) {
+                                "snel" -> "⚡️ Snelle Eindscore Starten"
+                                "enkelePot" -> "Start Enkele Pot (${selectedPlayerNames.size} spelers)"
+                                else -> "Start Ronde 1 van $targetRounds (${selectedPlayerNames.size} spelers)"
+                            },
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
             }
         } else {
-            // GAMEPLAY
+            // IN-GAME FASE
+            val scoresPairList = selectedPlayerNames.indices.map { i ->
+                val total = totalPenalties.getOrElse(i) { 0 } + roundPenalties.getOrElse(i) { 0 }
+                Pair(selectedPlayerNames[i], total)
+            }
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 16.dp),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // Header Status
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = AccentOrange.copy(alpha = 0.12f))
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .border(1.5.dp, AccentOrange.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
                                     .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text("Ronde $currentRound van $targetRounds", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                                    Text("Laagste score (zonder vos) wint", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                                }
-                                val validPlayers = selectedPlayerNames.indices.filter { !hasFoxInHand.getOrElse(it) { false } }
-                                val leader = validPlayers.minByOrNull { totalPenalties.getOrElse(it) { 0 } }
-                                if (leader != null) {
                                     Text(
-                                        text = "Leider: ${selectedPlayerNames[leader]} (${totalPenalties[leader]} pt)",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                                        if (gameMode == "enkelePot") "ENKELE POT" else "RONDE $currentRound VAN $targetRounds",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = AccentOrange
+                                    )
+                                    Text("Minste strafkaarten wint", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                }
+                                Surface(shape = RoundedCornerShape(8.dp), color = AccentOrange.copy(alpha = 0.2f)) {
+                                    Text(
+                                        "${selectedPlayerNames.size} spelers",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = AccentOrange
                                     )
                                 }
                             }
                         }
                     }
 
-                    itemsIndexed(selectedPlayerNames) { index, playerName ->
-                        val isExpanded = expandedPlayerIndex == index
-                        val roundPts = roundPenalties.getOrElse(index) { 0 }
-                        val totalPts = totalPenalties.getOrElse(index) { 0 }
-                        val fox = hasFoxInHand.getOrElse(index) { false }
+                    // Voskaart Regel Banner
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = WarningRed.copy(alpha = 0.10f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, WarningRed.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🦊", fontSize = 22.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text("Voskaart Regel", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = WarningRed)
+                                    Text(
+                                        "De speler die aan het einde van het spel de vos op hand heeft verliest direct!",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Live Lead Indicator
+                    item {
+                        LiveGameLeadCard(
+                            playerScores = scoresPairList,
+                            isLowestScoreWins = true,
+                            themeColor = SuccessGreen
+                        )
+                    }
+
+                    // Spelerslijst met strafkaarten en vos-toggle
+                    itemsIndexed(selectedPlayerNames) { idx, name ->
+                        val roundVal = roundPenalties.getOrElse(idx) { 0 }
+                        val totalVal = totalPenalties.getOrElse(idx) { 0 }
+                        val effectiveTotal = totalVal + roundVal
+                        val hasFox = hasFoxInHand.getOrElse(idx) { false }
 
                         Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    expandedPlayerIndex = if (isExpanded) null else index
-                                },
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (fox) WarningRed.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant
+                                containerColor = if (hasFox) WarningRed.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(playerName, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                                            if (fox) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("🦊 VOS OP HAND", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = WarningRed))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        if (hasFox) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(shape = RoundedCornerShape(4.dp), color = WarningRed) {
+                                                Text("🦊 VOS (+10)", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                            }
+                                        } else if (totalFoxCount.getOrElse(idx) { 0 } > 0) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(shape = RoundedCornerShape(4.dp), color = WarningRed.copy(alpha = 0.2f)) {
+                                                Text("🦊 ${totalFoxCount[idx]}x", color = WarningRed, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                                             }
                                         }
-                                        Text(
-                                            text = "Totaal strafkaarten: $totalPts",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Color.Gray
-                                        )
                                     }
+                                    Text(
+                                        text = "$effectiveTotal strafkaarten",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp,
+                                        color = if (hasFox) WarningRed else AccentOrange
+                                    )
+                                }
 
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "+$roundPts",
-                                            style = MaterialTheme.typography.headlineSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (roundPts > 0) WarningRed else PrimaryBlue
-                                            )
-                                        )
-                                        Text("deze ronde", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Strafkaarten deze ronde: +$roundVal", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        FilledTonalButton(
+                                            onClick = {
+                                                if (roundVal > 0) {
+                                                    val list = roundPenalties.toMutableList()
+                                                    list[idx] = list[idx] - 1
+                                                    roundPenalties = list
+                                                }
+                                            },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(32.dp),
+                                            shape = CircleShape
+                                        ) {
+                                            Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        FilledTonalButton(
+                                            onClick = {
+                                                val list = roundPenalties.toMutableList()
+                                                list[idx] = list[idx] + 1
+                                                roundPenalties = list
+                                            },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(32.dp),
+                                            shape = CircleShape
+                                        ) {
+                                            Text("+1", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        FilledTonalButton(
+                                            onClick = {
+                                                val list = roundPenalties.toMutableList()
+                                                list[idx] = list[idx] + 5
+                                                roundPenalties = list
+                                            },
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(32.dp),
+                                            shape = CircleShape
+                                        ) {
+                                            Text("+5", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
 
-                                AnimatedVisibility(visible = isExpanded) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 10.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Vos op hand (+10 kaarten & verlies):", fontSize = 12.sp, color = if (hasFox) WarningRed else Color.Unspecified)
+                                    Switch(
+                                        checked = hasFox,
+                                        onCheckedChange = { checked ->
+                                            val list = hasFoxInHand.toMutableList()
+                                            list[idx] = checked
+                                            hasFoxInHand = list
 
-                                        // Vos op hand toggle
-                                        FilterChip(
-                                            selected = fox,
-                                            onClick = {
-                                                val list = hasFoxInHand.toMutableList()
-                                                list[index] = !fox
-                                                hasFoxInHand = list
-                                            },
-                                            label = { Text(if (fox) "🦊 Vos op hand (Actief)" else "Geen vos op hand") },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = WarningRed,
-                                                selectedLabelColor = Color.White
-                                            ),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text("Strafkaarten deze ronde:", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-
-                                        NumericScoreStepper(
-                                            score = roundPts,
-                                            onScoreChange = { newVal ->
-                                                val list = roundPenalties.toMutableList()
-                                                list[index] = maxOf(0, newVal)
-                                                roundPenalties = list
-                                            },
-                                            enableLargeStep = true
-                                        )
-                                    }
+                                            val penalties = roundPenalties.toMutableList()
+                                            if (checked) {
+                                                penalties[idx] = penalties[idx] + 10
+                                            } else {
+                                                penalties[idx] = (penalties[idx] - 10).coerceAtLeast(0)
+                                            }
+                                            roundPenalties = penalties
+                                        }
+                                    )
                                 }
                             }
                         }
                     }
                 }
 
+                // Volgende Ronde of Afronden
                 Button(
                     onClick = {
-                        val newTotals = totalPenalties.toMutableList()
-                        selectedPlayerNames.indices.forEach { i ->
-                            newTotals[i] += roundPenalties.getOrElse(i) { 0 }
-                        }
+                        val isFinalRound = (gameMode == "enkelePot") || (currentRound >= targetRounds)
+                        val newTotals = totalPenalties.indices.map { i ->
+                            totalPenalties[i] + roundPenalties.getOrElse(i) { 0 }
+                        }.toMutableList()
+                        val newFoxCount = totalFoxCount.indices.map { i ->
+                            totalFoxCount[i] + if (hasFoxInHand.getOrElse(i) { false }) 1 else 0
+                        }.toMutableList()
+
                         totalPenalties = newTotals
+                        totalFoxCount = newFoxCount
 
-                        val record = FiftyFiftyRoundRecord(
-                            round = currentRound,
-                            penaltyCards = roundPenalties.toList(),
-                            hasFox = hasFoxInHand.toList(),
-                            totals = newTotals.toList()
-                        )
-                        val newHist = history.toMutableList()
-                        newHist.add(record)
-                        history = newHist
-
-                        if (currentRound >= targetRounds) {
-                            // Bepaal winnaar: minste strafkaarten onder spelers ZONDER vos
-                            val validIndices = selectedPlayerNames.indices.filter { !hasFoxInHand.getOrElse(it) { false } }
-                            val bestIdx = if (validIndices.isNotEmpty()) {
-                                validIndices.minByOrNull { newTotals[it] } ?: 0
-                            } else {
-                                newTotals.indices.minByOrNull { newTotals[it] } ?: 0
+                        if (isFinalRound) {
+                            // Bepaal winnaar: spelers met 0 vossen winnen ALTIJD van spelers met 1+ vossen
+                            val sortedIndices = selectedPlayerNames.indices.sortedWith { i1, i2 ->
+                                val v1 = newFoxCount.getOrElse(i1) { 0 }
+                                val v2 = newFoxCount.getOrElse(i2) { 0 }
+                                if (v1 != v2) {
+                                    v1.compareTo(v2)
+                                } else {
+                                    newTotals[i1].compareTo(newTotals[i2])
+                                }
                             }
-                            val winner = selectedPlayerNames.getOrElse(bestIdx) { "" }
-                            winnerPlayer = winner
-
-                            val detailed = selectedPlayerNames.indices.map { idx ->
-                                PlayerScoreDetail(name = selectedPlayerNames[idx], score = newTotals[idx])
-                            }
-                            scoreManager.saveGame(
-                                gameName = "Fifty Fifty",
-                                playerDetailedScores = detailed,
-                                winnerName = winner
-                            )
+                            val bestIdx = sortedIndices.first()
+                            winnerPlayer = selectedPlayerNames[bestIdx]
                             isGameOver = true
                         } else {
-                            currentRound += 1
+                            // Volgende ronde
+                            history.add(
+                                FiftyFiftyRoundRecord(
+                                    round = currentRound,
+                                    penaltyCards = roundPenalties.toList(),
+                                    hasFox = hasFoxInHand.toList(),
+                                    totals = newTotals.toList()
+                                )
+                            )
                             roundPenalties = MutableList(selectedPlayerNames.size) { 0 }
                             hasFoxInHand = MutableList(selectedPlayerNames.size) { false }
-                            expandedPlayerIndex = null
+                            currentRound++
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp)
-                        .height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    val isFinal = (gameMode == "enkelePot") || (currentRound >= targetRounds)
                     Text(
-                        text = if (currentRound >= targetRounds) "Spel Voltooien" else "Ronde $currentRound Beëindigen",
+                        if (isFinal) "Spel Afronden & Uitslag Bekijken 🏆" else "Ronde $currentRound Afronden ➔",
+                        fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -453,14 +595,48 @@ fun FiftyFiftyScreen(
         }
     }
 
-    if (showEditScoresDialog) {
-        PuntenWijzigenDialog(
-            playerNames = selectedPlayerNames,
-            currentScores = totalPenalties,
-            isLowestScoreWins = true,
-            onDismiss = { showEditScoresDialog = false },
-            onSave = { newScores ->
-                totalPenalties = newScores.toMutableList()
+    if (showHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showHistoryDialog = false },
+            title = { Text("Rondegeschiedenis (${history.size})") },
+            text = {
+                if (history.isEmpty()) {
+                    Text("Nog geen afgeronde rondes.")
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 280.dp)) {
+                        items(history.size) { idx ->
+                            val r = history[idx]
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Text("Ronde ${r.round}:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                selectedPlayerNames.forEachIndexed { pIdx, pName ->
+                                    val pen = r.penaltyCards.getOrElse(pIdx) { 0 }
+                                    val fox = r.hasFox.getOrElse(pIdx) { false }
+                                    Text("• $pName: +$pen strafkaarten ${if (fox) "(🦊 Vos)" else ""}", fontSize = 12.sp)
+                                }
+                                HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showHistoryDialog = false }) {
+                    Text("Sluiten")
+                }
+            }
+        )
+    }
+
+    if (showTafelschikkingDialog) {
+        val playerObjects = selectedPlayerNames.map { name ->
+            val prof = scoreManager.getPlayerProfile(name)
+            Player(name = name, colorHex = prof.colorHex, avatarEmoji = prof.avatarEmoji)
+        }
+        TafelschikkingDialog(
+            players = playerObjects,
+            onDismiss = { showTafelschikkingDialog = false },
+            onApplyOrder = { newOrdered ->
+                selectedPlayerNames = newOrdered.map { it.name }.toMutableList()
             }
         )
     }

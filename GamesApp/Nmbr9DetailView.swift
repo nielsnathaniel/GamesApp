@@ -197,6 +197,7 @@ struct Nmbr9DetailView: View {
                         }
                     ),
                     aantalSpelers: aantalSpelers,
+                    aantalSpelersBinding: $aantalSpelers,
                     tintColor: .indigo
                 )
 

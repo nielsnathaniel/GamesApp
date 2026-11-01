@@ -2,6 +2,7 @@ package nl.nnbp.gamesapp.ui.screens.games.crockinole
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,11 +25,17 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.TeamGameInput
 import nl.nnbp.gamesapp.data.model.CrokinoleGameStats
 import nl.nnbp.gamesapp.data.model.CrokinoleRoundRecord
+import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.GameModeItem
+import nl.nnbp.gamesapp.ui.components.GameModeSegmentedPicker
+import nl.nnbp.gamesapp.ui.components.GameSetupHeader
+import nl.nnbp.gamesapp.ui.components.LiveGameLeadCard
 import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
 import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
 import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -51,6 +58,9 @@ fun CrockinoleScreen(
 
     // Scoring mode: "Alles" (Direct) vs "Berekend" (Per schijf)
     var isCalculatedMode by remember { mutableStateOf(false) }
+    var targetSets by remember { mutableIntStateOf(2) } // 2 = Best of 3, 3 = Best of 5
+    var selectedTeamIndex by remember { mutableIntStateOf(0) } // 0 = Wit, 1 = Zwart
+    var showSettingsDialog by remember { mutableStateOf(false) }
 
     // In-game state
     var currentRound by remember { mutableIntStateOf(1) }
@@ -97,12 +107,25 @@ fun CrockinoleScreen(
 
     var isGameOver by remember { mutableStateOf(false) }
     var winnerTeamName by remember { mutableStateOf<String?>(null) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
 
     val teamWitDisplayName = remember(teamWitSpelers) {
         if (teamWitSpelers.isEmpty()) "Team Wit" else teamWitSpelers.joinToString(" & ")
     }
     val teamZwartDisplayName = remember(teamZwartSpelers) {
         if (teamZwartSpelers.isEmpty()) "Team Zwart" else teamZwartSpelers.joinToString(" & ")
+    }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Crokinole",
+            playerNames = listOf(teamWitDisplayName, teamZwartDisplayName),
+            isLowestScoreWins = false,
+            scoreUnit = "sets",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
     }
 
     if (isGameOver && winnerTeamName != null) {
@@ -133,6 +156,9 @@ fun CrockinoleScreen(
                 },
                 actions = {
                     if (isGameStarted) {
+                        IconButton(onClick = { showSettingsDialog = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Instellingen", tint = PrimaryBlue)
+                        }
                         IconButton(onClick = { showEditScoresDialog = true }) {
                             Icon(Icons.Default.Edit, contentDescription = "Punten wijzigen", tint = AccentOrange)
                         }
@@ -159,6 +185,26 @@ fun CrockinoleScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    item {
+                        GameSetupHeader(
+                            gameType = GameType.CROCKINOLE,
+                            subtitle = "Spelregels Crokinole 🔘",
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem("ronde", "Per Ronde & Schijven", Icons.Default.Timeline, "Houd sets, bordpositie en 20-punters live bij"),
+                                GameModeItem("snel", "Snelle Eindscore", Icons.Default.FlashOn, "Direct setstand en winnaar invoeren")
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "ronde",
+                            onSelect = { isQuickScoreMode = it == "snel" },
+                            themeColor = AccentOrange
+                        )
+                    }
+
                     item {
                         AppCard {
                             Text(
@@ -188,6 +234,37 @@ fun CrockinoleScreen(
                         }
                     }
 
+                    if (!isQuickScoreMode) {
+                        item {
+                            AppCard {
+                                Text(
+                                    text = "Wedstrijdduur",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    FilterChip(
+                                        selected = targetSets == 2,
+                                        onClick = { targetSets = 2 },
+                                        label = { Text("Best of 3 (2 sets)") },
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    FilterChip(
+                                        selected = targetSets == 3,
+                                        onClick = { targetSets = 3 },
+                                        label = { Text("Best of 5 (3 sets)") },
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Spelerselectie Team Wit
                     item {
                         SectionTitle(title = "Team Wit ${if (isTeamMode) "(2 spelers)" else "(1 speler)"}")
@@ -198,6 +275,15 @@ fun CrockinoleScreen(
                                 if (list.contains(name)) list.remove(name)
                                 else if (list.size < (if (isTeamMode) 2 else 1)) list.add(name)
                                 teamWitSpelers = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                if (isTeamMode) {
+                                    teamWitSpelers = listOfNotNull(seated.getOrNull(0), seated.getOrNull(2)).toMutableList()
+                                    teamZwartSpelers = listOfNotNull(seated.getOrNull(1), seated.getOrNull(3)).toMutableList()
+                                } else {
+                                    teamWitSpelers = listOfNotNull(seated.getOrNull(0)).toMutableList()
+                                    teamZwartSpelers = listOfNotNull(seated.getOrNull(1)).toMutableList()
+                                }
                             }
                         )
                         if (teamWitSpelers.isNotEmpty()) {
@@ -220,6 +306,15 @@ fun CrockinoleScreen(
                                 if (list.contains(name)) list.remove(name)
                                 else if (list.size < (if (isTeamMode) 2 else 1)) list.add(name)
                                 teamZwartSpelers = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                if (isTeamMode) {
+                                    teamWitSpelers = listOfNotNull(seated.getOrNull(0), seated.getOrNull(2)).toMutableList()
+                                    teamZwartSpelers = listOfNotNull(seated.getOrNull(1), seated.getOrNull(3)).toMutableList()
+                                } else {
+                                    teamWitSpelers = listOfNotNull(seated.getOrNull(0)).toMutableList()
+                                    teamZwartSpelers = listOfNotNull(seated.getOrNull(1)).toMutableList()
+                                }
                             }
                         )
                         if (teamZwartSpelers.isNotEmpty()) {
@@ -234,17 +329,27 @@ fun CrockinoleScreen(
                 }
 
                 val requiredPerTeam = if (isTeamMode) 2 else 1
-                val canStart = teamWitSpelers.size == requiredPerTeam && teamZwartSpelers.size == requiredPerTeam
+                val canStart = (isQuickScoreMode && (teamWitSpelers.isNotEmpty() || teamZwartSpelers.isNotEmpty())) ||
+                        (teamWitSpelers.size == requiredPerTeam && teamZwartSpelers.size == requiredPerTeam)
 
                 Button(
-                    onClick = { isGameStarted = true },
+                    onClick = {
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            isGameStarted = true
+                        }
+                    },
                     enabled = canStart,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Wedstrijd (Eerste tot 3 sets)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "Start Snelle Eindscore" else "Start Wedstrijd (Best of ${if (targetSets == 2) "3" else "5"})",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         } else {
@@ -260,6 +365,17 @@ fun CrockinoleScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    item {
+                        LiveGameLeadCard(
+                            playerScores = listOf(
+                                "Wit ($teamWitDisplayName)" to setsWonWit,
+                                "Zwart ($teamZwartDisplayName)" to setsWonZwart
+                            ),
+                            isLowestScoreWins = false,
+                            themeColor = AccentOrange
+                        )
+                    }
+
                     // Header Statuskaart: Sets & Set-punten
                     item {
                         Card(
@@ -267,77 +383,180 @@ fun CrockinoleScreen(
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Ronde $currentRound • Set $currentSet",
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                                    )
-                                    Text(
-                                        text = "100 pt = Setwinst",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.Gray
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    // Team Wit
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(teamWitDisplayName, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = "$setsWonWit sets",
-                                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = PrimaryBlue)
-                                        )
-                                        Text("$setPointsWit / 100 pt", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                    }
-
-                                    Text("VS", fontWeight = FontWeight.Bold, color = Color.Gray)
-
-                                    // Team Zwart
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(teamZwartDisplayName, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = "$setsWonZwart sets",
-                                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = AccentOrange)
-                                        )
-                                        Text("$setPointsZwart / 100 pt", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                                    }
-                                }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Ronde $currentRound • Set $currentSet",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "100 pt = Setwinst • Best of ${if (targetSets == 2) "3" else "5"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
                             }
                         }
                     }
 
-                    // Schakel telwijze knop
+                    // Team Wit & Zwart Tegels
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text("Telwijze:", fontWeight = FontWeight.SemiBold)
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
-                                    selected = !isCalculatedMode,
-                                    onClick = { isCalculatedMode = false },
-                                    label = { Text("Direct (Presets)") },
-                                    shape = RoundedCornerShape(10.dp)
-                                )
-                                FilterChip(
-                                    selected = isCalculatedMode,
-                                    onClick = { isCalculatedMode = true },
-                                    label = { Text("Berekend (Per schijf)") },
-                                    shape = RoundedCornerShape(10.dp)
-                                )
+                            // Team Wit Kaart
+                            val isWitSelected = selectedTeamIndex == 0
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedTeamIndex = 0 },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isWitSelected) Color.White else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                                border = if (isWitSelected) androidx.compose.foundation.BorderStroke(3.dp, Color(0xFFBDBDBD)) else null
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(18.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color.White)
+                                                    .border(1.5.dp, Color.Gray, CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = teamWitDisplayName,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = Color.Black,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        if (isWitSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = PrimaryBlue,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Text("Deze ronde", fontSize = 11.sp, color = Color.Gray)
+                                    Text(
+                                        text = "$effectiveWitScore pt",
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.Black
+                                    )
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Set-voortgang", fontSize = 11.sp, color = Color.Gray)
+                                        Text("$setPointsWit / 100 pt", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Sets gewonnen", fontSize = 11.sp, color = Color.Gray)
+                                        Text("$setsWonWit / $targetSets", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentOrange)
+                                    }
+                                }
+                            }
+
+                            // Team Zwart Kaart
+                            val isZwartSelected = selectedTeamIndex == 1
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedTeamIndex = 1 },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isZwartSelected) Color(0xFF1E1E1E) else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                                border = if (isZwartSelected) androidx.compose.foundation.BorderStroke(3.dp, Color.Black) else null
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(18.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color.Black)
+                                                    .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = teamZwartDisplayName,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = if (isZwartSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        if (isZwartSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider(color = if (isZwartSelected) Color.White.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.2f))
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Text("Deze ronde", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.7f) else Color.Gray)
+                                    Text(
+                                        text = "$effectiveZwartScore pt",
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (isZwartSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                    )
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Set-voortgang", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.7f) else Color.Gray)
+                                        Text("$setPointsZwart / 100 pt", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isZwartSelected) Color.White else AccentOrange)
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Sets gewonnen", fontSize = 11.sp, color = if (isZwartSelected) Color.White.copy(alpha = 0.7f) else Color.Gray)
+                                        Text("$setsWonZwart / $targetSets", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = AccentOrange)
+                                    }
+                                }
                             }
                         }
                     }
@@ -345,68 +564,67 @@ fun CrockinoleScreen(
                     // Score Invoer
                     item {
                         AppCard {
-                            Text("Ronde Invoer", fontWeight = FontWeight.Bold)
+                            val activeTeamName = if (selectedTeamIndex == 0) teamWitDisplayName else teamZwartDisplayName
+                            Text("Invoer voor $activeTeamName", fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(8.dp))
 
                             if (!isCalculatedMode) {
                                 // Directe presets
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Team Wit Score: $roundPointsWit pt", fontWeight = FontWeight.SemiBold, color = PrimaryBlue)
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        listOf(5, 10, 15, 20, 25).forEach { pts ->
+                                    if (selectedTeamIndex == 0) {
+                                        Text("Team Wit Score: $roundPointsWit pt", fontWeight = FontWeight.SemiBold, color = PrimaryBlue)
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            listOf(5, 10, 15, 20, 25).forEach { pts ->
+                                                FilledTonalButton(
+                                                    onClick = { roundPointsWit += pts },
+                                                    modifier = Modifier.weight(1f),
+                                                    contentPadding = PaddingValues(0.dp)
+                                                ) {
+                                                    Text("+$pts", fontSize = 11.sp)
+                                                }
+                                            }
                                             FilledTonalButton(
-                                                onClick = { roundPointsWit += pts },
+                                                onClick = { roundPointsWit = 0 },
                                                 modifier = Modifier.weight(1f),
                                                 contentPadding = PaddingValues(0.dp)
                                             ) {
-                                                Text("+$pts", fontSize = 11.sp)
+                                                Text("0", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                                             }
                                         }
-                                        FilledTonalButton(
-                                            onClick = { roundPointsWit = 0 },
-                                            modifier = Modifier.weight(1f),
-                                            contentPadding = PaddingValues(0.dp)
-                                        ) {
-                                            Text("0", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Text("Team Zwart Score: $roundPointsZwart pt", fontWeight = FontWeight.SemiBold, color = AccentOrange)
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        listOf(5, 10, 15, 20, 25).forEach { pts ->
+                                    } else {
+                                        Text("Team Zwart Score: $roundPointsZwart pt", fontWeight = FontWeight.SemiBold, color = AccentOrange)
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            listOf(5, 10, 15, 20, 25).forEach { pts ->
+                                                FilledTonalButton(
+                                                    onClick = { roundPointsZwart += pts },
+                                                    modifier = Modifier.weight(1f),
+                                                    contentPadding = PaddingValues(0.dp)
+                                                ) {
+                                                    Text("+$pts", fontSize = 11.sp)
+                                                }
+                                            }
                                             FilledTonalButton(
-                                                onClick = { roundPointsZwart += pts },
+                                                onClick = { roundPointsZwart = 0 },
                                                 modifier = Modifier.weight(1f),
                                                 contentPadding = PaddingValues(0.dp)
                                             ) {
-                                                Text("+$pts", fontSize = 11.sp)
+                                                Text("0", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                                             }
-                                        }
-                                        FilledTonalButton(
-                                            onClick = { roundPointsZwart = 0 },
-                                            modifier = Modifier.weight(1f),
-                                            contentPadding = PaddingValues(0.dp)
-                                        ) {
-                                            Text("0", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                                         }
                                     }
                                 }
                             } else {
-                                // Berekende modus (Centrum 20, Binnen 15, Midden 10, Buiten 5)
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Team Wit: $effectiveWitScore pt", fontWeight = FontWeight.SemiBold, color = PrimaryBlue)
+                                // Berekende modus
+                                if (selectedTeamIndex == 0) {
+                                    Text("Team Wit Schijven: $effectiveWitScore pt", fontWeight = FontWeight.SemiBold, color = PrimaryBlue)
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         RingStepper(title = "20pt", count = discsWit20, onAdd = { discsWit20++ }, onSub = { if (discsWit20 > 0) discsWit20-- })
                                         RingStepper(title = "15pt", count = discsWit15, onAdd = { discsWit15++ }, onSub = { if (discsWit15 > 0) discsWit15-- })
                                         RingStepper(title = "10pt", count = discsWit10, onAdd = { discsWit10++ }, onSub = { if (discsWit10 > 0) discsWit10-- })
                                         RingStepper(title = "5pt", count = discsWit5, onAdd = { discsWit5++ }, onSub = { if (discsWit5 > 0) discsWit5-- })
                                     }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    Text("Team Zwart: $effectiveZwartScore pt", fontWeight = FontWeight.SemiBold, color = AccentOrange)
+                                } else {
+                                    Text("Team Zwart Schijven: $effectiveZwartScore pt", fontWeight = FontWeight.SemiBold, color = AccentOrange)
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         RingStepper(title = "20pt", count = discsZwart20, onAdd = { discsZwart20++ }, onSub = { if (discsZwart20 > 0) discsZwart20-- })
                                         RingStepper(title = "15pt", count = discsZwart15, onAdd = { discsZwart15++ }, onSub = { if (discsZwart15 > 0) discsZwart15-- })
@@ -460,9 +678,9 @@ fun CrockinoleScreen(
                             currentSet += 1
                         }
 
-                        // Check of een team 3 sets heeft gewonnen
-                        if (setsWonWit >= 3 || setsWonZwart >= 3) {
-                            val winnaar = if (setsWonWit >= 3) "Wit" else "Zwart"
+                        // Check of een team de match heeft gewonnen
+                        if (setsWonWit >= targetSets || setsWonZwart >= targetSets) {
+                            val winnaar = if (setsWonWit >= targetSets) "Wit" else "Zwart"
                             winnerTeamName = winnaar
 
                             val crokStats = CrokinoleGameStats(
@@ -571,6 +789,59 @@ fun CrockinoleScreen(
             onSave = { newScores ->
                 setPointsWit = newScores.getOrElse(0) { setPointsWit }
                 setPointsZwart = newScores.getOrElse(1) { setPointsZwart }
+            }
+        )
+    }
+
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("Crokinole Instellingen", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column {
+                        Text("Telwijze:", fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = !isCalculatedMode,
+                                onClick = { isCalculatedMode = false },
+                                label = { Text("Direct") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = isCalculatedMode,
+                                onClick = { isCalculatedMode = true },
+                                label = { Text("Berekend") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    Column {
+                        Text("Wedstrijdduur:", fontWeight = FontWeight.SemiBold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = targetSets == 2,
+                                onClick = { targetSets = 2 },
+                                label = { Text("Best of 3 (2 sets)") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = targetSets == 3,
+                                onClick = { targetSets = 3 },
+                                label = { Text("Best of 5 (3 sets)") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettingsDialog = false }) {
+                    Text("Klaar")
+                }
             }
         )
     }

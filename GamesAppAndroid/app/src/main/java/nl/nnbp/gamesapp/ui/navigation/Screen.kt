@@ -13,6 +13,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
 
     object OpgeslagenSpelers : Screen("saved_players", "Opgeslagen Spelers")
     object SpelsessiesBeheer : Screen("sessions_manager", "Spelsessies")
+    object Gegevensbeheer : Screen("data_management", "Gegevensbeheer")
     object GameSetup : Screen("game_setup/{gameId}", "Spel Instellen") {
         fun createRoute(gameId: String) = "game_setup/$gameId"
     }
@@ -24,6 +25,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
     }
 
     companion object {
-        val bottomNavItems = listOf(Games, Statistics, Settings)
+        val bottomNavItems: List<Screen>
+            get() = listOf(Games, Statistics, Settings)
     }
 }

@@ -178,6 +178,7 @@ struct PigHoleSetupView: View {
                 SavedPlayersQuickChipsView(
                     spelers: $spelers,
                     aantalSpelers: aantalSpelers,
+                    aantalSpelersBinding: $aantalSpelers,
                     tintColor: .pink
                 )
 

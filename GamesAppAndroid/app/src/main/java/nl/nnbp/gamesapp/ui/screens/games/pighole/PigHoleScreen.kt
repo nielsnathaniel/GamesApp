@@ -5,9 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,10 +18,9 @@ import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.PlayerScore
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
+import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.ui.components.*
+import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -49,6 +46,19 @@ fun PigHoleScreen(
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showFinishConfirmDialog by remember { mutableStateOf(false) }
     var showEditScoresDialog by remember { mutableStateOf(false) }
+    var isQuickScoreMode by remember { mutableStateOf(false) }
+    var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    if (startQuickScoreGame) {
+        SnelleEindscoreScreen(
+            gameName = "Pig Hole",
+            playerNames = selectedPlayerNames,
+            isLowestScoreWins = true,
+            scoreUnit = "varkentjes",
+            onNavigateBack = { startQuickScoreGame = false }
+        )
+        return
+    }
 
     // Start pigs auto-calculated (60 pigs divided by player count)
     val defaultPigsPerPlayer = remember(selectedPlayerNames.size) {
@@ -86,7 +96,13 @@ fun PigHoleScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pig Hole", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.PIG_HOLE, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pig Hole", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
@@ -116,18 +132,43 @@ fun PigHoleScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels Pig Hole (Het Varkensgat) 🐷",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Hilarisch dobbelspel. De voorraad van 60 varkentjes wordt gelijk verdeeld ($defaultPigsPerPlayer per speler). Wie als eerste al zijn varkentjes kwijt is (0 over) wint!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.PIG_HOLE,
+                            subtitle = "Het varkensgat • Raak als eerste al je varkentjes kwijt! 🐷",
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem(
+                                    id = "live",
+                                    title = "Ronde voor ronde",
+                                    icon = Icons.Default.Casino,
+                                    description = "🎮 Begeleid elke ronde: R1 (max 1 worp), R2 (max 2 worpen), daarna onbeperkt."
+                                ),
+                                GameModeItem(
+                                    id = "snel",
+                                    title = "Snelle eindscore",
+                                    icon = Icons.Default.Bolt,
+                                    description = "⚡️ Vul direct het aantal overgebleven varkentjes per speler in."
+                                )
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "live",
+                            onSelect = { isQuickScoreMode = (it == "snel") },
+                            themeColor = AccentOrange
+                        )
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 6,
+                            selectedCount = selectedPlayerNames.size.coerceIn(2, 6),
+                            onSelect = { /* matches list */ },
+                            themeColor = AccentOrange
+                        )
                     }
 
                     item {
@@ -137,6 +178,9 @@ fun PigHoleScreen(
                                 val list = selectedPlayerNames.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerNames = seated.take(7).toMutableList()
                             }
                         )
                     }
@@ -172,16 +216,24 @@ fun PigHoleScreen(
 
                 Button(
                     onClick = {
-                        pigsPerPlayer = MutableList(selectedPlayerNames.size) { defaultPigsPerPlayer }
-                        isGameStarted = true
+                        if (isQuickScoreMode) {
+                            startQuickScoreGame = true
+                        } else {
+                            pigsPerPlayer = MutableList(selectedPlayerNames.size) { defaultPigsPerPlayer }
+                            isGameStarted = true
+                        }
                     },
                     enabled = selectedPlayerNames.size >= 2,
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("Start Spel ($defaultPigsPerPlayer varkentjes elk)", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (isQuickScoreMode) "⚡️ Snelle Eindscore Starten" else "Start Spel ($defaultPigsPerPlayer varkentjes elk)",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
                 }
             }
         } else {
@@ -197,6 +249,16 @@ fun PigHoleScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    item {
+                        val pairs = selectedPlayerNames.indices.map { i ->
+                            Pair(selectedPlayerNames[i], pigsPerPlayer.getOrElse(i) { 0 })
+                        }
+                        LiveGameLeadCard(
+                            playerScores = pairs,
+                            isLowestScoreWins = true,
+                            themeColor = AccentOrange
+                        )
+                    }
                     item {
                         // Regel banner
                         Card(

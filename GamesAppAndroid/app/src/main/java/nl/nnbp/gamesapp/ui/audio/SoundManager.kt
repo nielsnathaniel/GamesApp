@@ -18,7 +18,7 @@ class SoundManager private constructor(context: Context) {
     init {
         try {
             toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 85)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -33,7 +33,7 @@ class SoundManager private constructor(context: Context) {
         if (!isSoundEnabled) return
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 50)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -42,7 +42,7 @@ class SoundManager private constructor(context: Context) {
         if (!isSoundEnabled) return
         try {
             toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 90)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
     }
@@ -54,7 +54,7 @@ class SoundManager private constructor(context: Context) {
                 toneGenerator?.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 350)
                 delay(380)
                 toneGenerator?.startTone(ToneGenerator.TONE_CDMA_HIGH_L, 450)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
             }
         }
@@ -68,7 +68,7 @@ class SoundManager private constructor(context: Context) {
                 toneGenerator?.startTone(ToneGenerator.TONE_PROP_PROMPT, 120)
                 delay(130)
                 toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 180)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
             }
         }
@@ -79,7 +79,7 @@ class SoundManager private constructor(context: Context) {
         scope.launch {
             try {
                 toneGenerator?.startTone(ToneGenerator.TONE_SUP_ERROR, 280)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
             }
         }
@@ -97,7 +97,7 @@ class SoundManager private constructor(context: Context) {
                 toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 100)
                 delay(140)
                 toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 350)
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
             }
         }
@@ -111,7 +111,7 @@ class SoundManager private constructor(context: Context) {
                     toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 30)
                     delay(55)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 e.printStackTrace()
             }
         }
@@ -127,8 +127,13 @@ class SoundManager private constructor(context: Context) {
             }
         }
 
-        fun getInstance(): SoundManager {
-            return INSTANCE ?: throw IllegalStateException("SoundManager must be initialized in Application.onCreate")
+        fun getInstance(context: Context? = null): SoundManager {
+            return INSTANCE ?: synchronized(this) {
+                if (INSTANCE == null && context != null) {
+                    INSTANCE = SoundManager(context.applicationContext)
+                }
+                INSTANCE ?: throw IllegalStateException("SoundManager must be initialized in Application.onCreate")
+            }
         }
     }
 }

@@ -20,6 +20,7 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.PlayedGame
 import nl.nnbp.gamesapp.ui.components.AppCard
+import nl.nnbp.gamesapp.ui.components.GameLogoImageByName
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 import java.text.SimpleDateFormat
@@ -145,24 +146,31 @@ fun SpelsessiesBeheerScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = game.sessionTitle,
-                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(game.timestamp))
-                                        Text(
-                                            text = "$timeStr • Winnaar: ${if (game.winner.isEmpty()) "Gelijkspel" else game.winner}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = game.scores.joinToString(", ") { "${it.playerName}: ${it.score}" },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = PrimaryBlue
-                                        )
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        GameLogoImageByName(gameName = game.gameName, size = 40.dp, cornerRadius = 10.dp)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(
+                                                text = game.sessionTitle,
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            val timeStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(game.timestamp))
+                                            Text(
+                                                text = "$timeStr • Winnaar: ${if (game.winner.isEmpty()) "Gelijkspel" else game.winner}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = game.scores.joinToString(", ") { "${it.playerName}: ${it.score}" },
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = PrimaryBlue
+                                            )
+                                        }
                                     }
 
                                     IconButton(onClick = { sessionToDelete = game }) {

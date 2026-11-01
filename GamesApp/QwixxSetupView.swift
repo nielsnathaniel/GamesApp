@@ -97,6 +97,7 @@ struct QwixxSetupView: View {
                 SavedPlayersQuickChipsView(
                     spelers: $spelers,
                     aantalSpelers: aantalSpelers,
+                    aantalSpelersBinding: $aantalSpelers,
                     tintColor: .orange
                 )
 

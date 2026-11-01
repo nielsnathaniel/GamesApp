@@ -24,6 +24,7 @@ struct CrockinoleGameView: View {
     var teamWitSpelers: [String] = ["Wit"]
     var teamZwartNaam: String = "Zwart"
     var teamZwartSpelers: [String] = ["Zwart"]
+    @State private var targetSets: Int
 
     @ObservedObject private var scoreManager = ScoreManager.shared
 
@@ -75,7 +76,7 @@ struct CrockinoleGameView: View {
 
     let beschikbarePunten = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
-    init(spelers: [String] = ["Wit", "Zwart"], puntenMethode: String = "Alles") {
+    init(spelers: [String] = ["Wit", "Zwart"], puntenMethode: String = "Alles", targetSets: Int = 2) {
         self.isTeamMode = false
         let w = spelers.indices.contains(0) ? spelers[0] : "Wit"
         let z = spelers.indices.contains(1) ? spelers[1] : "Zwart"
@@ -83,6 +84,7 @@ struct CrockinoleGameView: View {
         self.teamWitSpelers = [w]
         self.teamZwartNaam = z
         self.teamZwartSpelers = [z]
+        _targetSets = State(initialValue: targetSets)
         _puntenMethode = State(initialValue: puntenMethode)
     }
 
@@ -92,13 +94,15 @@ struct CrockinoleGameView: View {
         teamWitSpelers: [String],
         teamZwartNaam: String,
         teamZwartSpelers: [String],
-        puntenMethode: String = "Alles"
+        puntenMethode: String = "Alles",
+        targetSets: Int = 2
     ) {
         self.isTeamMode = isTeamMode
         self.teamWitNaam = teamWitNaam
         self.teamWitSpelers = teamWitSpelers
         self.teamZwartNaam = teamZwartNaam
         self.teamZwartSpelers = teamZwartSpelers
+        _targetSets = State(initialValue: targetSets)
         _puntenMethode = State(initialValue: puntenMethode)
     }
 
@@ -152,36 +156,7 @@ struct CrockinoleGameView: View {
                 }
                 .padding(.horizontal)
 
-                // 2. Telwijze Selector (Tijdens het spel aanpasbaar!)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Image(systemName: "slider.horizontal.3")
-                            .foregroundColor(.blue)
-                        Text("Telwijze")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.secondary)
-
-                        Spacer()
-
-                        Text(puntenMethode == "Alles" ? "Directe ronde-score invoer" : "Schijf voor schijf per ring")
-                            .font(.caption2)
-                            .foregroundColor(.blue)
-                            .fontWeight(.medium)
-                    }
-
-                    Picker("Telwijze", selection: $puntenMethode) {
-                        Text("Alles (Direct)").tag("Alles")
-                        Text("Berekend (Per schijf)").tag("Berekend")
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
-                .padding()
-                .background(Color(UIColor.secondarySystemBackground).opacity(0.7))
-                .cornerRadius(12)
-                .padding(.horizontal)
-
-                // 3. Invoersectie op basis van gekozen telwijze
+                // 2. Invoersectie op basis van gekozen telwijze (aanpasbaar via tandwiel)
                 if puntenMethode == "Alles" {
                     directeInvoerSectie
                 } else {
@@ -222,11 +197,22 @@ struct CrockinoleGameView: View {
                     }
 
                     Menu {
-                        Button(action: { withAnimation { puntenMethode = "Alles" } }) {
-                            Label("Alles (Direct)", systemImage: puntenMethode == "Alles" ? "checkmark" : "")
+                        Section("Telwijze") {
+                            Button(action: { withAnimation { puntenMethode = "Alles" } }) {
+                                Label("Alles (Direct)", systemImage: puntenMethode == "Alles" ? "checkmark" : "")
+                            }
+                            Button(action: { withAnimation { puntenMethode = "Berekend" } }) {
+                                Label("Berekend (Per schijf)", systemImage: puntenMethode == "Berekend" ? "checkmark" : "")
+                            }
                         }
-                        Button(action: { withAnimation { puntenMethode = "Berekend" } }) {
-                            Label("Berekend (Per schijf)", systemImage: puntenMethode == "Berekend" ? "checkmark" : "")
+
+                        Section("Wedstrijdduur") {
+                            Button(action: { withAnimation { targetSets = 2 } }) {
+                                Label("Best of 3 (2 sets)", systemImage: targetSets == 2 ? "checkmark" : "")
+                            }
+                            Button(action: { withAnimation { targetSets = 3 } }) {
+                                Label("Best of 5 (3 sets)", systemImage: targetSets == 3 ? "checkmark" : "")
+                            }
                         }
                     } label: {
                         Image(systemName: "gearshape")
@@ -289,19 +275,19 @@ struct CrockinoleGameView: View {
         }
         .navigationDestination(isPresented: $showWinnaarView) {
             if isTeamMode {
-                let winnerName = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
+                let winnerName = (setScores[0] >= targetSets) ? teamWitNaam : teamZwartNaam
                 let entries = [
                     WinnaarTeamEntry(
                         teamName: teamWitNaam,
                         playerNames: teamWitSpelers,
                         score: setScores[0],
-                        isWinner: setScores[0] >= 3
+                        isWinner: setScores[0] >= targetSets
                     ),
                     WinnaarTeamEntry(
                         teamName: teamZwartNaam,
                         playerNames: teamZwartSpelers,
                         score: setScores[1],
-                        isWinner: setScores[1] >= 3
+                        isWinner: setScores[1] >= targetSets
                     )
                 ]
                 WinnaarView(
@@ -316,7 +302,7 @@ struct CrockinoleGameView: View {
                     }
                 )
             } else {
-                let winnerName = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
+                let winnerName = (setScores[0] >= targetSets) ? teamWitNaam : teamZwartNaam
                 WinnaarView(
                     gameName: "Crockinole",
                     winnaarNaam: winnerName,
@@ -783,83 +769,120 @@ struct CrockinoleGameView: View {
         let title = isWit ? teamWitNaam : teamZwartNaam
         let players = isWit ? teamWitSpelers : teamZwartSpelers
 
+        // Achtergrond & Randkleuren afgestemd op Wit en Zwart
+        let cardBg: Color = {
+            if isSelected {
+                return isWit ? Color.white : Color(red: 0.10, green: 0.10, blue: 0.12)
+            } else {
+                return Color(UIColor.secondarySystemBackground)
+            }
+        }()
+
+        let cardBorder: Color = {
+            if isSelected {
+                return isWit ? Color(white: 0.75) : Color.black
+            } else {
+                return Color.clear
+            }
+        }()
+
+        let textColor: Color = (isSelected && !isWit) ? Color.white : Color.primary
+        let subtextColor: Color = (isSelected && !isWit) ? Color.white.opacity(0.7) : Color.secondary
+
         return Button(action: {
-            selectedTeamIndex = index
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                selectedTeamIndex = index
+            }
         }) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
+            VStack(alignment: .leading, spacing: 10) {
+                // Bovenste balk: Schijf, Naam & Checkmark
+                HStack(spacing: 8) {
                     Circle()
                         .fill(isWit ? Color.white : Color.black)
-                        .frame(width: 20, height: 20)
-                        .overlay(Circle().stroke(Color.gray, lineWidth: 1))
+                        .frame(width: 22, height: 22)
+                        .overlay(Circle().stroke(isWit ? Color.gray.opacity(0.6) : Color.white.opacity(0.4), lineWidth: 1.5))
+                        .shadow(color: Color.black.opacity(0.1), radius: 2)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(textColor)
                             .lineLimit(1)
 
                         if isTeamMode {
                             Text(players.joined(separator: " & "))
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .font(.system(size: 11))
+                                .foregroundColor(subtextColor)
                                 .lineLimit(1)
                         }
                     }
 
-                    Spacer()
+                    Spacer(minLength: 4)
 
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.blue)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(isWit ? Color.blue : Color.white)
                     }
                 }
 
                 Divider()
+                    .overlay(isSelected && !isWit ? Color.white.opacity(0.2) : Color.gray.opacity(0.2))
 
+                // Ronde score
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Deze ronde")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(subtextColor)
                     Text("\(scores[safe: index] ?? 0) pt")
-                        .font(.title)
-                        .fontWeight(.heavy)
-                        .foregroundColor(.primary)
+                        .font(.system(size: 26, weight: .heavy))
+                        .foregroundColor(textColor)
                 }
 
-                HStack {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Set-voortgang:")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                // Statistieken: Set-voortgang en Sets gewonnen (volledige breedte, geen afgebroken tekst!)
+                VStack(spacing: 5) {
+                    HStack {
+                        Text("Set-voortgang")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(subtextColor)
+                            .lineLimit(1)
+                        Spacer()
                         Text("\(totaleScores[safe: index] ?? 0) / 100 pt")
-                            .font(.caption)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(isSelected && !isWit ? Color.white : (isWit ? Color.blue : Color.primary))
+                            .lineLimit(1)
                     }
 
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text("Sets gewonnen:")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(setScores[safe: index] ?? 0) / 3")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.orange)
+                    HStack {
+                        Text("Sets gewonnen")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(subtextColor)
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(setScores[safe: index] ?? 0) / \(targetSets)")
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundColor(Color.orange)
+                            .lineLimit(1)
                     }
                 }
+                .padding(.top, 2)
             }
-            .padding()
+            .padding(14)
             .frame(maxWidth: .infinity)
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(14)
+            .background(cardBg)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(cardBorder, lineWidth: isSelected ? 3 : 0)
             )
-            .shadow(color: isSelected ? Color.blue.opacity(0.2) : Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
+            .shadow(
+                color: isSelected ? (isWit ? Color.black.opacity(0.12) : Color.black.opacity(0.35)) : Color.black.opacity(0.04),
+                radius: isSelected ? 8 : 3,
+                x: 0,
+                y: isSelected ? 4 : 1
+            )
         }
+        .buttonStyle(.plain)
     }
 
     private func herberekenBerekendeScores() {
@@ -972,9 +995,9 @@ struct CrockinoleGameView: View {
         )
         crokinoleRoundRecords.append(roundRecord)
 
-        // Controleer of een team 3 sets heeft gewonnen
-        if setScores.contains(where: { $0 >= 3 }) {
-            let winner = (setScores[0] >= 3) ? teamWitNaam : teamZwartNaam
+        // Controleer of een team de match heeft gewonnen
+        if setScores.contains(where: { $0 >= targetSets }) {
+            let winner = (setScores[0] >= targetSets) ? teamWitNaam : teamZwartNaam
             winnaarTeam = winner
 
             let stats = CrokinoleGameStats(
@@ -994,8 +1017,8 @@ struct CrockinoleGameView: View {
 
             if isTeamMode {
                 let teamsToSave = [
-                    (teamName: teamWitNaam, playerNames: teamWitSpelers, score: setScores[0], isWinner: setScores[0] >= 3),
-                    (teamName: teamZwartNaam, playerNames: teamZwartSpelers, score: setScores[1], isWinner: setScores[1] >= 3)
+                    (teamName: teamWitNaam, playerNames: teamWitSpelers, score: setScores[0], isWinner: setScores[0] >= targetSets),
+                    (teamName: teamZwartNaam, playerNames: teamZwartSpelers, score: setScores[1], isWinner: setScores[1] >= targetSets)
                 ]
                 scoreManager.saveTeamGame(
                     gameName: "Crockinole",

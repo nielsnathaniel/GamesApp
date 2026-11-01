@@ -8,10 +8,43 @@ struct SavedPlayersQuickChipsView: View {
 
     @Binding var spelers: [String]
     var aantalSpelers: Int
+    var aantalSpelersBinding: Binding<Int>? = nil
     var tintColor: Color = .blue
 
     @State private var showNewPlayerAlert: Bool = false
     @State private var newPlayerNameInput: String = ""
+    @State private var showTafelschikkingSheet: Bool = false
+    @State private var showAppliedBanner: Bool = false
+
+    private func applyTafelschikking() {
+        let saved = scoreManager.savedTafelschikking
+        guard !saved.isEmpty else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        if let binding = aantalSpelersBinding {
+            binding.wrappedValue = min(max(binding.wrappedValue, saved.count), 12)
+        }
+
+        let count = min(aantalSpelersBinding?.wrappedValue ?? aantalSpelers, saved.count)
+        while spelers.count < count {
+            spelers.append("")
+        }
+
+        for i in 0..<count {
+            if i < spelers.count {
+                spelers[i] = saved[i]
+            }
+        }
+
+        withAnimation {
+            showAppliedBanner = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation {
+                showAppliedBanner = false
+            }
+        }
+    }
 
     private func isPlayerAssigned(_ name: String) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -71,6 +104,81 @@ struct SavedPlayersQuickChipsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Tafelschikking optie bovenaan
+            HStack(spacing: 8) {
+                if scoreManager.savedTafelschikking.count >= 2 {
+                    Button(action: applyTafelschikking) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "person.3.sequence.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("🪑 Tafelschikking overnemen (\(scoreManager.savedTafelschikking.count))")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.green, Color.teal],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .shadow(color: Color.green.opacity(0.3), radius: 3, x: 0, y: 1)
+                    }
+
+                    Button(action: { showTafelschikkingSheet = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text("Bekijk tafel")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color(UIColor.secondarySystemFill))
+                        .clipShape(Capsule())
+                    }
+                } else {
+                    Button(action: { showTafelschikkingSheet = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.3.sequence.fill")
+                                .font(.system(size: 11))
+                            Text("🪑 Stel tafelschikking in")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(UIColor.secondarySystemFill))
+                        .clipShape(Capsule())
+                    }
+                }
+
+                Spacer()
+            }
+
+            if showAppliedBanner {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Tafelschikking toegepast (\(scoreManager.savedTafelschikking.prefix(4).joined(separator: ", "))\(scoreManager.savedTafelschikking.count > 4 ? "..." : ""))")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.green.opacity(0.12))
+                .cornerRadius(8)
+                .transition(.opacity)
+            }
+
             HStack {
                 Text("Opgeslagen Spelers")
                     .font(.caption)
@@ -107,6 +215,11 @@ struct SavedPlayersQuickChipsView: View {
             }
         }
         .padding(.horizontal)
+        .sheet(isPresented: $showTafelschikkingSheet) {
+            TafelschikkingView(onApplyOrder: { _ in
+                applyTafelschikking()
+            })
+        }
         .alert("Nieuwe Speler Toevoegen", isPresented: $showNewPlayerAlert) {
             TextField("Naam van de speler", text: $newPlayerNameInput)
             Button("Toevoegen") {

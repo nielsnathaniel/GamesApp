@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,13 +25,8 @@ import nl.nnbp.gamesapp.data.PlayerScoreDetail
 import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.Player
 import nl.nnbp.gamesapp.data.model.PlayerScore
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
-import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
-import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
-import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.ui.components.*
 import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
@@ -112,7 +108,13 @@ fun BeverbendeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Beverbende", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.BEVERBENDE, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Beverbende", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
@@ -150,42 +152,43 @@ fun BeverbendeScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels Beverbende 🦫",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Tactisch kaartspel waarbij spelers 4 kaarten voor zich hebben. De speler met de minste strafpunten na alle rondes wint!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.BEVERBENDE,
+                            subtitle = "Tactisch kaartspel • Minste strafpunten wint! 🦫",
+                            themeColor = PrimaryBlue
+                        )
                     }
 
                     item {
-                        AppCard {
-                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = !isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = false },
-                                    label = { Text("Rondes bijhouden") },
-                                    modifier = Modifier.weight(1f)
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem(
+                                    id = "live",
+                                    title = "Ronde voor ronde",
+                                    icon = Icons.Default.Casino,
+                                    description = "🎮 Begeleid het spel ronde na ronde met 4 kaarten per speler."
+                                ),
+                                GameModeItem(
+                                    id = "snel",
+                                    title = "Snelle eindscore",
+                                    icon = Icons.Default.Bolt,
+                                    description = "⚡️ Vul direct het uiteindelijke aantal strafpunten per speler in."
                                 )
-                                FilterChip(
-                                    selected = isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = true },
-                                    label = { Text("⚡️ Alleen eindscore") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "live",
+                            onSelect = { isQuickScoreMode = (it == "snel") },
+                            themeColor = PrimaryBlue
+                        )
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 6,
+                            selectedCount = selectedPlayerNames.size.coerceIn(2, 6),
+                            onSelect = { /* count matches players */ },
+                            themeColor = PrimaryBlue
+                        )
                     }
 
                     if (!isQuickScoreMode) {
@@ -234,6 +237,9 @@ fun BeverbendeScreen(
                                 val list = selectedPlayerNames.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerNames = seated.take(6).toMutableList()
                             }
                         )
                     }
@@ -323,10 +329,13 @@ fun BeverbendeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     item {
-                        InhaalslagBanner(
-                            playerNames = selectedPlayerNames,
-                            scores = totalScores,
-                            lowestWins = true
+                        val pairs = selectedPlayerNames.indices.map { i ->
+                            Pair(selectedPlayerNames[i], totalScores.getOrElse(i) { 0 })
+                        }
+                        LiveGameLeadCard(
+                            playerScores = pairs,
+                            isLowestScoreWins = true,
+                            themeColor = PrimaryBlue
                         )
                     }
 

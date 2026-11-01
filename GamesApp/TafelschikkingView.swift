@@ -4,6 +4,8 @@ struct TafelschikkingView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var scoreManager = ScoreManager.shared
 
+    var onApplyOrder: (([String]) -> Void)? = nil
+
     @State private var seatedPlayers: [String] = []
     @State private var startPlayerIndex: Int? = nil
     @State private var needleRotation: Double = 0.0
@@ -13,6 +15,7 @@ struct TafelschikkingView: View {
     @State private var showAddPlayerSheet: Bool = false
     @State private var showReorderSheet: Bool = false
     @State private var selectedSwapIndex: Int? = nil
+    @State private var showSavedBanner: Bool = false
 
     // Drag & Drop State
     @State private var draggedPlayerIndex: Int? = nil
@@ -130,13 +133,32 @@ struct TafelschikkingView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Klaar") {
+                        saveTafelschikking(notify: false)
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                     .foregroundColor(.white)
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 12) {
+                        Button(action: {
+                            saveTafelschikking(notify: true)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: showSavedBanner ? "checkmark" : "square.and.arrow.down")
+                                Text(showSavedBanner ? "Opgeslagen" : "Opslaan")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                            }
+                            .foregroundColor(showSavedBanner ? .green : .white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(showSavedBanner ? Color.green.opacity(0.2) : Color.white.opacity(0.15))
+                            .clipShape(Capsule())
+                        }
+                        .disabled(seatedPlayers.count < 2)
+
                         // Snelle knop om volgorde via lijst aan te passen
                         Button(action: { showReorderSheet = true }) {
                             Image(systemName: "arrow.up.arrow.down")
@@ -146,13 +168,13 @@ struct TafelschikkingView: View {
                         .disabled(seatedPlayers.count < 2)
 
                         Menu {
-                            Button(action: { showReorderSheet = true }) {
-                                Label("Volgorde lijst", systemImage: "list.number")
+                            Button(action: { saveTafelschikking(notify: true) }) {
+                                Label("Tafelschikking opslaan", systemImage: "square.and.arrow.down")
                             }
                             .disabled(seatedPlayers.count < 2)
 
-                            Button(action: randomizeSeats) {
-                                Label("Hussel stoelen", systemImage: "shuffle")
+                            Button(action: { showReorderSheet = true }) {
+                                Label("Volgorde lijst", systemImage: "list.number")
                             }
                             .disabled(seatedPlayers.count < 2)
 
@@ -161,9 +183,15 @@ struct TafelschikkingView: View {
                             }
                             .disabled(seatedPlayers.count < 2)
 
+                            Button(action: randomizeSeats) {
+                                Label("Hussel stoelen", systemImage: "shuffle")
+                            }
+                            .disabled(seatedPlayers.count < 2)
+
                             Button(role: .destructive, action: {
                                 seatedPlayers.removeAll()
                                 startPlayerIndex = nil
+                                scoreManager.saveTafelschikking([])
                             }) {
                                 Label("Tafel leegmaken", systemImage: "trash")
                             }
@@ -187,36 +215,56 @@ struct TafelschikkingView: View {
 
     // MARK: - Header Bar
     private var headerBar: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(spacing: 8) {
+            if showSavedBanner {
                 HStack(spacing: 6) {
-                    Image(systemName: "person.3.sequence.fill")
+                    Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                    Text("Wie zit waar?")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                }
-                Text(seatedPlayers.count < 2 ? "Voeg minimaal 2 spelers toe aan de tafel" : "Sleep een speler naar een andere stoel om te wisselen")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            Spacer()
-
-            if let startIndex = startPlayerIndex, seatedPlayers.indices.contains(startIndex) {
-                HStack(spacing: 6) {
-                    Text("Startspeler:")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.8))
-                    Text(seatedPlayers[startIndex])
+                    Text("Tafelschikking opgeslagen! Beschikbaar in alle spellen.")
                         .font(.caption)
                         .fontWeight(.bold)
-                        .foregroundColor(.yellow)
+                        .foregroundColor(.white)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.yellow.opacity(0.2))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.yellow.opacity(0.4), lineWidth: 1))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
+                .background(Color.green.opacity(0.25))
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.green.opacity(0.5), lineWidth: 1))
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.3.sequence.fill")
+                            .foregroundColor(.green)
+                        Text("Wie zit waar?")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+                    Text(seatedPlayers.count < 2 ? "Voeg minimaal 2 spelers toe aan de tafel" : "Sleep een speler naar een andere stoel om te wisselen")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                Spacer()
+
+                if let startIndex = startPlayerIndex, seatedPlayers.indices.contains(startIndex) {
+                    HStack(spacing: 6) {
+                        Text("Startspeler:")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.8))
+                        Text(seatedPlayers[startIndex])
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.yellow)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.yellow.opacity(0.2))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.yellow.opacity(0.4), lineWidth: 1))
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -330,6 +378,7 @@ struct TafelschikkingView: View {
                     .onMove { indices, newOffset in
                         seatedPlayers.move(fromOffsets: indices, toOffset: newOffset)
                         startPlayerIndex = nil
+                        saveTafelschikking(notify: false)
                     }
                 } footer: {
                     Text("Sleep de hendels rechts om de zitplaatsen met de klok mee te herschikken.")
@@ -531,6 +580,28 @@ struct TafelschikkingView: View {
                 }
             }
 
+            // Opslaan knop
+            if seatedPlayers.count >= 2 {
+                Button(action: { saveTafelschikking(notify: true) }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: showSavedBanner ? "checkmark.circle.fill" : "square.and.arrow.down.fill")
+                            .font(.headline)
+                        Text(showSavedBanner ? "Tafelschikking Opgeslagen!" : "Tafelschikking Opslaan (\(seatedPlayers.count) spelers)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                    }
+                    .foregroundColor(showSavedBanner ? .green : .white)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(showSavedBanner ? Color.green.opacity(0.18) : Color.white.opacity(0.15))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(showSavedBanner ? Color.green : Color.white.opacity(0.25), lineWidth: 1.5)
+                    )
+                }
+            }
+
             HStack(spacing: 12) {
                 // Wissel / Schikking knop
                 Button(action: shiftSeatsClockwise) {
@@ -576,9 +647,32 @@ struct TafelschikkingView: View {
     // MARK: - Logic & Actions
     private func loadInitialPlayers() {
         if seatedPlayers.isEmpty {
-            let saved = scoreManager.savedPlayerNames
-            if saved.count >= 2 {
-                seatedPlayers = Array(saved.prefix(6))
+            let savedTafel = scoreManager.savedTafelschikking
+            if !savedTafel.isEmpty {
+                seatedPlayers = savedTafel
+            } else {
+                let saved = scoreManager.savedPlayerNames
+                if saved.count >= 2 {
+                    seatedPlayers = Array(saved.prefix(6))
+                }
+            }
+        }
+    }
+
+    private func saveTafelschikking(notify: Bool = true) {
+        guard !seatedPlayers.isEmpty else { return }
+        scoreManager.saveTafelschikking(seatedPlayers)
+        onApplyOrder?(seatedPlayers)
+
+        if notify {
+            HapticManager.shared.success()
+            withAnimation {
+                showSavedBanner = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                withAnimation {
+                    showSavedBanner = false
+                }
             }
         }
     }
@@ -594,6 +688,8 @@ struct TafelschikkingView: View {
                 startPlayerIndex = nil
             }
         }
+        scoreManager.saveTafelschikking(seatedPlayers)
+        onApplyOrder?(seatedPlayers)
     }
 
     private func handleSeatTap(index: Int) {
@@ -602,6 +698,8 @@ struct TafelschikkingView: View {
             if first != index {
                 seatedPlayers.swapAt(first, index)
                 startPlayerIndex = nil
+                scoreManager.saveTafelschikking(seatedPlayers)
+                onApplyOrder?(seatedPlayers)
             }
             selectedSwapIndex = nil
         } else {
@@ -653,6 +751,8 @@ struct TafelschikkingView: View {
                 seatedPlayers.swapAt(index, target)
                 startPlayerIndex = nil
             }
+            scoreManager.saveTafelschikking(seatedPlayers)
+            onApplyOrder?(seatedPlayers)
             HapticManager.shared.success()
         }
 
@@ -669,12 +769,16 @@ struct TafelschikkingView: View {
         let last = seatedPlayers.removeLast()
         seatedPlayers.insert(last, at: 0)
         startPlayerIndex = nil
+        scoreManager.saveTafelschikking(seatedPlayers)
+        onApplyOrder?(seatedPlayers)
     }
 
     private func randomizeSeats() {
         HapticManager.shared.medium()
         seatedPlayers.shuffle()
         startPlayerIndex = nil
+        scoreManager.saveTafelschikking(seatedPlayers)
+        onApplyOrder?(seatedPlayers)
     }
 
     private func spinNeedle() {

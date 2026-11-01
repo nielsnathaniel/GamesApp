@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,14 +27,8 @@ import nl.nnbp.gamesapp.data.model.Player
 import nl.nnbp.gamesapp.data.model.PlayerScore
 import nl.nnbp.gamesapp.data.model.RoundScoreDataPoint
 import nl.nnbp.gamesapp.ui.audio.SoundManager
-import nl.nnbp.gamesapp.ui.components.AppCard
-import nl.nnbp.gamesapp.ui.components.InhaalslagBanner
-import nl.nnbp.gamesapp.ui.components.PuntenWijzigenDialog
-import nl.nnbp.gamesapp.ui.components.SavedPlayersQuickChips
-import nl.nnbp.gamesapp.ui.components.SectionTitle
-import nl.nnbp.gamesapp.ui.components.StartspelerKiezerDialog
-import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
-import nl.nnbp.gamesapp.ui.components.WieHeeftGelijkDialog
+import nl.nnbp.gamesapp.data.model.GameType
+import nl.nnbp.gamesapp.ui.components.*
 import nl.nnbp.gamesapp.ui.screens.games.SnelleEindscoreScreen
 import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
@@ -131,7 +126,13 @@ fun BalzakkenScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Balzakken", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        GameLogoImage(gameType = GameType.BALZAKKEN, size = 30.dp, cornerRadius = 8.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Balzakken", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Terug")
@@ -169,48 +170,43 @@ fun BalzakkenScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        AppCard {
-                            Text(
-                                text = "Spelregels Balzakken 🎲",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Kaartspel waarbij de laagste score wint. Het spel stopt zodra iemand 100 strafpunten bereikt.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "• BALZAK! = 0 strafpunten\n• Valse Balzak = +25 strafpunten\n• Exact 69 strafpunten = terugval naar 50 pt!\n• Exact 99 strafpunten = terugval naar 75 pt!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = AccentOrange
-                            )
-                        }
+                        GameSetupHeader(
+                            gameType = GameType.BALZAKKEN,
+                            subtitle = "Kaartspel met 69 en 99 regels • Laagste strafpunten wint! 🎒",
+                            themeColor = WarningRed
+                        )
                     }
 
                     item {
-                        AppCard {
-                            Text("Spelmodus:", fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = !isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = false },
-                                    label = { Text("Rondes bijhouden") },
-                                    modifier = Modifier.weight(1f)
+                        GameModeSegmentedPicker(
+                            options = listOf(
+                                GameModeItem(
+                                    id = "live",
+                                    title = "Ronde voor ronde",
+                                    icon = Icons.Default.Casino,
+                                    description = "🎮 Begeleid het spel ronde na ronde met automatische strafpunten, BALZAK! en 69/99 regels."
+                                ),
+                                GameModeItem(
+                                    id = "snel",
+                                    title = "Snelle eindscore",
+                                    icon = Icons.Default.Bolt,
+                                    description = "⚡️ Voer direct de uiteindelijke strafpunten per speler in."
                                 )
-                                FilterChip(
-                                    selected = isQuickScoreMode,
-                                    onClick = { isQuickScoreMode = true },
-                                    label = { Text("⚡️ Alleen eindscore") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
+                            ),
+                            selectedId = if (isQuickScoreMode) "snel" else "live",
+                            onSelect = { isQuickScoreMode = (it == "snel") },
+                            themeColor = WarningRed
+                        )
+                    }
+
+                    item {
+                        PlayerCountPicker(
+                            minPlayers = 2,
+                            maxPlayers = 8,
+                            selectedCount = selectedPlayerNames.size.coerceIn(2, 8),
+                            onSelect = { /* count is reflected by selected players */ },
+                            themeColor = WarningRed
+                        )
                     }
 
                     item {
@@ -220,6 +216,9 @@ fun BalzakkenScreen(
                                 val list = selectedPlayerNames.toMutableList()
                                 if (list.contains(name)) list.remove(name) else list.add(name)
                                 selectedPlayerNames = list
+                            },
+                            onApplyTafelschikking = { seated ->
+                                selectedPlayerNames = seated.take(8).toMutableList()
                             }
                         )
                     }
@@ -354,10 +353,13 @@ fun BalzakkenScreen(
                     }
 
                     item {
-                        InhaalslagBanner(
-                            playerNames = selectedPlayerNames,
-                            scores = totalScores,
-                            lowestWins = true
+                        val pairs = selectedPlayerNames.indices.map { i ->
+                            Pair(selectedPlayerNames[i], totalScores.getOrElse(i) { 0 })
+                        }
+                        LiveGameLeadCard(
+                            playerScores = pairs,
+                            isLowestScoreWins = true,
+                            themeColor = WarningRed
                         )
                     }
 
@@ -478,16 +480,6 @@ fun BalzakkenScreen(
                                                     val newStatus = roundStatus.toMutableList()
                                                     val newScores = roundScores.toMutableList()
                                                     if (status == BalzakStatus.VALSE_BALZAK) {
-                                                        newStatus[index] = BalzakStatus.GEEN
-                                                        newScores[index] = 0
-                                                    } else {
-                                                        newStatus[index] = BalzakStatus.VALSE_BALZAK
-                                                        newScores[index] = 25
-                                                        soundManager.playBalzakFail()
-                                                    }
-                                                    roundStatus = newStatus
-                                                    roundScores = newScores
-                                                },
                                                         newStatus[index] = BalzakStatus.GEEN
                                                         newScores[index] = 0
                                                     } else {

@@ -132,6 +132,7 @@ struct DuizendenSetupView: View {
                     SavedPlayersQuickChipsView(
                         spelers: $spelers,
                         aantalSpelers: aantalSpelers,
+                        aantalSpelersBinding: $aantalSpelers,
                         tintColor: .teal
                     )
 

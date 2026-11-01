@@ -24,8 +24,23 @@ struct CrockinoleSetupView: View {
         var id: String { rawValue }
     }
 
+    enum CrokinoleMatchLength: String, CaseIterable, Identifiable {
+        case bestOf3 = "Best of 3 (2 sets)"
+        case bestOf5 = "Best of 5 (3 sets)"
+
+        var id: String { rawValue }
+
+        var targetSets: Int {
+            switch self {
+            case .bestOf3: return 2
+            case .bestOf5: return 3
+            }
+        }
+    }
+
     @State private var invoerModus: InvoerModus = .live
     @State private var mode: CrokinoleMode = .eenTegenEen
+    @State private var matchLength: CrokinoleMatchLength = .bestOf3
 
     // 1 vs 1
     @State private var spelerWit: String = ""
@@ -41,6 +56,33 @@ struct CrockinoleSetupView: View {
     @State private var puntenMethode: String = "Alles"
     @State private var showNewPlayerAlert: Bool = false
     @State private var newPlayerNameInput: String = ""
+    @State private var showTafelschikkingSheet: Bool = false
+    @State private var showAppliedBanner: Bool = false
+
+    private func applyTafelschikking() {
+        let saved = scoreManager.savedTafelschikking
+        guard !saved.isEmpty else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        if mode == .eenTegenEen {
+            if saved.count >= 1 { spelerWit = saved[0] }
+            if saved.count >= 2 { spelerZwart = saved[1] }
+        } else {
+            if saved.count >= 1 { spelerWit1 = saved[0] }
+            if saved.count >= 2 { spelerZwart1 = saved[1] }
+            if saved.count >= 3 { spelerWit2 = saved[2] }
+            if saved.count >= 4 { spelerZwart2 = saved[3] }
+        }
+
+        withAnimation {
+            showAppliedBanner = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation {
+                showAppliedBanner = false
+            }
+        }
+    }
 
     // Berekende teamnamen op basis van de spelers
     private var effectiveTeamWitNaam: String {
@@ -126,8 +168,99 @@ struct CrockinoleSetupView: View {
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
 
+                // Wedstrijdduur Selector (alleen bij live spelen)
+                if invoerModus == .live {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Wedstrijdduur")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        Picker("Wedstrijdduur", selection: $matchLength) {
+                            ForEach(CrokinoleMatchLength.allCases) { ml in
+                                Text(ml.rawValue).tag(ml)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(.horizontal)
+                    }
+                }
+
                 // 2. Snelle Speler Toevoegen & Bestaande spelers badge bar
                 VStack(alignment: .leading, spacing: 8) {
+                    // Tafelschikking optie
+                    HStack(spacing: 8) {
+                        if scoreManager.savedTafelschikking.count >= 2 {
+                            Button(action: applyTafelschikking) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "person.3.sequence.fill")
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text("🪑 Tafelschikking overnemen (\(scoreManager.savedTafelschikking.count))")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.green, Color.teal],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(Capsule())
+                                .shadow(color: Color.green.opacity(0.3), radius: 3, x: 0, y: 1)
+                            }
+
+                            Button(action: { showTafelschikkingSheet = true }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "slider.horizontal.3")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text("Bekijk tafel")
+                                        .font(.caption2)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color(UIColor.tertiarySystemFill))
+                                .clipShape(Capsule())
+                            }
+                        } else {
+                            Button(action: { showTafelschikkingSheet = true }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "person.3.sequence.fill")
+                                        .font(.system(size: 11))
+                                    Text("🪑 Stel tafelschikking in")
+                                        .font(.caption2)
+                                        .fontWeight(.medium)
+                                }
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color(UIColor.tertiarySystemFill))
+                                .clipShape(Capsule())
+                            }
+                        }
+
+                        Spacer()
+                    }
+
+                    if showAppliedBanner {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Tafelschikking toegepast!")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.green)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.12))
+                        .cornerRadius(8)
+                    }
+
                     HStack {
                         Text("Beschikbare Spelers")
                             .font(.caption)
@@ -222,6 +355,11 @@ struct CrockinoleSetupView: View {
         }
         .onAppear {
             scoreManager.refresh()
+        }
+        .sheet(isPresented: $showTafelschikkingSheet) {
+            TafelschikkingView(onApplyOrder: { _ in
+                applyTafelschikking()
+            })
         }
         .alert("Nieuwe Speler Toevoegen", isPresented: $showNewPlayerAlert) {
             TextField("Naam van de speler", text: $newPlayerNameInput)
@@ -474,7 +612,8 @@ struct CrockinoleSetupView: View {
                     teamWitSpelers: [w.isEmpty ? "Wit" : w],
                     teamZwartNaam: z.isEmpty ? "Zwart" : z,
                     teamZwartSpelers: [z.isEmpty ? "Zwart" : z],
-                    puntenMethode: puntenMethode
+                    puntenMethode: puntenMethode,
+                    targetSets: matchLength.targetSets
                 )
             } else {
                 CrockinoleGameView(
@@ -483,7 +622,8 @@ struct CrockinoleSetupView: View {
                     teamWitSpelers: [spelerWit1, spelerWit2],
                     teamZwartNaam: effectiveTeamZwartNaam,
                     teamZwartSpelers: [spelerZwart1, spelerZwart2],
-                    puntenMethode: puntenMethode
+                    puntenMethode: puntenMethode,
+                    targetSets: matchLength.targetSets
                 )
             }
         }

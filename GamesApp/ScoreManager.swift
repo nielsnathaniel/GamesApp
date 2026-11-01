@@ -318,11 +318,13 @@ class ScoreManager: ObservableObject {
     private let gamesKey = "saved_played_games"
     private let playersKey = "saved_player_names"
     private let profilesKey = "saved_player_profiles"
+    private let tafelschikkingKey = "saved_tafelschikking_players"
 
     @Published var scores: [Score] = []
     @Published var playedGames: [PlayedGame] = []
     @Published var savedPlayerNames: [String] = []
     @Published var playerProfiles: [String: PlayerProfile] = [:]
+    @Published var savedTafelschikking: [String] = []
 
     init() {
         refresh()
@@ -333,6 +335,7 @@ class ScoreManager: ObservableObject {
         playedGames = fetchGames()
         savedPlayerNames = fetchPlayerNames()
         playerProfiles = fetchProfiles()
+        savedTafelschikking = fetchTafelschikking()
     }
 
     // MARK: - Spelersbeheer (Automatisch opslaan & Hergebruiken)
@@ -448,6 +451,26 @@ class ScoreManager: ObservableObject {
         let sorted = sortPlayersByPopularity(names)
         UserDefaults.standard.set(sorted, forKey: playersKey)
         self.savedPlayerNames = sorted
+        DataBackupManager.shared.scheduleAutoSyncToiCloud()
+    }
+
+    // MARK: - Tafelschikking (Stoelvolgorde rondom de tafel)
+
+    func fetchTafelschikking() -> [String] {
+        return UserDefaults.standard.stringArray(forKey: tafelschikkingKey) ?? []
+    }
+
+    func saveTafelschikking(_ players: [String]) {
+        let cleaned = players
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        UserDefaults.standard.set(cleaned, forKey: tafelschikkingKey)
+        DispatchQueue.main.async {
+            self.savedTafelschikking = cleaned
+        }
+        for p in cleaned {
+            savePlayerName(p)
+        }
         DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 
@@ -910,8 +933,10 @@ class ScoreManager: ObservableObject {
     func clearAllPlayers() {
         UserDefaults.standard.set([String](), forKey: playersKey)
         UserDefaults.standard.removeObject(forKey: profilesKey)
+        UserDefaults.standard.removeObject(forKey: tafelschikkingKey)
         self.savedPlayerNames = []
         self.playerProfiles = [:]
+        self.savedTafelschikking = []
         DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 
@@ -926,10 +951,12 @@ class ScoreManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: gamesKey)
         UserDefaults.standard.removeObject(forKey: playersKey)
         UserDefaults.standard.removeObject(forKey: profilesKey)
+        UserDefaults.standard.removeObject(forKey: tafelschikkingKey)
         scores = []
         playedGames = []
         savedPlayerNames = []
         playerProfiles = [:]
+        savedTafelschikking = []
         DataBackupManager.shared.scheduleAutoSyncToiCloud()
     }
 

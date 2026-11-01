@@ -25,6 +25,8 @@ import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.GameSortOption
 import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.Player
+import nl.nnbp.gamesapp.ui.components.GameLogoImage
+import nl.nnbp.gamesapp.ui.components.GameLogoImageByName
 import nl.nnbp.gamesapp.ui.components.TafelschikkingDialog
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
@@ -36,8 +38,9 @@ fun GamesOverviewScreen(
     onGameSelected: (GameType) -> Unit,
     onResumeActiveGame: (String) -> Unit
 ) {
-    val scoreManager = remember { ScoreManager.getInstance() }
-    val activeGameManager = remember { ActiveGameManager.getInstance() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scoreManager = remember { ScoreManager.getInstance(context) }
+    val activeGameManager = remember { ActiveGameManager.getInstance(context) }
 
     val playedGames by scoreManager.playedGames.collectAsState()
     val activeSession by activeGameManager.activeSession.collectAsState()
@@ -135,13 +138,8 @@ fun GamesOverviewScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(PrimaryBlue)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                GameLogoImageByName(gameName = session.gameName, size = 32.dp, cornerRadius = 8.dp)
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
                                     text = "Lopend potje: ${session.gameName}",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -264,21 +262,27 @@ fun GamesOverviewScreen(
     }
 
     if (showTafelschikkingDialog) {
-        val players = if (savedPlayerNames.isNotEmpty()) {
-            savedPlayerNames.map { name ->
+        val savedTafel = scoreManager.getSavedTafelschikking()
+        val players = if (savedTafel.isNotEmpty()) {
+            savedTafel.map { name ->
+                val prof = scoreManager.getPlayerProfile(name)
+                Player(name = name, colorHex = prof.colorHex, avatarEmoji = prof.avatarEmoji)
+            }
+        } else if (savedPlayerNames.isNotEmpty()) {
+            savedPlayerNames.take(6).map { name ->
                 val prof = scoreManager.getPlayerProfile(name)
                 Player(name = name, colorHex = prof.colorHex, avatarEmoji = prof.avatarEmoji)
             }
         } else {
-            listOf("Speler 1", "Speler 2", "Speler 3", "Speler 4").map { name ->
-                val prof = scoreManager.getPlayerProfile(name)
-                Player(name = name, colorHex = prof.colorHex, avatarEmoji = prof.avatarEmoji)
-            }
+            emptyList()
         }
         TafelschikkingDialog(
             players = players,
             onDismiss = { showTafelschikkingDialog = false },
-            onApplyOrder = { /* Ordered applied */ }
+            onApplyOrder = { ordered ->
+                scoreManager.saveTafelschikking(ordered.map { it.name })
+                showTafelschikkingDialog = false
+            }
         )
     }
 }
@@ -312,33 +316,7 @@ fun GameGridCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(46.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(PrimaryBlue.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = when (game) {
-                                GameType.BALZAKKEN -> Icons.Default.SportsBaseball
-                                GameType.TICKET_TO_RIDE -> Icons.Default.DirectionsTransit
-                                GameType.THIRTY_SECONDS -> Icons.Default.Timer
-                                GameType.CRANIUM -> Icons.Default.Psychology
-                                GameType.QWIXX -> Icons.Default.Casino
-                                GameType.LOVE_LETTER -> Icons.Default.Favorite
-                                GameType.REGENWORMEN -> Icons.Default.BugReport
-                                GameType.JATTEN -> Icons.Default.PanTool
-                                GameType.BEVERBENDE -> Icons.Default.Pets
-                                GameType.PIG_HOLE -> Icons.Default.Savings
-                                GameType.QUICKSTOP -> Icons.Default.FlashOn
-                                else -> Icons.Default.Extension
-                            },
-                            contentDescription = null,
-                            tint = PrimaryBlue,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
+                    GameLogoImage(gameType = game, size = 52.dp, cornerRadius = 13.dp)
 
                     if (playCount > 0) {
                         Surface(
