@@ -22,7 +22,7 @@ final class CloudSyncManager: ObservableObject {
 
     // MARK: - Standaard Configuratie
     /// Standaard database-URL (kan door de gebruiker worden overschreven in de app-instellingen)
-    static let defaultDatabaseUrl = "https://gamesapp-sync-default-rtdb.europe-west1.firebasedatabase.app"
+    static let defaultDatabaseUrl = "https://gamesapp-858bc-default-rtdb.europe-west1.firebasedatabase.app"
 
     // UserDefaults Keys
     private let syncCodeKey = "cloud_sync_vault_code_v1"
@@ -47,7 +47,13 @@ final class CloudSyncManager: ObservableObject {
 
     private init() {
         self.syncCode = UserDefaults.standard.string(forKey: syncCodeKey) ?? ""
-        self.databaseUrl = UserDefaults.standard.string(forKey: databaseUrlKey) ?? CloudSyncManager.defaultDatabaseUrl
+        let storedUrl = UserDefaults.standard.string(forKey: databaseUrlKey)
+        if let stored = storedUrl, !stored.isEmpty, !stored.contains("gamesapp-sync-default-rtdb") {
+            self.databaseUrl = stored
+        } else {
+            self.databaseUrl = CloudSyncManager.defaultDatabaseUrl
+            UserDefaults.standard.set(CloudSyncManager.defaultDatabaseUrl, forKey: databaseUrlKey)
+        }
         if UserDefaults.standard.object(forKey: autoSyncKey) != nil {
             self.isAutoSyncEnabled = UserDefaults.standard.bool(forKey: autoSyncKey)
         }
@@ -414,7 +420,7 @@ final class CloudSyncManager: ObservableObject {
     // MARK: - Testen van Database Verbinding
 
     func testConnection(completion: @escaping (Bool, String) -> Void) {
-        guard let url = URL(string: "\(cleanDatabaseUrl)/.json?shallow=true") else {
+        guard let url = URL(string: "\(cleanDatabaseUrl)/vaults/_ping.json") else {
             completion(false, "Ongeldige URL indeling.")
             return
         }

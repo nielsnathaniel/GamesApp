@@ -20,7 +20,7 @@ import java.util.*
 class CloudSyncManager private constructor(private val context: Context) {
 
     companion object {
-        const val DEFAULT_DATABASE_URL = "https://gamesapp-sync-default-rtdb.europe-west1.firebasedatabase.app"
+        const val DEFAULT_DATABASE_URL = "https://gamesapp-858bc-default-rtdb.europe-west1.firebasedatabase.app"
 
         private const val PREFS_NAME = "cloud_sync_prefs_v1"
         private const val KEY_SYNC_CODE = "sync_vault_code"
@@ -52,7 +52,15 @@ class CloudSyncManager private constructor(private val context: Context) {
     private val _syncCode = MutableStateFlow(prefs.getString(KEY_SYNC_CODE, "") ?: "")
     val syncCode: StateFlow<String> = _syncCode.asStateFlow()
 
-    private val _databaseUrl = MutableStateFlow(prefs.getString(KEY_DATABASE_URL, DEFAULT_DATABASE_URL) ?: DEFAULT_DATABASE_URL)
+    private val initialDbUrl = run {
+        val stored = prefs.getString(KEY_DATABASE_URL, null)
+        if (stored.isNullOrEmpty() || stored.contains("gamesapp-sync-default-rtdb")) {
+            DEFAULT_DATABASE_URL.also { prefs.edit().putString(KEY_DATABASE_URL, it).apply() }
+        } else {
+            stored
+        }
+    }
+    private val _databaseUrl = MutableStateFlow(initialDbUrl)
     val databaseUrl: StateFlow<String> = _databaseUrl.asStateFlow()
 
     private val _isAutoSyncEnabled = MutableStateFlow(prefs.getBoolean(KEY_AUTO_SYNC, true))
@@ -454,7 +462,7 @@ class CloudSyncManager private constructor(private val context: Context) {
     fun testConnection(onResult: (Boolean, String) -> Unit) {
         scope.launch {
             try {
-                val testUrl = "$cleanDatabaseUrl/.json?shallow=true"
+                val testUrl = "$cleanDatabaseUrl/vaults/_ping.json"
                 val url = URL(testUrl)
                 val conn = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
