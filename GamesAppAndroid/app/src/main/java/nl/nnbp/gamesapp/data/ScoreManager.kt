@@ -510,6 +510,7 @@ class ScoreManager private constructor(context: Context) {
         }
 
         games.removeAll { ids.contains(it.id) }
+        ids.forEach { CloudSyncManager.getInstance(context).recordDeletedGameId(it) }
         persistGames(games)
         persistScores(existingScores)
         refresh()
@@ -588,6 +589,7 @@ class ScoreManager private constructor(context: Context) {
             prefs.edit().putString(gamesKey, json.encodeToString(games)).apply()
             _playedGames.value = games
             _savedPlayerNames.value = fetchPlayerNames(games, _scores.value)
+            CloudSyncManager.getInstance(context).scheduleAutoSync()
         } catch (e: Exception) {
             e.printStackTrace()
         }

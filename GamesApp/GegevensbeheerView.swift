@@ -143,6 +143,55 @@ struct GegevensbeheerView: View {
                 }
             }
 
+            // Online Cloud Synchronisatie (Koppelcode iOS & Android)
+            Section(
+                header: Label("Online Synchronisatie (Koppelcode)", systemImage: "arrow.triangle.2.circlepath.circle.fill"),
+                footer: Text("Houd spelers, potjes en statistieken automatisch up-to-date tussen al je iOS- en Android-apparaten met één unieke koppelcode.")
+            ) {
+                NavigationLink(destination: CloudSyncView()) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(LinearGradient(colors: [Color.blue.opacity(0.2), Color.cyan.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: "cloud.fill")
+                                .foregroundColor(.blue)
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Koppelcode & Live Sync")
+                                .font(.body)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+
+                            if CloudSyncManager.shared.isConnected {
+                                Text("Verbonden met code: \(CloudSyncManager.shared.cleanSyncCode)")
+                                    .font(.caption2)
+                                    .foregroundColor(.green)
+                            } else {
+                                Text("Niet gekoppeld • Tik om code aan te maken of in te vullen")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        if CloudSyncManager.shared.isConnected {
+                            Text(CloudSyncManager.shared.cleanSyncCode)
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
             // Backup & Synchronisatie (JSON & iCloud)
             Section(
                 header: Label("Backup & Synchronisatie", systemImage: "arrow.triangle.2.circlepath.icloud.fill"),

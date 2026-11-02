@@ -34,14 +34,17 @@ import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 fun GegevensbeheerScreen(
     onNavigateBack: () -> Unit,
     onNavigateToPlayers: () -> Unit,
-    onNavigateToSessions: () -> Unit
+    onNavigateToSessions: () -> Unit,
+    onNavigateToCloudSync: () -> Unit
 ) {
     val context = LocalContext.current
     val scoreManager = remember { ScoreManager.getInstance(context) }
+    val syncManager = remember { nl.nnbp.gamesapp.data.CloudSyncManager.getInstance(context) }
 
     val players by scoreManager.savedPlayerNames.collectAsState()
     val games by scoreManager.playedGames.collectAsState()
     val scores by scoreManager.scores.collectAsState()
+    val syncCode by syncManager.syncCode.collectAsState()
 
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     var showMergeDialog by remember { mutableStateOf(false) }
@@ -150,6 +153,57 @@ fun GegevensbeheerScreen(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("${scores.size}", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold))
+                        }
+                    }
+                }
+            }
+
+            // Online Cloud Synchronisatie (Koppelcode)
+            item {
+                SectionTitle(title = "Online Synchronisatie (Koppelcode)")
+                AppCard {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onNavigateToCloudSync)
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryBlue.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Sync, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Koppelcode & Live Sync", fontWeight = FontWeight.Bold)
+                                if (syncCode.isNotBlank()) {
+                                    Text("Verbonden met code: $syncCode", fontSize = 11.sp, color = Color(0xFF4CAF50))
+                                } else {
+                                    Text("Niet gekoppeld • Tik om code aan te maken of in te voeren", fontSize = 11.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+
+                        if (syncCode.isNotBlank()) {
+                            Text(
+                                text = syncCode,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryBlue,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(PrimaryBlue.copy(alpha = 0.12f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        } else {
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
                         }
                     }
                 }

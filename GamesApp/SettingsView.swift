@@ -46,7 +46,43 @@ struct SettingsView: View {
                 }
 
                 // 1. Gegevensbeheer (Navigeer naar dedicated GegevensbeheerView)
-                Section(header: Label("Gegevensbeheer", systemImage: "cylinder.split.1x2.fill")) {
+                Section(header: Label("Gegevens & Synchronisatie", systemImage: "cylinder.split.1x2.fill")) {
+                    NavigationLink(destination: CloudSyncView()) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(LinearGradient(colors: [Color.blue.opacity(0.2), Color.cyan.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 20))
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Online Synchronisatie (Koppelcode)")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+
+                                Text("Live sync tussen iOS en Android met één code")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Spacer()
+
+                            if CloudSyncManager.shared.isConnected {
+                                Text(CloudSyncManager.shared.cleanSyncCode)
+                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.blue)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+
                     NavigationLink(destination: GegevensbeheerView()) {
                         HStack(spacing: 14) {
                             ZStack {
@@ -59,11 +95,11 @@ struct SettingsView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Gegevensbeheer")
+                                Text("Gegevensbeheer & Back-up")
                                     .font(.headline)
                                     .foregroundColor(.primary)
 
-                                Text("Opgeslagen spelers & spelsessies beheren")
+                                Text("Opgeslagen spelers, sessies & JSON export")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

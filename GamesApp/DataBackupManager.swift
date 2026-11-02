@@ -166,6 +166,7 @@ final class DataBackupManager: ObservableObject {
         }
         UserDefaults.standard.set(Array(existing), forKey: localDeletedIdsKey)
         scheduleAutoSyncToiCloud()
+        CloudSyncManager.shared.scheduleAutoSync()
     }
 
     private func getLocalDeletedIds() -> Set<String> {
@@ -184,6 +185,7 @@ final class DataBackupManager: ObservableObject {
         }
         autoSyncWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
+        CloudSyncManager.shared.scheduleAutoSync()
     }
 
     // MARK: - Volledige iCloud Synchronisatie (Spelers, Gespeelde Spellen & Scores)

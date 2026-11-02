@@ -14,6 +14,7 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector?
     object OpgeslagenSpelers : Screen("saved_players", "Opgeslagen Spelers")
     object SpelsessiesBeheer : Screen("sessions_manager", "Spelsessies")
     object Gegevensbeheer : Screen("data_management", "Gegevensbeheer")
+    object CloudSync : Screen("cloud_sync", "Cloud Synchronisatie")
     object GameSetup : Screen("game_setup/{gameId}", "Spel Instellen") {
         fun createRoute(gameId: String) = "game_setup/$gameId"
     }

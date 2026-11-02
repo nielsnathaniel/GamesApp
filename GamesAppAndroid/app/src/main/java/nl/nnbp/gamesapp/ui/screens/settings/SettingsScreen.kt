@@ -34,14 +34,17 @@ import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 fun SettingsScreen(
     onNavigateToPlayers: () -> Unit,
     onNavigateToSessions: () -> Unit,
-    onNavigateToDataManagement: () -> Unit
+    onNavigateToDataManagement: () -> Unit,
+    onNavigateToCloudSync: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scoreManager = remember { ScoreManager.getInstance(context) }
+    val syncManager = remember { nl.nnbp.gamesapp.data.CloudSyncManager.getInstance(context) }
     val soundManager = remember { SoundManager.getInstance(context) }
     val players by scoreManager.savedPlayerNames.collectAsState()
     val games by scoreManager.playedGames.collectAsState()
     val currentThemeMode by scoreManager.themeMode.collectAsState()
+    val syncCode by syncManager.syncCode.collectAsState()
 
     var isSoundEnabled by remember { mutableStateOf(soundManager.isSoundEnabled) }
     var expandedRulesGame by remember { mutableStateOf<String?>(null) }
@@ -119,8 +122,50 @@ fun SettingsScreen(
 
             // Gegevensbeheer Hub
             item {
-                SectionTitle(title = "Gegevensbeheer & Back-up")
+                SectionTitle(title = "Gegevens & Synchronisatie")
                 AppCard {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onNavigateToCloudSync)
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryBlue.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Sync, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Online Synchronisatie (Koppelcode)", fontWeight = FontWeight.Bold)
+                                Text("Live sync tussen iOS & Android met één code", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+                        }
+                        if (syncCode.isNotBlank()) {
+                            Text(
+                                text = syncCode,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryBlue,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(PrimaryBlue.copy(alpha = 0.12f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        } else {
+                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -141,8 +186,8 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
-                                Text("Back-up & Synchronisatie (JSON)", fontWeight = FontWeight.Bold)
-                                Text("Exporteer, deel of importeer spelgeschiedenis & spelers", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                Text("Back-up & Export (JSON)", fontWeight = FontWeight.Bold)
+                                Text("Exporteer, deel of importeer JSON-bestand", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                             }
                         }
                         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)

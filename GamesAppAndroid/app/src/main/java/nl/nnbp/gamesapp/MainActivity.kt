@@ -28,6 +28,7 @@ import nl.nnbp.gamesapp.ui.screens.games.qwixx.QwixxScreen
 import nl.nnbp.gamesapp.ui.screens.games.regenwormen.RegenwormenScreen
 import nl.nnbp.gamesapp.ui.screens.games.thirtyseconds.ThirtySecondsScreen
 import nl.nnbp.gamesapp.ui.screens.games.tickettoride.TicketToRideScreen
+import nl.nnbp.gamesapp.ui.screens.settings.CloudSyncScreen
 import nl.nnbp.gamesapp.ui.screens.settings.GegevensbeheerScreen
 import nl.nnbp.gamesapp.ui.screens.settings.OpgeslagenSpelersScreen
 import nl.nnbp.gamesapp.ui.screens.settings.SettingsScreen
@@ -56,6 +57,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        nl.nnbp.gamesapp.data.CloudSyncManager.getInstance(applicationContext).syncNowIfNeeded()
     }
 }
 
@@ -129,6 +135,9 @@ fun GamesAppMainShell() {
                     },
                     onNavigateToDataManagement = {
                         navController.navigate(Screen.Gegevensbeheer.route)
+                    },
+                    onNavigateToCloudSync = {
+                        navController.navigate(Screen.CloudSync.route)
                     }
                 )
             }
@@ -137,7 +146,14 @@ fun GamesAppMainShell() {
                 GegevensbeheerScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToPlayers = { navController.navigate(Screen.OpgeslagenSpelers.route) },
-                    onNavigateToSessions = { navController.navigate(Screen.SpelsessiesBeheer.route) }
+                    onNavigateToSessions = { navController.navigate(Screen.SpelsessiesBeheer.route) },
+                    onNavigateToCloudSync = { navController.navigate(Screen.CloudSync.route) }
+                )
+            }
+
+            composable(Screen.CloudSync.route) {
+                CloudSyncScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
 
