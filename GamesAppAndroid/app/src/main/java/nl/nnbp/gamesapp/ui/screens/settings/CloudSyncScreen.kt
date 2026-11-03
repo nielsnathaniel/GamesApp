@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.nnbp.gamesapp.data.CloudSyncManager
+import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.ui.components.AppCard
 import nl.nnbp.gamesapp.ui.components.SectionTitle
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
@@ -46,6 +47,7 @@ fun CloudSyncScreen(
 ) {
     val context = LocalContext.current
     val syncManager = remember { CloudSyncManager.getInstance(context) }
+    val scoreManager = remember { ScoreManager.getInstance(context) }
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val syncCode by syncManager.syncCode.collectAsState()
@@ -53,10 +55,15 @@ fun CloudSyncScreen(
     val isSyncing by syncManager.isSyncing.collectAsState()
     val lastSyncDate by syncManager.lastSyncDate.collectAsState()
     val lastSyncSummary by syncManager.lastSyncSummary.collectAsState()
-    val databaseUrl by syncManager.databaseUrl.collectAsState()
+    val customDatabaseUrl by syncManager.customDatabaseUrl.collectAsState()
+    val excludedPlayers by syncManager.excludedPlayerNames.collectAsState()
+
+    val allPlayers by scoreManager.savedPlayerNames.collectAsState()
+    val allGames by scoreManager.playedGames.collectAsState()
 
     var inputCode by remember { mutableStateOf("") }
-    var customDbUrl by remember(databaseUrl) { mutableStateOf(databaseUrl) }
+    // Bevat UITSLUITEND een eigen ingevulde URL van de gebruiker (nooit onze default!)
+    var customDbUrlInput by remember(customDatabaseUrl) { mutableStateOf(customDatabaseUrl) }
     var isAdvancedExpanded by remember { mutableStateOf(false) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
@@ -64,6 +71,7 @@ fun CloudSyncScreen(
     var isTestingConnection by remember { mutableStateOf(false) }
 
     val isConnected = syncCode.trim().isNotEmpty()
+    val isUsingCustomDb = syncManager.isUsingCustomDatabaseUrl
 
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
@@ -95,7 +103,7 @@ fun CloudSyncScreen(
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterVertically
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
@@ -181,7 +189,7 @@ fun CloudSyncScreen(
                                             type = "text/plain"
                                             putExtra(
                                                 Intent.EXTRA_TEXT,
-                                                "Mijn GamesApp koppelcode is: ${syncManager.cleanSyncCode}\nVoer deze in bij Instellingen > Cloud Synchronisatie om samen live scores en statistieken te delen!"
+                                                "Mijn GamesApp koppelcode is: ${syncManager.cleanSyncCode}\nVoer deze in bij Instellingen > Online Synchronisatie om samen live scores en statistieken te delen!"
                                             )
                                         }
                                         context.startActivity(Intent.createChooser(shareIntent, "Deel Koppelcode via"))
@@ -392,7 +400,105 @@ fun CloudSyncScreen(
                 }
             }
 
-            // MARK: - 3. Server Instellingen
+            // MARK: - 3. Spelers Selectie voor Synchronisatie
+            item {
+                val activeCount = allPlayers.filter { syncManager.isPlayerSyncEnabled(it) }.size
+                SectionTitle(title = "Spelers Synchroniseren ($activeCount/${allPlayers.size} actief)")
+                AppCard {
+                    Text(
+                        text = "Vink de spelers aan die je wilt delen via de cloud. Uitgevinkte spelers en hun gespeelde potjes blijven uitsluitend privé op dit toestel.",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (allPlayers.isEmpty()) {
+                        Text("Nog geen spelers geregistreerd.", fontSize = 12.sp, color = Color.Gray)
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { syncManager.selectAllPlayers() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("Alles selecteren", fontSize = 11.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = { syncManager.deselectAllPlayers(allPlayers) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("Alles deselecteren", fontSize = 11.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                        allPlayers.forEach { player ->
+                            val isSynced = syncManager.isPlayerSyncEnabled(player)
+                            val gameCount = allGames.filter { it.playerNamesList.contains(player) }.size
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { syncManager.togglePlayerSync(player) }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isSynced) PrimaryBlue.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = player.take(1).uppercase(Locale.getDefault()),
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSynced) PrimaryBlue else Color.Gray
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column {
+                                        Text(
+                                            text = player,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (isSynced) MaterialTheme.colorScheme.onSurface else Color.Gray
+                                        )
+                                        Text(
+                                            text = "$gameCount potjes • ${if (isSynced) "Wordt gesynchroniseerd" else "Uitsluitend privé op dit toestel"}",
+                                            fontSize = 11.sp,
+                                            color = if (isSynced) Color.Gray else AccentOrange
+                                        )
+                                    }
+                                }
+
+                                Checkbox(
+                                    checked = isSynced,
+                                    onCheckedChange = { syncManager.togglePlayerSync(player) }
+                                )
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                        }
+                    }
+                }
+            }
+
+            // MARK: - 4. Server Instellingen (Onze URL blijft geheim!)
             item {
                 SectionTitle(title = "Server & Database")
                 AppCard {
@@ -418,12 +524,45 @@ fun CloudSyncScreen(
 
                     AnimatedVisibility(visible = isAdvancedExpanded) {
                         Column(modifier = Modifier.padding(top = 10.dp)) {
-                            Text("Firebase Realtime Database URL:", fontSize = 11.sp, color = Color.Gray)
+                            // Status Badge
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isUsingCustomDb) AccentOrange.copy(alpha = 0.12f) else Color(0xFF4CAF50).copy(alpha = 0.12f))
+                                    .padding(8.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isUsingCustomDb) AccentOrange else Color(0xFF4CAF50))
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isUsingCustomDb) "Aangepaste Cloud Database (Actief)" else "Standaard GamesApp Cloud (Actief)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isUsingCustomDb) AccentOrange else Color(0xFF2E7D32)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = if (isUsingCustomDb) "Eigen Firebase URL:" else "Wil je een eigen Firebase database gebruiken? Vul dan hieronder jouw database-URL in:",
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
 
+                            // Het tekstveld toont NOOIT onze verborgen URL, alleen een eigen URL!
                             OutlinedTextField(
-                                value = customDbUrl,
-                                onValueChange = { customDbUrl = it },
+                                value = customDbUrlInput,
+                                onValueChange = { customDbUrlInput = it },
+                                placeholder = { Text("https://jouw-project-default-rtdb...", fontSize = 12.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontFamily = FontFamily.Monospace),
@@ -438,25 +577,28 @@ fun CloudSyncScreen(
                             ) {
                                 Button(
                                     onClick = {
-                                        syncManager.updateDatabaseUrl(customDbUrl)
-                                        Toast.makeText(context, "URL opgeslagen", Toast.LENGTH_SHORT).show()
+                                        syncManager.updateCustomDatabaseUrl(customDbUrlInput)
+                                        Toast.makeText(context, "Eigen URL opgeslagen", Toast.LENGTH_SHORT).show()
                                     },
                                     modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(8.dp),
+                                    enabled = customDbUrlInput.trim().isNotEmpty()
                                 ) {
                                     Text("Opslaan", fontSize = 12.sp)
                                 }
 
-                                OutlinedButton(
-                                    onClick = {
-                                        syncManager.resetDatabaseUrlToDefault()
-                                        customDbUrl = CloudSyncManager.DEFAULT_DATABASE_URL
-                                        Toast.makeText(context, "Standaard hersteld", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text("Standaard", fontSize = 12.sp)
+                                if (isUsingCustomDb) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            syncManager.resetDatabaseUrlToDefault()
+                                            customDbUrlInput = ""
+                                            Toast.makeText(context, "Standaard database hersteld", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Text("Herstel Standaard", fontSize = 11.sp)
+                                    }
                                 }
                             }
 
@@ -466,7 +608,9 @@ fun CloudSyncScreen(
                                 onClick = {
                                     isTestingConnection = true
                                     testResultText = null
-                                    syncManager.updateDatabaseUrl(customDbUrl)
+                                    if (customDbUrlInput.isNotBlank()) {
+                                        syncManager.updateCustomDatabaseUrl(customDbUrlInput)
+                                    }
                                     syncManager.testConnection { success, message ->
                                         isTestingConnection = false
                                         testResultText = message
@@ -511,7 +655,7 @@ fun CloudSyncScreen(
                     ) {
                         Icon(Icons.Default.HelpOutline, contentDescription = null, tint = PrimaryBlue)
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Hoe stel ik mijn eigen Firebase in? (Stappenplan)", fontSize = 13.sp, color = PrimaryBlue)
+                        Text("Hoe stel ik een eigen Firebase in? (Stappenplan)", fontSize = 13.sp, color = PrimaryBlue)
                     }
                 }
             }
@@ -548,7 +692,7 @@ fun CloudSyncScreen(
     if (showHelpDialog) {
         AlertDialog(
             onDismissRequest = { showHelpDialog = false },
-            title = { Text("In 2 minuten gratis Firebase instellen") },
+            title = { Text("In 2 minuten een eigen gratis Firebase instellen") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("1. Ga naar console.firebase.google.com en maak een nieuw gratis project aan.")

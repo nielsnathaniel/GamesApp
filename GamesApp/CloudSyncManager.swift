@@ -20,26 +20,28 @@ struct GamesAppCloudPayload: Codable {
 final class CloudSyncManager: ObservableObject {
     static let shared = CloudSyncManager()
 
-    // MARK: - Standaard Configuratie
-    /// Standaard database-URL (kan door de gebruiker worden overschreven in de app-instellingen)
-    static let defaultDatabaseUrl = "https://gamesapp-858bc-default-rtdb.europe-west1.firebasedatabase.app"
+    // MARK: - Standaard Configuratie (Privé & Veilig)
+    // Onze standaard database-URL wordt NOOIT getoond in de UI en blijft privé in de code.
+    private static let internalDefaultDatabaseUrl = "https://gamesapp-858bc-default-rtdb.europe-west1.firebasedatabase.app"
 
     // UserDefaults Keys
     private let syncCodeKey = "cloud_sync_vault_code_v1"
-    private let databaseUrlKey = "cloud_sync_database_url_v1"
+    private let customDatabaseUrlKey = "cloud_sync_custom_database_url_v1"
     private let autoSyncKey = "cloud_sync_auto_enabled_v1"
     private let lastSyncTimestampKey = "cloud_sync_last_timestamp_v1"
     private let lastSyncSummaryKey = "cloud_sync_last_summary_v1"
     private let localDeletedIdsKey = "local_deleted_game_ids_v1"
+    private let excludedPlayersKey = "cloud_sync_excluded_players_v1"
 
     // MARK: - Gepubliceerde Status
     @Published var syncCode: String = ""
-    @Published var databaseUrl: String = ""
+    @Published var customDatabaseUrl: String = "" // Bevat UITSLUITEND een eigen ingevulde URL van de gebruiker (nooit onze default!)
     @Published var isAutoSyncEnabled: Bool = true
     @Published var isSyncing: Bool = false
     @Published var lastSyncDate: Date? = nil
     @Published var lastSyncSummary: String = ""
     @Published var lastErrorMessage: String? = nil
+    @Published var excludedPlayerNames: Set<String> = [] // Spelers die de gebruiker NIET wil synchroniseren
 
     private let scoreManager = ScoreManager.shared
     private var autoSyncWorkItem: DispatchWorkItem? = nil
@@ -47,13 +49,16 @@ final class CloudSyncManager: ObservableObject {
 
     private init() {
         self.syncCode = UserDefaults.standard.string(forKey: syncCodeKey) ?? ""
-        let storedUrl = UserDefaults.standard.string(forKey: databaseUrlKey)
-        if let stored = storedUrl, !stored.isEmpty, !stored.contains("gamesapp-sync-default-rtdb") {
-            self.databaseUrl = stored
+
+        // Alleen een EIGEN ingevulde URL inladen; onze interne standaard URL blijft verborgen
+        let storedCustom = UserDefaults.standard.string(forKey: customDatabaseUrlKey) ?? ""
+        if !storedCustom.isEmpty && !storedCustom.contains("gamesapp-858bc") && !storedCustom.contains("gamesapp-sync-default-rtdb") {
+            self.customDatabaseUrl = storedCustom
         } else {
-            self.databaseUrl = CloudSyncManager.defaultDatabaseUrl
-            UserDefaults.standard.set(CloudSyncManager.defaultDatabaseUrl, forKey: databaseUrlKey)
+            self.customDatabaseUrl = ""
+            UserDefaults.standard.removeObject(forKey: customDatabaseUrlKey)
         }
+
         if UserDefaults.standard.object(forKey: autoSyncKey) != nil {
             self.isAutoSyncEnabled = UserDefaults.standard.bool(forKey: autoSyncKey)
         }
@@ -61,6 +66,9 @@ final class CloudSyncManager: ObservableObject {
             self.lastSyncDate = Date(timeIntervalSince1970: ts)
         }
         self.lastSyncSummary = UserDefaults.standard.string(forKey: lastSyncSummaryKey) ?? ""
+
+        let storedExcluded = UserDefaults.standard.stringArray(forKey: excludedPlayersKey) ?? []
+        self.excludedPlayerNames = Set(storedExcluded.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) })
 
         // Initiële automatische synchronisatie bij opstarten
         if isConnected && isAutoSyncEnabled {
@@ -71,6 +79,7 @@ final class CloudSyncManager: ObservableObject {
     }
 
     // MARK: - Berekende Eigenschappen
+
     var isConnected: Bool {
         return !syncCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -79,11 +88,15 @@ final class CloudSyncManager: ObservableObject {
         return syncCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
 
+    /// Geeft aan of de gebruiker een eigen database gebruikt in plaats van onze standaard
+    var isUsingCustomDatabaseUrl: Bool {
+        return !customDatabaseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// De effectieve database URL die onder de motorkap wordt aangeroepen
     private var cleanDatabaseUrl: String {
-        var url = databaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        if url.isEmpty {
-            url = CloudSyncManager.defaultDatabaseUrl
-        }
+        let raw = isUsingCustomDatabaseUrl ? customDatabaseUrl : CloudSyncManager.internalDefaultDatabaseUrl
+        var url = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         while url.hasSuffix("/") {
             url.removeLast()
         }
@@ -93,22 +106,71 @@ final class CloudSyncManager: ObservableObject {
         return url
     }
 
-    // MARK: - Configuratie & Instellingen Opslaan
+    // MARK: - Configuratie & Eigen Database URL Opslaan
 
-    func updateDatabaseUrl(_ newUrl: String) {
+    func updateCustomDatabaseUrl(_ newUrl: String) {
         let trimmed = newUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.databaseUrl = trimmed.isEmpty ? CloudSyncManager.defaultDatabaseUrl : trimmed
-        UserDefaults.standard.set(self.databaseUrl, forKey: databaseUrlKey)
+        // Voorkom dat de gebruiker per ongeluk onze verborgen URL invoert
+        if trimmed.contains("gamesapp-858bc") {
+            self.customDatabaseUrl = ""
+            UserDefaults.standard.removeObject(forKey: customDatabaseUrlKey)
+        } else {
+            self.customDatabaseUrl = trimmed
+            UserDefaults.standard.set(trimmed, forKey: customDatabaseUrlKey)
+        }
     }
 
     func resetDatabaseUrlToDefault() {
-        self.databaseUrl = CloudSyncManager.defaultDatabaseUrl
-        UserDefaults.standard.set(self.databaseUrl, forKey: databaseUrlKey)
+        self.customDatabaseUrl = ""
+        UserDefaults.standard.removeObject(forKey: customDatabaseUrlKey)
     }
 
     func setAutoSyncEnabled(_ enabled: Bool) {
         self.isAutoSyncEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: autoSyncKey)
+    }
+
+    // MARK: - Speler-selectie voor Synchronisatie
+
+    func isPlayerSyncEnabled(name: String) -> Bool {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return !excludedPlayerNames.contains(key)
+    }
+
+    func togglePlayerSync(name: String) {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return }
+        if excludedPlayerNames.contains(key) {
+            excludedPlayerNames.remove(key)
+        } else {
+            excludedPlayerNames.insert(key)
+        }
+        UserDefaults.standard.set(Array(excludedPlayerNames), forKey: excludedPlayersKey)
+        scheduleAutoSync()
+    }
+
+    func setPlayerSyncEnabled(name: String, enabled: Bool) {
+        let key = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !key.isEmpty else { return }
+        if enabled {
+            excludedPlayerNames.remove(key)
+        } else {
+            excludedPlayerNames.insert(key)
+        }
+        UserDefaults.standard.set(Array(excludedPlayerNames), forKey: excludedPlayersKey)
+        scheduleAutoSync()
+    }
+
+    func selectAllPlayers() {
+        excludedPlayerNames.removeAll()
+        UserDefaults.standard.set([], forKey: excludedPlayersKey)
+        scheduleAutoSync()
+    }
+
+    func deselectAllPlayers(allPlayers: [String]) {
+        excludedPlayerNames = Set(allPlayers.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() })
+        UserDefaults.standard.set(Array(excludedPlayerNames), forKey: excludedPlayersKey)
+        scheduleAutoSync()
     }
 
     // MARK: - Koppelcode Beheer
@@ -255,7 +317,6 @@ final class CloudSyncManager: ObservableObject {
                 self.uploadMergedData(code: code, completion: completion)
             } catch {
                 print("Fout bij decoderen van cloud payload: \(error)")
-                // Als decodering faalt door compatibiliteit, probeer toch lokale data te behouden
                 self.uploadMergedData(code: code, completion: completion)
             }
         }.resume()
@@ -333,7 +394,7 @@ final class CloudSyncManager: ObservableObject {
         }
     }
 
-    // MARK: - Uploaden naar Firebase REST
+    // MARK: - Uploaden naar Firebase REST (Met Spelersfilter)
 
     private func uploadMergedData(code: String, completion: ((Result<String, Error>) -> Void)?) {
         guard let url = URL(string: "\(cleanDatabaseUrl)/vaults/\(code).json") else {
@@ -342,10 +403,24 @@ final class CloudSyncManager: ObservableObject {
         }
 
         let localDeletedIds = Array(Set(UserDefaults.standard.stringArray(forKey: localDeletedIdsKey) ?? []))
-        let players = scoreManager.fetchPlayerNames()
-        let games = scoreManager.playedGames
-        let scores = scoreManager.scores
-        let tafel = scoreManager.savedTafelschikking
+
+        // Alleen spelers die actief zijn goedgekeurd voor synchronisatie
+        let allPlayers = scoreManager.fetchPlayerNames()
+        let playersToSync = allPlayers.filter { isPlayerSyncEnabled(name: $0) }
+        let syncedPlayerSet = Set(playersToSync.map { $0.lowercased() })
+
+        // Alleen potjes synchroniseren waarvan alle deelnemers geselecteerd zijn
+        let gamesToSync = scoreManager.playedGames.filter { game in
+            let participants = game.playerNamesList.map { $0.lowercased() }
+            return !participants.isEmpty && participants.allSatisfy { syncedPlayerSet.contains($0) }
+        }
+
+        // Alleen scores van gesynchroniseerde spelers
+        let scoresToSync = scoreManager.scores.filter { sc in
+            syncedPlayerSet.contains(sc.playerName.lowercased())
+        }
+
+        let tafel = scoreManager.savedTafelschikking.filter { isPlayerSyncEnabled(name: $0) }
 
         let now = Date()
         let isoFormatter = ISO8601DateFormatter()
@@ -354,9 +429,9 @@ final class CloudSyncManager: ObservableObject {
             exportDate: isoFormatter.string(from: now),
             lastUpdated: Int64(now.timeIntervalSince1970 * 1000),
             lastUpdatedDevice: "iOS",
-            playerNames: players,
-            playedGames: games,
-            scores: scores,
+            playerNames: playersToSync,
+            playedGames: gamesToSync,
+            scores: scoresToSync,
             tafelschikking: tafel,
             deletedGameIds: localDeletedIds
         )
@@ -387,7 +462,7 @@ final class CloudSyncManager: ObservableObject {
                     return
                 }
 
-                let summary = "Gesynchroniseerd: \(games.count) potjes en \(players.count) spelers up-to-date."
+                let summary = "Gesynchroniseerd: \(gamesToSync.count) potjes en \(playersToSync.count) spelers up-to-date."
                 self.finishSync(successSummary: summary, completion: completion)
             }.resume()
         } catch {
@@ -417,7 +492,7 @@ final class CloudSyncManager: ObservableObject {
         }
     }
 
-    // MARK: - Testen van Database Verbinding
+    // MARK: - Testen van Database Verbinding (Veilig via /vaults/_ping.json)
 
     func testConnection(completion: @escaping (Bool, String) -> Void) {
         guard let url = URL(string: "\(cleanDatabaseUrl)/vaults/_ping.json") else {
@@ -439,7 +514,7 @@ final class CloudSyncManager: ObservableObject {
                     if http.statusCode == 200 {
                         completion(true, "Verbinding met Firebase Realtime Database is geslaagd! (HTTP 200)")
                     } else if http.statusCode == 401 || http.statusCode == 403 {
-                        completion(false, "Toegang geweigerd (HTTP \(http.statusCode)). Controleer de Firebase Security Rules (zie instructies).")
+                        completion(false, "Toegang geweigerd (HTTP \(http.statusCode)). Controleer de Firebase Security Rules.")
                     } else {
                         completion(false, "Server gaf HTTP statuscode \(http.statusCode) terug.")
                     }

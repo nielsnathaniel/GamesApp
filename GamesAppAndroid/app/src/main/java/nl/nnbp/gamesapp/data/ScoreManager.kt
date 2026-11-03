@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
 
-class ScoreManager private constructor(context: Context) {
+class ScoreManager private constructor(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("GamesAppPrefs", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }

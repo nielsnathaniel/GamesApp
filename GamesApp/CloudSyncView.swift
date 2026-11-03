@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CloudSyncView: View {
     @ObservedObject private var syncManager = CloudSyncManager.shared
+    @ObservedObject private var scoreManager = ScoreManager.shared
 
     @State private var inputCode: String = ""
     @State private var customDatabaseUrl: String = ""
@@ -52,76 +53,17 @@ struct CloudSyncView: View {
                 notConnectedSection
             }
 
-            // MARK: - 3. Server & Geavanceerde Instellingen
-            Section(
-                header: Text("Server & Database"),
-                footer: Text("Standaard gebruikt GamesApp een gedeelde Firebase Realtime Database. Je kunt hier ook je eigen gratis Firebase URL invullen.")
-            ) {
-                DisclosureGroup("Geavanceerde Database Instellingen") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Firebase Database URL:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+            // MARK: - 3. Spelers Selectie voor Synchronisatie
+            playersSyncSection
 
-                        TextField("https://jouw-project-default-rtdb...", text: $customDatabaseUrl)
-                            .font(.caption)
-                            .textInputAutocapitalization(.never)
-                            .disableAutocorrection(true)
-                            .padding(8)
-                            .background(Color(UIColor.tertiarySystemBackground))
-                            .cornerRadius(8)
-
-                        HStack(spacing: 10) {
-                            Button("Opslaan") {
-                                HapticManager.shared.light()
-                                syncManager.updateDatabaseUrl(customDatabaseUrl)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-
-                            Button("Herstel Standaard") {
-                                HapticManager.shared.light()
-                                syncManager.resetDatabaseUrlToDefault()
-                                customDatabaseUrl = syncManager.databaseUrl
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-
-                            Spacer()
-
-                            Button(action: runConnectionTest) {
-                                if isTestingConnection {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                } else {
-                                    Text("Test Verbinding")
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(isTestingConnection)
-                        }
-
-                        if let testMsg = testStatusMessage {
-                            Text(testMsg)
-                                .font(.caption2)
-                                .foregroundColor(testMsg.contains("geslaagd") ? .green : .red)
-                                .padding(.top, 4)
-                        }
-                    }
-                    .padding(.vertical, 6)
-                }
-
-                Button(action: { showHelpSheet = true }) {
-                    Label("Hoe stel ik mijn eigen Firebase in? (Uitleg)", systemImage: "questionmark.circle")
-                        .font(.subheadline)
-                }
-            }
+            // MARK: - 4. Server & Geavanceerde Instellingen (Onze URL blijft 100% geheim)
+            serverSettingsSection
         }
         .navigationTitle("Cloud Synchronisatie")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            customDatabaseUrl = syncManager.databaseUrl
+            // Vul UITSLUITEND een eigen custom URL in; onze interne URL wordt NOOIT getoond
+            customDatabaseUrl = syncManager.customDatabaseUrl
         }
         .alert("Toestel Ontkoppelen?", isPresented: $showDisconnectAlert) {
             Button("Ontkoppel", role: .destructive) {
@@ -176,7 +118,7 @@ struct CloudSyncView: View {
                             .buttonStyle(.plain)
 
                             ShareLink(
-                                item: "Mijn GamesApp koppelcode is: \(syncManager.cleanSyncCode)\nVoer deze code in op iOS of Android bij Instellingen > Cloud Synchronisatie om samen live scores en statistieken te delen!",
+                                item: "Mijn GamesApp koppelcode is: \(syncManager.cleanSyncCode)\nVoer deze code in op iOS of Android bij Instellingen > Online Synchronisatie om samen live scores en statistieken te delen!",
                                 subject: Text("GamesApp Koppelcode: \(syncManager.cleanSyncCode)")
                             ) {
                                 Image(systemName: "square.and.arrow.up")
@@ -204,7 +146,7 @@ struct CloudSyncView: View {
                         Spacer()
 
                         if let date = syncManager.lastSyncDate {
-                            Text("Laatste sync: \(date.formatted(date: .omitted, time: .shortened))")
+                            Text("Laatste: \(date.formatted(date: .omitted, time: .shortened))")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -345,12 +287,184 @@ struct CloudSyncView: View {
         }
     }
 
+    // MARK: - C. Spelers Selectie voor Synchronisatie
+
+    private var playersSyncSection: some View {
+        let allPlayers = scoreManager.fetchPlayerNames()
+        let activeCount = allPlayers.filter { syncManager.isPlayerSyncEnabled(name: $0) }.count
+
+        return Section(
+            header: HStack {
+                Text("Spelers Synchroniseren")
+                Spacer()
+                Text("\(activeCount) van \(allPlayers.count) actief")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            },
+            footer: Text("Vink de spelers aan die je wilt delen via de cloud. Uitgevinkte spelers en hun gespeelde potjes blijven uitsluitend privé op dit toestel.")
+        ) {
+            if allPlayers.isEmpty {
+                Text("Nog geen spelers opgeslagen.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            } else {
+                HStack {
+                    Button("Alles selecteren") {
+                        HapticManager.shared.light()
+                        syncManager.selectAllPlayers()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Spacer()
+
+                    Button("Alles deselecteren") {
+                        HapticManager.shared.light()
+                        syncManager.deselectAllPlayers(allPlayers: allPlayers)
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.vertical, 2)
+
+                ForEach(allPlayers, id: \.self) { player in
+                    let isSynced = syncManager.isPlayerSyncEnabled(name: player)
+                    let gameCount = scoreManager.playedGames.filter { $0.playerNamesList.contains(player) }.count
+
+                    Toggle(isOn: Binding(
+                        get: { isSynced },
+                        set: { _ in
+                            HapticManager.shared.selection()
+                            syncManager.togglePlayerSync(name: player)
+                        }
+                    )) {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(isSynced ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15))
+                                    .frame(width: 34, height: 34)
+                                Text(String(player.prefix(1)).uppercased())
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(isSynced ? .blue : .gray)
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(player)
+                                    .font(.body)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(isSynced ? .primary : .secondary)
+
+                                Text("\(gameCount) potjes • \(isSynced ? "Wordt gesynchroniseerd" : "Uitsluitend privé op dit toestel")")
+                                    .font(.caption2)
+                                    .foregroundColor(isSynced ? .secondary : .orange)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    // MARK: - D. Server & Geavanceerde Instellingen (Onze URL blijft privé)
+
+    private var serverSettingsSection: some View {
+        Section(
+            header: Text("Server & Database"),
+            footer: Text("Standaard gebruikt GamesApp de officiële en beveiligde cloud. De server-URL is privé verborgen. Je kunt hier optioneel een eigen Firebase database instellen.")
+        ) {
+            DisclosureGroup("Geavanceerde Database Instellingen") {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Status Badge (Toont nooit onze URL!)
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(syncManager.isUsingCustomDatabaseUrl ? Color.orange : Color.green)
+                            .frame(width: 8, height: 8)
+
+                        Text(syncManager.isUsingCustomDatabaseUrl ? "Aangepaste Cloud Database (Actief)" : "Standaard GamesApp Cloud (Actief)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(syncManager.isUsingCustomDatabaseUrl ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))
+                    .cornerRadius(8)
+
+                    Text(syncManager.isUsingCustomDatabaseUrl ? "Eigen Firebase URL:" : "Wil je een eigen Firebase database gebruiken? Vul dan hieronder jouw database-URL in:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    TextField("https://jouw-project-default-rtdb...", text: $customDatabaseUrl)
+                        .font(.caption)
+                        .textInputAutocapitalization(.never)
+                        .disableAutocorrection(true)
+                        .padding(8)
+                        .background(Color(UIColor.tertiarySystemBackground))
+                        .cornerRadius(8)
+
+                    HStack(spacing: 10) {
+                        Button("Opslaan") {
+                            HapticManager.shared.light()
+                            syncManager.updateCustomDatabaseUrl(customDatabaseUrl)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(customDatabaseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        if syncManager.isUsingCustomDatabaseUrl {
+                            Button("Herstel Standaard Database") {
+                                HapticManager.shared.light()
+                                syncManager.resetDatabaseUrlToDefault()
+                                customDatabaseUrl = ""
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+
+                        Spacer()
+
+                        Button(action: runConnectionTest) {
+                            if isTestingConnection {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Text("Test Verbinding")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(isTestingConnection)
+                    }
+
+                    if let testMsg = testStatusMessage {
+                        Text(testMsg)
+                            .font(.caption2)
+                            .foregroundColor(testMsg.contains("geslaagd") ? .green : .red)
+                            .padding(.top, 4)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+
+            Button(action: { showHelpSheet = true }) {
+                Label("Hoe stel ik een eigen Firebase in? (Uitleg)", systemImage: "questionmark.circle")
+                    .font(.subheadline)
+            }
+        }
+    }
+
     private func runConnectionTest() {
         HapticManager.shared.light()
         isTestingConnection = true
         testStatusMessage = nil
 
-        syncManager.updateDatabaseUrl(customDatabaseUrl)
+        if !customDatabaseUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            syncManager.updateCustomDatabaseUrl(customDatabaseUrl)
+        }
         syncManager.testConnection { success, message in
             isTestingConnection = false
             testStatusMessage = message
@@ -362,11 +476,11 @@ struct CloudSyncView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("In 2 minuten je eigen gratis Firebase instellen")
+                    Text("In 2 minuten een eigen gratis Firebase instellen")
                         .font(.title3)
                         .fontWeight(.bold)
 
-                    Text("Wil je je eigen privé-database gebruiken in plaats van de standaard? Volg deze eenvoudige stappen:")
+                    Text("Wil je een eigen privé-database gebruiken in plaats van de standaard GamesApp Cloud? Volg deze stappen:")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 
@@ -374,7 +488,7 @@ struct CloudSyncView: View {
                         helpStep(
                             number: "1",
                             title: "Maak een gratis Firebase project",
-                            desc: "Ga naar console.firebase.google.com, log in met een Google-account en klik op 'Project toevoegen' (naam bijv. 'MijnGamesApp')."
+                            desc: "Ga naar console.firebase.google.com, log in met een Google-account en klik op 'Project toevoegen'."
                         )
 
                         helpStep(
@@ -386,19 +500,19 @@ struct CloudSyncView: View {
                         helpStep(
                             number: "3",
                             title: "Stel de Regels in",
-                            desc: "Ga naar het tabblad 'Rules' (Regels) en zet .read en .write op true:\n{\n  \"rules\": {\n    \"vaults\": {\n      \"$vault\": {\n        \".read\": true,\n        \".write\": true\n      }\n    }\n  }\n}"
+                            desc: "Ga naar het tabblad 'Rules' (Regels) en stel in:\n{\n  \"rules\": {\n    \"vaults\": {\n      \"$vault\": {\n        \".read\": true,\n        \".write\": true\n      }\n    }\n  }\n}"
                         )
 
                         helpStep(
                             number: "4",
                             title: "Kopieer de URL",
-                            desc: "Kopieer de getoonde URL (eindigt op .firebasedatabase.app) en plak hem hier in het veld 'Firebase Database URL'. Klaar!"
+                            desc: "Kopieer de getoonde URL (eindigt op .firebasedatabase.app) en plak hem hier in het veld 'Eigen Firebase URL'. Klaar!"
                         )
                     }
                 }
                 .padding()
             }
-            .navigationTitle("Firebase Hulp")
+            .navigationTitle("Eigen Firebase Hulp")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

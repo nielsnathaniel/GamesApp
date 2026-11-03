@@ -20,15 +20,17 @@ import java.util.*
 class CloudSyncManager private constructor(private val context: Context) {
 
     companion object {
-        const val DEFAULT_DATABASE_URL = "https://gamesapp-858bc-default-rtdb.europe-west1.firebasedatabase.app"
+        // Onze standaard database-URL blijft privé en wordt NOOIT in de UI getoond.
+        private const val INTERNAL_DEFAULT_DATABASE_URL = "https://gamesapp-858bc-default-rtdb.europe-west1.firebasedatabase.app"
 
         private const val PREFS_NAME = "cloud_sync_prefs_v1"
         private const val KEY_SYNC_CODE = "sync_vault_code"
-        private const val KEY_DATABASE_URL = "sync_database_url"
+        private const val KEY_CUSTOM_DATABASE_URL = "sync_custom_database_url_v2"
         private const val KEY_AUTO_SYNC = "sync_auto_enabled"
         private const val KEY_LAST_TIMESTAMP = "sync_last_timestamp"
         private const val KEY_LAST_SUMMARY = "sync_last_summary"
         private const val KEY_DELETED_IDS = "sync_deleted_game_ids"
+        private const val KEY_EXCLUDED_PLAYERS = "sync_excluded_players_v1"
 
         @Volatile
         private var INSTANCE: CloudSyncManager? = null
@@ -52,16 +54,18 @@ class CloudSyncManager private constructor(private val context: Context) {
     private val _syncCode = MutableStateFlow(prefs.getString(KEY_SYNC_CODE, "") ?: "")
     val syncCode: StateFlow<String> = _syncCode.asStateFlow()
 
-    private val initialDbUrl = run {
-        val stored = prefs.getString(KEY_DATABASE_URL, null)
-        if (stored.isNullOrEmpty() || stored.contains("gamesapp-sync-default-rtdb")) {
-            DEFAULT_DATABASE_URL.also { prefs.edit().putString(KEY_DATABASE_URL, it).apply() }
+    // Bevat UITSLUITEND een eigen ingevulde URL van de gebruiker (nooit onze default!)
+    private val initialCustomUrl = run {
+        val stored = prefs.getString(KEY_CUSTOM_DATABASE_URL, "") ?: ""
+        if (stored.contains("gamesapp-858bc") || stored.contains("gamesapp-sync-default-rtdb")) {
+            prefs.edit().remove(KEY_CUSTOM_DATABASE_URL).apply()
+            ""
         } else {
             stored
         }
     }
-    private val _databaseUrl = MutableStateFlow(initialDbUrl)
-    val databaseUrl: StateFlow<String> = _databaseUrl.asStateFlow()
+    private val _customDatabaseUrl = MutableStateFlow(initialCustomUrl)
+    val customDatabaseUrl: StateFlow<String> = _customDatabaseUrl.asStateFlow()
 
     private val _isAutoSyncEnabled = MutableStateFlow(prefs.getBoolean(KEY_AUTO_SYNC, true))
     val isAutoSyncEnabled: StateFlow<Boolean> = _isAutoSyncEnabled.asStateFlow()
@@ -80,16 +84,25 @@ class CloudSyncManager private constructor(private val context: Context) {
     private val _lastErrorMessage = MutableStateFlow<String?>(null)
     val lastErrorMessage: StateFlow<String?> = _lastErrorMessage.asStateFlow()
 
+    // Spelers die de gebruiker NIET wil synchroniseren
+    private val _excludedPlayerNames = MutableStateFlow(
+        prefs.getStringSet(KEY_EXCLUDED_PLAYERS, emptySet())?.map { it.lowercase().trim() }?.toSet() ?: emptySet()
+    )
+    val excludedPlayerNames: StateFlow<Set<String>> = _excludedPlayerNames.asStateFlow()
+
     val isConnected: Boolean
         get() = _syncCode.value.trim().isNotEmpty()
 
     val cleanSyncCode: String
         get() = _syncCode.value.trim().uppercase(Locale.getDefault())
 
+    val isUsingCustomDatabaseUrl: Boolean
+        get() = _customDatabaseUrl.value.trim().isNotEmpty()
+
     val cleanDatabaseUrl: String
         get() {
-            var url = _databaseUrl.value.trim()
-            if (url.isEmpty()) url = DEFAULT_DATABASE_URL
+            val raw = if (isUsingCustomDatabaseUrl) _customDatabaseUrl.value.trim() else INTERNAL_DEFAULT_DATABASE_URL
+            var url = raw
             while (url.endsWith("/")) {
                 url = url.substring(0, url.length - 1)
             }
@@ -109,23 +122,75 @@ class CloudSyncManager private constructor(private val context: Context) {
         }
     }
 
-    // MARK: - Configuratie
+    // MARK: - Configuratie & Eigen Database URL
 
-    fun updateDatabaseUrl(newUrl: String) {
+    fun updateCustomDatabaseUrl(newUrl: String) {
         val trimmed = newUrl.trim()
-        val finalUrl = if (trimmed.isEmpty()) DEFAULT_DATABASE_URL else trimmed
-        _databaseUrl.value = finalUrl
-        prefs.edit().putString(KEY_DATABASE_URL, finalUrl).apply()
+        if (trimmed.contains("gamesapp-858bc")) {
+            _customDatabaseUrl.value = ""
+            prefs.edit().remove(KEY_CUSTOM_DATABASE_URL).apply()
+        } else {
+            _customDatabaseUrl.value = trimmed
+            prefs.edit().putString(KEY_CUSTOM_DATABASE_URL, trimmed).apply()
+        }
     }
 
     fun resetDatabaseUrlToDefault() {
-        _databaseUrl.value = DEFAULT_DATABASE_URL
-        prefs.edit().putString(KEY_DATABASE_URL, DEFAULT_DATABASE_URL).apply()
+        _customDatabaseUrl.value = ""
+        prefs.edit().remove(KEY_CUSTOM_DATABASE_URL).apply()
     }
 
     fun setAutoSyncEnabled(enabled: Boolean) {
         _isAutoSyncEnabled.value = enabled
         prefs.edit().putBoolean(KEY_AUTO_SYNC, enabled).apply()
+    }
+
+    // MARK: - Speler-selectie voor Synchronisatie
+
+    fun isPlayerSyncEnabled(name: String): Boolean {
+        val key = name.trim().lowercase(Locale.getDefault())
+        return !_excludedPlayerNames.value.contains(key)
+    }
+
+    fun togglePlayerSync(name: String) {
+        val key = name.trim().lowercase(Locale.getDefault())
+        if (key.isEmpty()) return
+        val current = _excludedPlayerNames.value.toMutableSet()
+        if (current.contains(key)) {
+            current.remove(key)
+        } else {
+            current.add(key)
+        }
+        _excludedPlayerNames.value = current
+        prefs.edit().putStringSet(KEY_EXCLUDED_PLAYERS, current).apply()
+        scheduleAutoSync()
+    }
+
+    fun setPlayerSyncEnabled(name: String, enabled: Boolean) {
+        val key = name.trim().lowercase(Locale.getDefault())
+        if (key.isEmpty()) return
+        val current = _excludedPlayerNames.value.toMutableSet()
+        if (enabled) {
+            current.remove(key)
+        } else {
+            current.add(key)
+        }
+        _excludedPlayerNames.value = current
+        prefs.edit().putStringSet(KEY_EXCLUDED_PLAYERS, current).apply()
+        scheduleAutoSync()
+    }
+
+    fun selectAllPlayers() {
+        _excludedPlayerNames.value = emptySet()
+        prefs.edit().remove(KEY_EXCLUDED_PLAYERS).apply()
+        scheduleAutoSync()
+    }
+
+    fun deselectAllPlayers(allPlayers: List<String>) {
+        val set = allPlayers.map { it.trim().lowercase(Locale.getDefault()) }.toSet()
+        _excludedPlayerNames.value = set
+        prefs.edit().putStringSet(KEY_EXCLUDED_PLAYERS, set).apply()
+        scheduleAutoSync()
     }
 
     // MARK: - Koppelcode Beheer
@@ -310,10 +375,24 @@ class CloudSyncManager private constructor(private val context: Context) {
     private suspend fun performUpload(code: String): Result<String> {
         return try {
             val scoreManager = ScoreManager.getInstance(context)
-            val players = scoreManager.fetchPlayerNames()
-            val games = scoreManager.playedGames.value
-            val scores = scoreManager.scores.value
-            val tafelschikking = scoreManager.getSavedTafelschikking()
+
+            // Alleen spelers die actief zijn goedgekeurd voor synchronisatie
+            val allPlayers = scoreManager.fetchPlayerNames()
+            val playersToSync = allPlayers.filter { isPlayerSyncEnabled(it) }
+            val syncedPlayerSet = playersToSync.map { it.lowercase(Locale.getDefault()) }.toSet()
+
+            // Alleen potjes synchroniseren waarvan alle deelnemers geselecteerd zijn
+            val gamesToSync = scoreManager.playedGames.value.filter { game ->
+                val participants = game.playerNamesList.map { it.lowercase(Locale.getDefault()) }
+                participants.isNotEmpty() && participants.all { syncedPlayerSet.contains(it) }
+            }
+
+            // Alleen scores van gesynchroniseerde spelers
+            val scoresToSync = scoreManager.scores.value.filter { sc ->
+                syncedPlayerSet.contains(sc.playerName.lowercase(Locale.getDefault()))
+            }
+
+            val tafelschikking = scoreManager.getSavedTafelschikking().filter { isPlayerSyncEnabled(it) }
             val localDeletedIds = prefs.getStringSet(KEY_DELETED_IDS, emptySet())?.toList() ?: emptyList()
 
             val now = System.currentTimeMillis()
@@ -324,7 +403,7 @@ class CloudSyncManager private constructor(private val context: Context) {
                 put("lastUpdatedDevice", "Android")
 
                 put("playerNames", buildJsonArray {
-                    players.forEach { add(JsonPrimitive(it)) }
+                    playersToSync.forEach { add(JsonPrimitive(it)) }
                 })
                 put("tafelschikking", buildJsonArray {
                     tafelschikking.forEach { add(JsonPrimitive(it)) }
@@ -335,7 +414,7 @@ class CloudSyncManager private constructor(private val context: Context) {
 
                 // Volledige games
                 put("playedGames", buildJsonArray {
-                    games.forEach { g ->
+                    gamesToSync.forEach { g ->
                         add(buildJsonObject {
                             put("id", g.id)
                             put("timestamp", g.timestamp)
@@ -384,7 +463,7 @@ class CloudSyncManager private constructor(private val context: Context) {
 
                 // Scores
                 put("scores", buildJsonArray {
-                    scores.forEach { sc ->
+                    scoresToSync.forEach { sc ->
                         add(buildJsonObject {
                             put("id", sc.id)
                             put("timestamp", sc.timestamp)
@@ -403,7 +482,7 @@ class CloudSyncManager private constructor(private val context: Context) {
             val responseCode = httpPut(targetUrl, jsonString)
 
             if (responseCode in 200..299) {
-                val summary = "Gesynchroniseerd: ${games.size} potjes en ${players.size} spelers up-to-date."
+                val summary = "Gesynchroniseerd: ${gamesToSync.size} potjes en ${playersToSync.size} spelers up-to-date."
                 _lastSyncDate.value = now
                 _lastSyncSummary.value = summary
                 prefs.edit().putLong(KEY_LAST_TIMESTAMP, now).putString(KEY_LAST_SUMMARY, summary).apply()
@@ -457,7 +536,7 @@ class CloudSyncManager private constructor(private val context: Context) {
         return conn.responseCode
     }
 
-    // MARK: - Testen van Database Verbinding
+    // MARK: - Testen van Database Verbinding (Veilig via /vaults/_ping.json)
 
     fun testConnection(onResult: (Boolean, String) -> Unit) {
         scope.launch {
