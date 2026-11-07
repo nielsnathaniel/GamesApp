@@ -19,6 +19,7 @@ import nl.nnbp.gamesapp.ui.screens.games.cranium.CraniumScreen
 import nl.nnbp.gamesapp.ui.screens.games.crockinole.CrockinoleScreen
 import nl.nnbp.gamesapp.ui.screens.games.duizenden.DuizendenScreen
 import nl.nnbp.gamesapp.ui.screens.games.fiftyfifty.FiftyFiftyScreen
+import nl.nnbp.gamesapp.ui.screens.games.risk.RiskScreen
 import nl.nnbp.gamesapp.ui.screens.games.jatten.JattenScreen
 import nl.nnbp.gamesapp.ui.screens.games.loveletter.LoveLetterScreen
 import nl.nnbp.gamesapp.ui.screens.games.nmbr9.Nmbr9Screen
@@ -190,6 +191,7 @@ fun GamesAppMainShell() {
                     GameType.THIRTY_SECONDS -> ThirtySecondsScreen(onNavigateBack = { navController.popBackStack() })
                     GameType.CRANIUM -> CraniumScreen(onNavigateBack = { navController.popBackStack() })
                     GameType.FIFTY_FIFTY -> FiftyFiftyScreen(onNavigateBack = { navController.popBackStack() })
+                    GameType.RISK -> RiskScreen(onNavigateBack = { navController.popBackStack() })
                 }
             }
         }

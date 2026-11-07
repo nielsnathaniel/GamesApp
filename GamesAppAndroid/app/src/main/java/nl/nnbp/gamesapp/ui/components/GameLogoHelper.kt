@@ -35,6 +35,7 @@ fun getGameLogoResId(gameType: GameType): Int? {
         GameType.QWIXX -> R.drawable.game_qwixx
         GameType.REGENWORMEN -> R.drawable.game_regenwormen
         GameType.TICKET_TO_RIDE -> R.drawable.game_tickettoride
+        GameType.RISK -> R.drawable.game_risk
         else -> null
     }
 }
@@ -54,6 +55,7 @@ fun getGameLogoResIdByName(name: String): Int? {
         norm.contains("qwixx") -> R.drawable.game_qwixx
         norm.contains("regenworm") || norm.contains("worm") -> R.drawable.game_regenwormen
         norm.contains("ticket") || norm.contains("trein") -> R.drawable.game_tickettoride
+        norm.contains("risk") -> R.drawable.game_risk
         else -> null
     }
 }

@@ -48,6 +48,7 @@ struct ContentView: View {
         ("30 Seconds", "ThirtySeconds"),
         ("Cranium", "Cranium"),
         ("Fifty Fifty", "FiftyFifty"),
+        ("Risk", "Risk"),
         ("Wie begint?", "WieBegint"),
         ("Tafelschikking", "Tafelschikking")
     ]
@@ -326,6 +327,9 @@ struct ContentView: View {
         if assetName.caseInsensitiveCompare("fiftyfifty") == .orderedSame || assetName.caseInsensitiveCompare("fifty fifty") == .orderedSame {
             if UIImage(named: "FiftyFifty") != nil { return "FiftyFifty" }
         }
+        if assetName.caseInsensitiveCompare("risk") == .orderedSame {
+            if UIImage(named: "Risk") != nil { return "Risk" }
+        }
         return nil
     }
 
@@ -410,6 +414,7 @@ struct ContentView: View {
         case "30 Seconds": return "timer"
         case "Cranium": return "brain.head.profile"
         case "Fifty Fifty": return "square.stack.3d.up.fill"
+        case "Risk": return "shield.lefthalf.filled"
         case "Wie begint?": return "hand.tap.fill"
         default: return "gamecontroller.fill"
         }
@@ -429,6 +434,7 @@ struct ContentView: View {
         case "30 Seconds": return .orange
         case "Cranium": return .purple
         case "Fifty Fifty": return .orange
+        case "Risk": return .red
         case "Wie begint?": return .yellow
         default: return .green
         }
@@ -467,6 +473,8 @@ struct ContentView: View {
             CraniumSetupView()
         case "Fifty Fifty":
             FiftyFiftySetupView()
+        case "Risk":
+            RiskSetupView()
         case "Wie begint?":
             StartspelerKiezerView()
         case "Tafelschikking":

@@ -340,7 +340,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Ondersteunde Spellen")
                         Spacer()
-                        Text("14 spellen")
+                        Text("16 spellen (+ 2 tools)")
                             .foregroundColor(.secondary)
                     }
                 }

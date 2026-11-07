@@ -143,6 +143,15 @@ enum class GameType(
         maxPlayers = 6,
         description = "White Goblin kaartspel: ontwijk strafkaarten en de vos!",
         iconName = "layers"
+    ),
+    RISK(
+        id = "Risk",
+        displayName = "Risk",
+        isLowestScoreWins = false,
+        minPlayers = 2,
+        maxPlayers = 6,
+        description = "Wereldheerschappij assistent: gevechtsdobbelstenen, blitz, versterkingen en missies",
+        iconName = "military_tech"
     );
 
     companion object {

@@ -48,7 +48,7 @@ object DataBackupManager {
         val profiles = scoreManager.playerProfiles.value
 
         val root = buildJsonObject {
-            put("appVersion", "1.2.1")
+            put("appVersion", "1.3.0")
             put("exportDate", isoFormat.format(Date()))
             put("playerNames", buildJsonArray {
                 players.forEach { add(JsonPrimitive(it)) }
