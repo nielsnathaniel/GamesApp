@@ -424,8 +424,9 @@ final class CloudSyncManager: ObservableObject {
 
         let now = Date()
         let isoFormatter = ISO8601DateFormatter()
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.1"
         let payload = GamesAppCloudPayload(
-            appVersion: "1.0",
+            appVersion: currentVersion,
             exportDate: isoFormatter.string(from: now),
             lastUpdated: Int64(now.timeIntervalSince1970 * 1000),
             lastUpdatedDevice: "iOS",

@@ -334,7 +334,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Versie")
                         Spacer()
-                        Text("1.0 (iOS 18+)")
+                        Text("\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.1") (iOS 18+)")
                             .foregroundColor(.secondary)
                     }
                     HStack {

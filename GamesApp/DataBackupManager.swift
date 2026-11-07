@@ -67,8 +67,9 @@ final class DataBackupManager: ObservableObject {
 
     /// Genereert een JSON backup-bestand en geeft de bestands-URL terug
     func generateBackupFile() -> URL? {
+        let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.2.1"
         let backup = GamesAppBackupPayload(
-            appVersion: "1.0",
+            appVersion: currentVersion,
             exportDate: Date(),
             playerNames: scoreManager.fetchPlayerNames(),
             playedGames: scoreManager.playedGames,
