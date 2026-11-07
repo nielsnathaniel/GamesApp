@@ -16,7 +16,7 @@ struct GamesAppApp: App {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(themeManager.selectedTheme.colorScheme)
-                .onChange(of: scenePhase) { newPhase in
+                .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
                         CloudSyncManager.shared.syncNowIfNeeded()
                     }
