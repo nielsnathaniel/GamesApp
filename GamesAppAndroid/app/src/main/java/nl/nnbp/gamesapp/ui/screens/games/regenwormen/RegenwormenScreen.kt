@@ -24,6 +24,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +75,7 @@ fun RegenwormenScreen(
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
+    val haptic = LocalHapticFeedback.current
 
     var isGameStarted by remember { mutableStateOf(false) }
     var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
@@ -488,6 +491,7 @@ fun RegenwormenScreen(
                                                         .background(MaterialTheme.colorScheme.surfaceVariant)
                                                         .border(1.dp, AccentOrange.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                                                         .clickable {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                             // Pak steen van tafel
                                                             tableStones.remove(stone)
                                                             playerStacks[activePlayerIndex].add(stone)
@@ -561,6 +565,7 @@ fun RegenwormenScreen(
                                                 val worms = getStoneWorms(topStone)
                                                 Button(
                                                     onClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                         playerStacks[otherIdx].removeAt(playerStacks[otherIdx].lastIndex)
                                                         playerStacks[activePlayerIndex].add(topStone)
                                                         turnHistory.add(
@@ -662,6 +667,7 @@ fun RegenwormenScreen(
                                                         shape = RoundedCornerShape(10.dp)
                                                     )
                                                     .clickable {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                         if (ownerIndex == selectedAssignPlayerIndex) {
                                                             // Deselect
                                                             playerStacks[selectedAssignPlayerIndex].remove(stone)
@@ -725,6 +731,7 @@ fun RegenwormenScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         val activeStack = playerStacks.getOrNull(activePlayerIndex)
                         if (!activeStack.isNullOrEmpty()) {
                             val returnedStone = activeStack.removeAt(activeStack.lastIndex)
@@ -769,6 +776,7 @@ fun RegenwormenScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         playerStacks[fromIdx].remove(stone)
                         playerStacks[toIdx].add(stone)
                         pendingTransfer = null

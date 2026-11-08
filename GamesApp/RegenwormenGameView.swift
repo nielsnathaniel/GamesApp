@@ -582,6 +582,7 @@ struct RegenwormenGameView: View {
                         let wCount = wormen(voor: nummer)
 
                         Button(action: {
+                            HapticManager.shared.medium()
                             toggleSteenVoorEindstand(nummer)
                         }) {
                             VStack(spacing: 3) {
@@ -723,7 +724,7 @@ struct RegenwormenGameView: View {
         if let eig = eigenaar(van: nummer) {
             if eig.spelerIndex == geselecteerdeSpelerIndexVoorEindstand {
                 // Eigenaar tikt eigen steen aan: ontkoppel steen (maak weer vrij)
-                HapticManager.shared.light()
+                HapticManager.shared.medium()
                 spelerStapels[geselecteerdeSpelerIndexVoorEindstand].removeAll { $0 == nummer }
                 if !tafelStenen.contains(nummer) {
                     tafelStenen.append(nummer)
@@ -740,7 +741,7 @@ struct RegenwormenGameView: View {
             }
         } else {
             // Steen is nog vrij: wijs toe aan huidige speler
-            HapticManager.shared.light()
+            HapticManager.shared.medium()
             tafelStenen.removeAll { $0 == nummer }
             omgedraaideStenen.remove(nummer)
             spelerStapels[geselecteerdeSpelerIndexVoorEindstand].append(nummer)
@@ -827,6 +828,7 @@ struct RegenwormenGameView: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                         ForEach(tafelStenen, id: \.self) { nummer in
                             Button(action: {
+                                HapticManager.shared.medium()
                                 pakSteenVanTafel(nummer)
                             }) {
                                 dominoTileView(
@@ -927,6 +929,7 @@ struct RegenwormenGameView: View {
                                 // Alleen de LAATSTE (bovenste) steen mag gezien en afgepakt worden!
                                 if let steen = topSteen {
                                     Button(action: {
+                                        HapticManager.shared.medium()
                                         steelSteenVanMedespeler(van: otherIdx, steenNummer: steen)
                                     }) {
                                         miniSteenBadge(nummer: steen, wormenAantal: wormen(voor: steen), tint: otherKleur)
@@ -1054,7 +1057,7 @@ struct RegenwormenGameView: View {
 
     /// Actieve speler pakt een steen van de barbecue
     private func pakSteenVanTafel(_ nummer: Int) {
-        HapticManager.shared.success()
+        HapticManager.shared.medium()
 
         // 1. Verwijder van tafel
         tafelStenen.removeAll { $0 == nummer }
