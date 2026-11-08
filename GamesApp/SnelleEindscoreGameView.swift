@@ -25,6 +25,47 @@ struct SnelleEindscoreGameView: View {
     @State private var winnaarPlayer: Player = Player(name: "")
     @State private var winnaarTeamName: String = ""
 
+    // Fifty Fifty 100-controle & auto-fill
+    @State private var handmatigIngevuldFiftyFifty: Set<Int> = []
+    @State private var automatischAangevuldFiftyFiftyIndex: Int? = nil
+
+    private var isFiftyFifty: Bool {
+        gameName.caseInsensitiveCompare("Fifty Fifty") == .orderedSame || gameName.caseInsensitiveCompare("FiftyFifty") == .orderedSame
+    }
+
+    private var fiftyFiftyTotaal: Int {
+        scores.reduce(0, +)
+    }
+
+    private var isFiftyFiftyGeldig: Bool {
+        !isFiftyFifty || fiftyFiftyTotaal == 100
+    }
+
+    private func updateScore(at index: Int, newScore: Int, isHandmatig: Bool = true) {
+        guard index < scores.count else { return }
+        let clamped = isFiftyFifty ? max(0, min(100, newScore)) : (allowNegative ? newScore : max(0, newScore))
+        scores[index] = clamped
+
+        if isFiftyFifty {
+            if isHandmatig {
+                handmatigIngevuldFiftyFifty.insert(index)
+                if automatischAangevuldFiftyFiftyIndex == index {
+                    automatischAangevuldFiftyFiftyIndex = nil
+                }
+            }
+            // Auto-fill laatste speler als N-1 handmatig zijn ingevuld
+            let nietIngevuld = Array(0..<itemCount).filter { !handmatigIngevuldFiftyFifty.contains($0) }
+            if nietIngevuld.count == 1, let targetIdx = nietIngevuld.first {
+                let somAnderen = (0..<itemCount).filter { $0 != targetIdx }.reduce(0) { $0 + (scores[safe: $1] ?? 0) }
+                let restant = max(0, 100 - somAnderen)
+                if targetIdx < scores.count {
+                    scores[targetIdx] = restant
+                    automatischAangevuldFiftyFiftyIndex = targetIdx
+                }
+            }
+        }
+    }
+
     init(
         gameName: String,
         assetName: String? = nil,
@@ -102,6 +143,11 @@ struct SnelleEindscoreGameView: View {
 
                 // Instructie banner
                 instructionBanner
+
+                // Fifty Fifty 100-controle banner
+                if isFiftyFifty {
+                    fiftyFiftyControleBanner
+                }
 
                 // Speler / Team Score Rijtjes
                 scoresListSection
@@ -189,6 +235,113 @@ struct SnelleEindscoreGameView: View {
         .padding(.horizontal)
     }
 
+    private var fiftyFiftyControleBanner: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                if isFiftyFiftyGeldig {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Totaal: 100 / 100 strafkaarten ✅")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                        Text("Klopt exact! Alle 100 kaarten zijn verdeeld.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else if fiftyFiftyTotaal < 100 {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Totaal: \(fiftyFiftyTotaal) / 100 strafkaarten")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.orange)
+                        let rest = 100 - fiftyFiftyTotaal
+                        Text("Nog \(rest) strafkaart\(rest == 1 ? "" : "en") te verdelen.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Image(systemName: "xmark.octagon.fill")
+                        .foregroundColor(.red)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Totaal: \(fiftyFiftyTotaal) / 100 strafkaarten")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.red)
+                        let teVeel = fiftyFiftyTotaal - 100
+                        Text("\(teVeel) strafkaart\(teVeel == 1 ? "" : "en") te veel ingevoerd!")
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                    }
+                }
+
+                Spacer()
+
+                Text("\(fiftyFiftyTotaal)/100")
+                    .font(.subheadline)
+                    .fontWeight(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        isFiftyFiftyGeldig ? Color.green.opacity(0.18) :
+                        (fiftyFiftyTotaal > 100 ? Color.red.opacity(0.18) : Color.orange.opacity(0.18))
+                    )
+                    .foregroundColor(isFiftyFiftyGeldig ? .green : (fiftyFiftyTotaal > 100 ? .red : .orange))
+                    .clipShape(Capsule())
+            }
+
+            // Quick actie als er nog 1 persoon niet handmatig is ingevuld
+            let nietIngevuld = Array(0..<itemCount).filter { !handmatigIngevuldFiftyFifty.contains($0) }
+            if nietIngevuld.count == 1, let targetIdx = nietIngevuld.first, fiftyFiftyTotaal != 100 {
+                let somAnderen = (0..<itemCount).filter { $0 != targetIdx }.reduce(0) { $0 + (scores[safe: $1] ?? 0) }
+                let restant = max(0, 100 - somAnderen)
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        HapticManager.shared.light()
+                        updateScore(at: targetIdx, newScore: restant, isHandmatig: true)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "wand.and.stars")
+                            Text("Vul restant in bij \(itemName(at: targetIdx)) (\(restant) pt)")
+                                .fontWeight(.semibold)
+                        }
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 10)
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            isFiftyFiftyGeldig ? Color.green.opacity(0.08) :
+            (fiftyFiftyTotaal > 100 ? Color.red.opacity(0.08) : Color.orange.opacity(0.08))
+        )
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    isFiftyFiftyGeldig ? Color.green.opacity(0.3) :
+                    (fiftyFiftyTotaal > 100 ? Color.red.opacity(0.3) : Color.orange.opacity(0.3)),
+                    lineWidth: 1.5
+                )
+        )
+        .padding(.horizontal)
+    }
+
     private var scoresListSection: some View {
         VStack(spacing: 12) {
             ForEach(0..<itemCount, id: \.self) { idx in
@@ -204,10 +357,25 @@ struct SnelleEindscoreGameView: View {
                             .frame(width: 28, alignment: .center)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(name)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
+                            HStack(spacing: 6) {
+                                Text(name)
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.primary)
+
+                                if isFiftyFifty && automatischAangevuldFiftyFiftyIndex == idx {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "wand.and.stars")
+                                        Text("Aangevuld")
+                                    }
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.orange)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.orange.opacity(0.15))
+                                    .clipShape(Capsule())
+                                }
+                            }
 
                             if let members = members {
                                 Text(members)
@@ -223,7 +391,7 @@ struct SnelleEindscoreGameView: View {
                             Button(action: {
                                 HapticManager.shared.light()
                                 if idx < scores.count {
-                                    scores[idx] -= 5
+                                    updateScore(at: idx, newScore: scores[idx] - 5)
                                 }
                             }) {
                                 Text("-5")
@@ -238,7 +406,7 @@ struct SnelleEindscoreGameView: View {
                             Button(action: {
                                 HapticManager.shared.light()
                                 if idx < scores.count {
-                                    scores[idx] -= 1
+                                    updateScore(at: idx, newScore: scores[idx] - 1)
                                 }
                             }) {
                                 Image(systemName: "minus.circle.fill")
@@ -248,9 +416,12 @@ struct SnelleEindscoreGameView: View {
 
                             if idx < scores.count {
                                 NumericScoreInputView(
-                                    score: $scores[idx],
-                                    allowNegative: allowNegative,
-                                    range: -999...9999,
+                                    score: Binding(
+                                        get: { scores[idx] },
+                                        set: { updateScore(at: idx, newScore: $0) }
+                                    ),
+                                    allowNegative: allowNegative && !isFiftyFifty,
+                                    range: isFiftyFifty ? 0...100 : -999...9999,
                                     tintColor: themeColor,
                                     minWidth: 54,
                                     height: 36
@@ -260,7 +431,7 @@ struct SnelleEindscoreGameView: View {
                             Button(action: {
                                 HapticManager.shared.light()
                                 if idx < scores.count {
-                                    scores[idx] += 1
+                                    updateScore(at: idx, newScore: scores[idx] + 1)
                                 }
                             }) {
                                 Image(systemName: "plus.circle.fill")
@@ -271,7 +442,7 @@ struct SnelleEindscoreGameView: View {
                             Button(action: {
                                 HapticManager.shared.light()
                                 if idx < scores.count {
-                                    scores[idx] += 5
+                                    updateScore(at: idx, newScore: scores[idx] + 5)
                                 }
                             }) {
                                 Text("+5")
@@ -371,24 +542,44 @@ struct SnelleEindscoreGameView: View {
     }
 
     private var submitButton: some View {
-        Button(action: {
-            HapticManager.shared.medium()
-            bepaalWinnaarEnGaVerder()
-        }) {
-            HStack(spacing: 8) {
-                Image(systemName: "trophy.fill")
-                Text("Bekijk Uitslag & Winnaar")
+        VStack(spacing: 8) {
+            Button(action: {
+                if isFiftyFiftyGeldig {
+                    HapticManager.shared.medium()
+                    bepaalWinnaarEnGaVerder()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: isFiftyFiftyGeldig ? "trophy.fill" : "lock.fill")
+                    Text("Bekijk Uitslag & Winnaar")
+                }
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(isFiftyFiftyGeldig ? themeColor : Color.gray.opacity(0.5))
+                .cornerRadius(14)
+                .shadow(color: isFiftyFiftyGeldig ? themeColor.opacity(0.35) : Color.clear, radius: 6, x: 0, y: 3)
             }
-            .font(.headline)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(themeColor)
-            .cornerRadius(14)
-            .shadow(color: themeColor.opacity(0.35), radius: 6, x: 0, y: 3)
+            .disabled(!isFiftyFiftyGeldig)
+            .padding(.horizontal)
+
+            if isFiftyFifty && !isFiftyFiftyGeldig {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(fiftyFiftyTotaal > 100 ? .red : .orange)
+                    if fiftyFiftyTotaal < 100 {
+                        Text("Totaal moet exact 100 zijn om door te gaan (nog \(100 - fiftyFiftyTotaal) open).")
+                    } else {
+                        Text("Totaal moet exact 100 zijn om door te gaan (\(fiftyFiftyTotaal - 100) te veel).")
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+            }
         }
-        .padding(.horizontal)
     }
 
     // MARK: - Afronden & Winnaar
@@ -471,6 +662,8 @@ struct SnelleEindscoreGameView: View {
         scores = Array(repeating: initialScore, count: itemCount)
         juisteBalzakken = Array(repeating: 0, count: itemCount)
         fouteBalzakken = Array(repeating: 0, count: itemCount)
+        handmatigIngevuldFiftyFifty.removeAll()
+        automatischAangevuldFiftyFiftyIndex = nil
         showWinnaarView = false
     }
 }

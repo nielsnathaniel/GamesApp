@@ -38,6 +38,10 @@ struct FiftyFiftyGameView: View {
     @State private var showRestoreDialog: Bool = false
     @State private var showPuntenWijzigenSheet: Bool = false
 
+    // Fifty Fifty 100-kaarten controle & automatische aanvulling
+    @State private var handmatigIngevuld: Set<Int> = []
+    @State private var automatischAangevuldIndex: Int? = nil
+
     init(
         spelers: [String],
         gameMode: FiftyFiftyWhiteGoblinMode = .rondes,
@@ -91,6 +95,9 @@ struct FiftyFiftyGameView: View {
 
                 // Voskaart waarschuwing / banner
                 vosRuleBanner
+
+                // Totaal strafkaarten controle banner (moet altijd 100 zijn)
+                scoreControleBanner
 
                 // Spelerslijst met strafkaarten invoer
                 playersList
@@ -269,6 +276,163 @@ struct FiftyFiftyGameView: View {
         .padding(.horizontal)
     }
 
+    // MARK: - Fifty Fifty 100-Strafkaarten Controle Banner
+
+    private var huidigeRondeTotaal: Int {
+        rondeStrafkaarten.reduce(0, +)
+    }
+
+    private var isTotaalGeldig: Bool {
+        huidigeRondeTotaal == 100
+    }
+
+    private var overgeblevenNietIngevuldeSpelerIndex: Int? {
+        guard spelers.count >= 2 else { return nil }
+        let nietIngevuld = spelers.indices.filter { !handmatigIngevuld.contains($0) }
+        return nietIngevuld.count == 1 ? nietIngevuld.first : nil
+    }
+
+    private func updateSpelerScore(index: Int, newScore: Int, isHandmatig: Bool = true) {
+        let clamped = max(0, min(100, newScore))
+        rondeStrafkaarten[index] = clamped
+
+        if isHandmatig {
+            handmatigIngevuld.insert(index)
+            if automatischAangevuldIndex == index {
+                automatischAangevuldIndex = nil
+            }
+        }
+
+        // Automatisch de laatste overgebleven persoon invullen als er N-1 spelers zijn ingevuld
+        controleerEnVulLaatsteSpelerIn()
+        saveDraft()
+    }
+
+    private func controleerEnVulLaatsteSpelerIn() {
+        guard spelers.count >= 2 else { return }
+        let nietIngevuld = spelers.indices.filter { !handmatigIngevuld.contains($0) }
+        if nietIngevuld.count == 1, let targetIdx = nietIngevuld.first {
+            let somAnderen = spelers.indices.filter { $0 != targetIdx }.reduce(0) { $0 + rondeStrafkaarten[$1] }
+            let restant = max(0, 100 - somAnderen)
+            rondeStrafkaarten[targetIdx] = restant
+            automatischAangevuldIndex = targetIdx
+        }
+    }
+
+    private func pasRestantHandmatigToe(targetIdx: Int, restant: Int) {
+        rondeStrafkaarten[targetIdx] = max(0, restant)
+        handmatigIngevuld.insert(targetIdx)
+        automatischAangevuldIndex = nil
+        saveDraft()
+    }
+
+    private var scoreControleBanner: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                if isTotaalGeldig {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Totaal: 100 / 100 strafkaarten ✅")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                        Text("Klopt exact! Alle 100 kaarten zijn verdeeld.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else if huidigeRondeTotaal < 100 {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Totaal: \(huidigeRondeTotaal) / 100 strafkaarten")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.orange)
+                        let rest = 100 - huidigeRondeTotaal
+                        Text("Nog \(rest) strafkaart\(rest == 1 ? "" : "en") te verdelen.")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Image(systemName: "xmark.octagon.fill")
+                        .foregroundColor(.red)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Totaal: \(huidigeRondeTotaal) / 100 strafkaarten")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.red)
+                        let teVeel = huidigeRondeTotaal - 100
+                        Text("\(teVeel) strafkaart\(teVeel == 1 ? "" : "en") te veel ingevoerd!")
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                    }
+                }
+
+                Spacer()
+
+                // Badge
+                Text("\(huidigeRondeTotaal)/100")
+                    .font(.subheadline)
+                    .fontWeight(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        isTotaalGeldig ? Color.green.opacity(0.18) :
+                        (huidigeRondeTotaal > 100 ? Color.red.opacity(0.18) : Color.orange.opacity(0.18))
+                    )
+                    .foregroundColor(isTotaalGeldig ? .green : (huidigeRondeTotaal > 100 ? .red : .orange))
+                    .clipShape(Capsule())
+            }
+
+            // Quick button als er nog 1 persoon niet is ingevuld of om restant toe te passen
+            if let targetIdx = overgeblevenNietIngevuldeSpelerIndex, huidigeRondeTotaal != 100 {
+                let somAnderen = spelers.indices.filter { $0 != targetIdx }.reduce(0) { $0 + rondeStrafkaarten[$1] }
+                let restant = max(0, 100 - somAnderen)
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        HapticManager.shared.light()
+                        pasRestantHandmatigToe(targetIdx: targetIdx, restant: restant)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "wand.and.stars")
+                            Text("Vul restant in bij \(spelers[targetIdx]) (\(restant) pt)")
+                                .fontWeight(.semibold)
+                        }
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 10)
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            isTotaalGeldig ? Color.green.opacity(0.08) :
+            (huidigeRondeTotaal > 100 ? Color.red.opacity(0.08) : Color.orange.opacity(0.08))
+        )
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    isTotaalGeldig ? Color.green.opacity(0.3) :
+                    (huidigeRondeTotaal > 100 ? Color.red.opacity(0.3) : Color.orange.opacity(0.3)),
+                    lineWidth: 1.5
+                )
+        )
+        .padding(.horizontal)
+    }
+
     // MARK: - Spelers Kaartenlijst
 
     private var playersList: some View {
@@ -290,14 +454,29 @@ struct FiftyFiftyGameView: View {
             // Spelerheader + Strafkaarten badge
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(name)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                    HStack(spacing: 6) {
+                        Text(name)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+
+                        if automatischAangevuldIndex == index {
+                            HStack(spacing: 3) {
+                                Image(systemName: "wand.and.stars")
+                                Text("Aangevuld")
+                            }
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15))
+                            .clipShape(Capsule())
+                        }
+                    }
 
                     if hasFox {
                         HStack(spacing: 4) {
                             Text("🦊")
-                            Text("Vos op hand (+10 pt & verliest ronde)")
+                            Text("Vos op hand (verliest ronde)")
                                 .font(.caption2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.red)
@@ -347,32 +526,39 @@ struct FiftyFiftyGameView: View {
 
             // Invoerknoppen voor strafkaarten
             VStack(spacing: 8) {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Button(action: {
                         HapticManager.shared.light()
                         if rondeStrafkaarten[index] > 0 {
-                            rondeStrafkaarten[index] -= 1
-                            saveDraft()
+                            updateSpelerScore(index: index, newScore: rondeStrafkaarten[index] - 1)
                         }
                     }) {
                         Image(systemName: "minus.circle.fill")
-                            .font(.title)
+                            .font(.title2)
                             .foregroundColor(rondeStrafkaarten[index] > 0 ? .orange : .gray.opacity(0.3))
                     }
                     .disabled(rondeStrafkaarten[index] <= 0)
 
-                    Text("\(currentRoundScore)")
-                        .font(.title2)
-                        .fontWeight(.black)
-                        .frame(minWidth: 44)
+                    NumericScoreInputView(
+                        score: Binding(
+                            get: { rondeStrafkaarten[index] },
+                            set: { updateSpelerScore(index: index, newScore: $0) }
+                        ),
+                        allowNegative: false,
+                        range: 0...100,
+                        tintColor: .orange,
+                        placeholder: "0",
+                        minWidth: 50,
+                        height: 36,
+                        font: .title3
+                    )
 
                     Button(action: {
                         HapticManager.shared.light()
-                        rondeStrafkaarten[index] += 1
-                        saveDraft()
+                        updateSpelerScore(index: index, newScore: rondeStrafkaarten[index] + 1)
                     }) {
                         Image(systemName: "plus.circle.fill")
-                            .font(.title)
+                            .font(.title2)
                             .foregroundColor(.orange)
                     }
 
@@ -383,8 +569,7 @@ struct FiftyFiftyGameView: View {
                         ForEach([1, 2, 5], id: \.self) { amount in
                             Button(action: {
                                 HapticManager.shared.light()
-                                rondeStrafkaarten[index] += amount
-                                saveDraft()
+                                updateSpelerScore(index: index, newScore: rondeStrafkaarten[index] + amount)
                             }) {
                                 Text("+\(amount)")
                                     .font(.caption)
@@ -403,11 +588,6 @@ struct FiftyFiftyGameView: View {
                 Button(action: {
                     HapticManager.shared.medium()
                     heeftVosOpHand[index].toggle()
-                    if heeftVosOpHand[index] {
-                        rondeStrafkaarten[index] += 10
-                    } else {
-                        rondeStrafkaarten[index] = max(0, rondeStrafkaarten[index] - 10)
-                    }
                     saveDraft()
                 }) {
                     HStack(spacing: 8) {
@@ -415,7 +595,7 @@ struct FiftyFiftyGameView: View {
                             .foregroundColor(hasFox ? .red : .secondary)
                             .font(.subheadline)
 
-                        Text("🦊 Vos op hand (+10 strafkaarten & verliest ronde)")
+                        Text("🦊 Vos op hand (verliest direct bij einde)")
                             .font(.caption)
                             .fontWeight(hasFox ? .bold : .regular)
                             .foregroundColor(hasFox ? .red : .secondary)
@@ -443,9 +623,13 @@ struct FiftyFiftyGameView: View {
             if gameMode == .rondes {
                 if huidigeRonde < aantalRondesDoel {
                     // Volgende Ronde knop
-                    Button(action: volgendeRonde) {
+                    Button(action: {
+                        if isTotaalGeldig {
+                            volgendeRonde()
+                        }
+                    }) {
                         HStack(spacing: 8) {
-                            Image(systemName: "arrow.right.circle.fill")
+                            Image(systemName: isTotaalGeldig ? "arrow.right.circle.fill" : "lock.fill")
                             Text("Voltooi Ronde \(huidigeRonde) / \(aantalRondesDoel)")
                         }
                         .font(.headline)
@@ -453,16 +637,21 @@ struct FiftyFiftyGameView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.orange)
+                        .background(isTotaalGeldig ? Color.orange : Color.gray.opacity(0.5))
                         .cornerRadius(12)
-                        .shadow(color: Color.orange.opacity(0.35), radius: 5, x: 0, y: 3)
+                        .shadow(color: isTotaalGeldig ? Color.orange.opacity(0.35) : Color.clear, radius: 5, x: 0, y: 3)
                     }
+                    .disabled(!isTotaalGeldig)
                     .padding(.horizontal)
                 } else {
                     // Laatste ronde voltooid -> Afronden knop
-                    Button(action: finishGame) {
+                    Button(action: {
+                        if isTotaalGeldig {
+                            finishGame()
+                        }
+                    }) {
                         HStack(spacing: 8) {
-                            Image(systemName: "flag.checkered")
+                            Image(systemName: isTotaalGeldig ? "flag.checkered" : "lock.fill")
                             Text("Voltooi Laatste Ronde & Bekijk Winnaar")
                         }
                         .font(.headline)
@@ -470,32 +659,72 @@ struct FiftyFiftyGameView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.green)
+                        .background(isTotaalGeldig ? Color.green : Color.gray.opacity(0.5))
                         .cornerRadius(12)
-                        .shadow(color: Color.green.opacity(0.35), radius: 5, x: 0, y: 3)
+                        .shadow(color: isTotaalGeldig ? Color.green.opacity(0.35) : Color.clear, radius: 5, x: 0, y: 3)
                     }
+                    .disabled(!isTotaalGeldig)
                     .padding(.horizontal)
                 }
+            } else {
+                // Enkele pot
+                Button(action: {
+                    if isTotaalGeldig {
+                        finishGame()
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: isTotaalGeldig ? "flag.checkered" : "lock.fill")
+                        Text("Spel Afronden & Uitslag Bekijken")
+                    }
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(isTotaalGeldig ? Color.green : Color.gray.opacity(0.5))
+                    .cornerRadius(12)
+                    .shadow(color: isTotaalGeldig ? Color.green.opacity(0.35) : Color.clear, radius: 5, x: 0, y: 3)
+                }
+                .disabled(!isTotaalGeldig)
+                .padding(.horizontal)
+            }
+
+            if !isTotaalGeldig {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(huidigeRondeTotaal > 100 ? .red : .orange)
+                    if huidigeRondeTotaal < 100 {
+                        Text("Totaal moet exact 100 zijn om door te gaan (nog \(100 - huidigeRondeTotaal) open).")
+                    } else {
+                        Text("Totaal moet exact 100 zijn om door te gaan (\(huidigeRondeTotaal - 100) te veel).")
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
             }
 
             // Tussentijds afronden knop
-            Button(action: {
-                HapticManager.shared.medium()
-                showFinishConfirm = true
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "flag.checkered")
-                    Text("Spel Nu Afronden")
+            if gameMode == .rondes && (!rondeGeschiedenis.isEmpty || isTotaalGeldig) {
+                Button(action: {
+                    HapticManager.shared.medium()
+                    showFinishConfirm = true
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flag.checkered")
+                        Text("Spel Nu Voortijdig Afronden")
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(10)
                 }
-                .font(.subheadline)
-                .fontWeight(.bold)
-                .foregroundColor(.red)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(10)
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
         .padding(.top, 8)
     }
@@ -525,6 +754,8 @@ struct FiftyFiftyGameView: View {
         // 3. Reset ronde invoervelden
         rondeStrafkaarten = Array(repeating: 0, count: spelers.count)
         heeftVosOpHand = Array(repeating: false, count: spelers.count)
+        handmatigIngevuld.removeAll()
+        automatischAangevuldIndex = nil
 
         // 4. Volgende ronde
         huidigeRonde += 1
@@ -537,6 +768,8 @@ struct FiftyFiftyGameView: View {
             totaleStrafkaarten = entry.totaleStrafkaartenNaRonde
             rondeStrafkaarten = Array(repeating: 0, count: spelers.count)
             heeftVosOpHand = entry.vosOpHandDezeRonde
+            handmatigIngevuld.removeAll()
+            automatischAangevuldIndex = nil
             rondeGeschiedenis.removeAll { $0.ronde >= entry.ronde }
             huidigeRonde = entry.ronde
             toonGeschiedenisSheet = false
@@ -632,6 +865,8 @@ struct FiftyFiftyGameView: View {
         totaleStrafkaarten = Array(repeating: 0, count: spelers.count)
         rondeStrafkaarten = Array(repeating: 0, count: spelers.count)
         heeftVosOpHand = Array(repeating: false, count: spelers.count)
+        handmatigIngevuld.removeAll()
+        automatischAangevuldIndex = nil
         rondeGeschiedenis.removeAll()
         huidigeRonde = 1
         activeGameManager.clearActiveGame()
@@ -676,6 +911,10 @@ struct FiftyFiftyGameView: View {
             let parts = rs.split(separator: ",").compactMap { Int($0) }
             if parts.count == spelers.count {
                 self.rondeStrafkaarten = parts
+                for i in parts.indices where parts[i] > 0 {
+                    self.handmatigIngevuld.insert(i)
+                }
+                controleerEnVulLaatsteSpelerIn()
             }
         }
         if let v = draft.stateData["heeftVosOpHand"] {

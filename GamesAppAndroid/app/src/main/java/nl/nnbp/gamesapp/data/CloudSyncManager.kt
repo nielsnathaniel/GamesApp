@@ -397,7 +397,7 @@ class CloudSyncManager private constructor(private val context: Context) {
 
             val now = System.currentTimeMillis()
             val payload = buildJsonObject {
-                put("appVersion", "1.3.0")
+                put("appVersion", "1.3.1")
                 put("exportDate", isoFormat.format(Date(now)))
                 put("lastUpdated", now)
                 put("lastUpdatedDevice", "Android")

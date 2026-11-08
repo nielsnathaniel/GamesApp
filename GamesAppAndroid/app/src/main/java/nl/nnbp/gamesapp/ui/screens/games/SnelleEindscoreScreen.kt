@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ import nl.nnbp.gamesapp.ui.screens.winner.WinnaarScreen
 import nl.nnbp.gamesapp.ui.theme.AccentOrange
 import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 import nl.nnbp.gamesapp.ui.theme.SuccessGreen
+import nl.nnbp.gamesapp.ui.theme.WarningRed
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +44,42 @@ fun SnelleEindscoreScreen(
     val scoreManager = remember { ScoreManager.getInstance() }
     var scores by remember { mutableStateOf(playerNames.map { initialScore }.toMutableList()) }
     var isGameOver by remember { mutableStateOf(false) }
+
+    val isFiftyFifty = gameName.equals("Fifty Fifty", ignoreCase = true) || gameName.equals("FiftyFifty", ignoreCase = true)
+    var manuallyEnteredIndices by remember { mutableStateOf(setOf<Int>()) }
+    var autoFilledIndex by remember { mutableStateOf<Int?>(null) }
+    val fiftyFiftyTotal = scores.sum()
+    val isFiftyFiftyValid = !isFiftyFifty || fiftyFiftyTotal == 100
+
+    fun updatePlayerScore(idx: Int, newScore: Int, isManual: Boolean = true) {
+        val clamped = if (isFiftyFifty) newScore.coerceIn(0, 100) else newScore
+        val list = scores.toMutableList()
+        if (idx < list.size) {
+            list[idx] = clamped
+        }
+        if (isFiftyFifty) {
+            val updatedManual = manuallyEnteredIndices.toMutableSet()
+            if (isManual) {
+                updatedManual.add(idx)
+                if (autoFilledIndex == idx) {
+                    autoFilledIndex = null
+                }
+            }
+            manuallyEnteredIndices = updatedManual
+
+            val unentered = playerNames.indices.filter { !updatedManual.contains(it) }
+            if (unentered.size == 1) {
+                val targetIdx = unentered[0]
+                val sumOthers = playerNames.indices.filter { it != targetIdx }.sumOf { list.getOrElse(it) { 0 } }
+                val remainder = (100 - sumOthers).coerceAtLeast(0)
+                if (targetIdx < list.size) {
+                    list[targetIdx] = remainder
+                    autoFilledIndex = targetIdx
+                }
+            }
+        }
+        scores = list
+    }
 
     // Live rangorde
     val sortedIndices = remember(scores, isLowestScoreWins) {
@@ -129,6 +167,113 @@ fun SnelleEindscoreScreen(
                     }
                 }
 
+                if (isFiftyFifty) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = when {
+                                    isFiftyFiftyValid -> SuccessGreen.copy(alpha = 0.12f)
+                                    fiftyFiftyTotal > 100 -> WarningRed.copy(alpha = 0.12f)
+                                    else -> AccentOrange.copy(alpha = 0.12f)
+                                }
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.5.dp,
+                                when {
+                                    isFiftyFiftyValid -> SuccessGreen.copy(alpha = 0.4f)
+                                    fiftyFiftyTotal > 100 -> WarningRed.copy(alpha = 0.4f)
+                                    else -> AccentOrange.copy(alpha = 0.4f)
+                                }
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            when {
+                                                isFiftyFiftyValid -> "✅"
+                                                fiftyFiftyTotal > 100 -> "❌"
+                                                else -> "⚠️"
+                                            },
+                                            fontSize = 20.sp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                "Totaal: $fiftyFiftyTotal / 100 strafkaarten",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
+                                                color = when {
+                                                    isFiftyFiftyValid -> SuccessGreen
+                                                    fiftyFiftyTotal > 100 -> WarningRed
+                                                    else -> AccentOrange
+                                                }
+                                            )
+                                            Text(
+                                                when {
+                                                    isFiftyFiftyValid -> "Klopt exact! Alle 100 kaarten zijn verdeeld."
+                                                    fiftyFiftyTotal < 100 -> "Nog ${100 - fiftyFiftyTotal} strafkaarten te verdelen."
+                                                    else -> "${fiftyFiftyTotal - 100} strafkaarten te veel ingevoerd!"
+                                                },
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                            )
+                                        }
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = when {
+                                            isFiftyFiftyValid -> SuccessGreen.copy(alpha = 0.2f)
+                                            fiftyFiftyTotal > 100 -> WarningRed.copy(alpha = 0.2f)
+                                            else -> AccentOrange.copy(alpha = 0.2f)
+                                        }
+                                    ) {
+                                        Text(
+                                            "$fiftyFiftyTotal / 100",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = when {
+                                                isFiftyFiftyValid -> SuccessGreen
+                                                fiftyFiftyTotal > 100 -> WarningRed
+                                                else -> AccentOrange
+                                            }
+                                        )
+                                    }
+                                }
+
+                                val unentered = playerNames.indices.filter { !manuallyEnteredIndices.contains(it) }
+                                if (unentered.size == 1 && fiftyFiftyTotal != 100) {
+                                    val targetIdx = unentered[0]
+                                    val sumOthers = playerNames.indices.filter { it != targetIdx }.sumOf { scores.getOrElse(it) { 0 } }
+                                    val remainder = (100 - sumOthers).coerceAtLeast(0)
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                        TextButton(
+                                            onClick = {
+                                                updatePlayerScore(targetIdx, remainder, isManual = true)
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                "⚡ Vul restant in bij ${playerNames[targetIdx]} ($remainder pt)",
+                                                fontSize = 11.sp,
+                                                color = AccentOrange,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 itemsIndexed(playerNames) { idx, name ->
                     val profile = scoreManager.getPlayerProfile(name)
                     val playerColor = Color(profile.colorHex)
@@ -193,7 +338,15 @@ fun SnelleEindscoreScreen(
                                 }
 
                                 Column {
-                                    Text(name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        if (isFiftyFifty && autoFilledIndex == idx) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(shape = RoundedCornerShape(4.dp), color = AccentOrange.copy(alpha = 0.2f)) {
+                                                Text("✨ Aangevuld", color = AccentOrange, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                            }
+                                        }
+                                    }
                                     Text(
                                         text = if (rank == 1) "Leidt de wedstrijd" else "$currentScore $scoreUnit",
                                         style = MaterialTheme.typography.bodySmall,
@@ -206,11 +359,7 @@ fun SnelleEindscoreScreen(
                             NumericScoreStepper(
                                 score = currentScore,
                                 onScoreChange = { newScore ->
-                                    val list = scores.toMutableList()
-                                    if (idx < list.size) {
-                                        list[idx] = newScore
-                                        scores = list
-                                    }
+                                    updatePlayerScore(idx, newScore, isManual = true)
                                 },
                                 enableLargeStep = true
                             )
@@ -241,15 +390,29 @@ fun SnelleEindscoreScreen(
 
                     isGameOver = true
                 },
+                enabled = isFiftyFiftyValid,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isFiftyFiftyValid) PrimaryBlue else Color.Gray.copy(alpha = 0.5f)
+                )
             ) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Uitslag Opslaan & Naar Podium", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (isFiftyFifty && !isFiftyFiftyValid) {
+                    Icon(Icons.Default.Info, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        if (fiftyFiftyTotal < 100) "Totaal moet 100 zijn (nu: $fiftyFiftyTotal, nog ${100 - fiftyFiftyTotal} open)"
+                        else "Totaal moet 100 zijn (nu: $fiftyFiftyTotal, ${fiftyFiftyTotal - 100} te veel)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Uitslag Opslaan & Naar Podium", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

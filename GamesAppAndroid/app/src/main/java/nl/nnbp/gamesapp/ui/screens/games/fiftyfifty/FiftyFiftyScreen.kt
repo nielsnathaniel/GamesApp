@@ -63,6 +63,10 @@ fun FiftyFiftyScreen(
     var history by remember { mutableStateOf(mutableListOf<FiftyFiftyRoundRecord>()) }
     var showHistoryDialog by remember { mutableStateOf(false) }
 
+    // Fifty Fifty 100-controle & auto-fill state
+    var manuallyEnteredIndices by remember { mutableStateOf(setOf<Int>()) }
+    var autoFilledIndex by remember { mutableStateOf<Int?>(null) }
+
     var isGameOver by remember { mutableStateOf(false) }
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showEditScoresDialog by remember { mutableStateOf(false) }
@@ -306,6 +310,8 @@ fun FiftyFiftyScreen(
                                 hasFoxInHand = MutableList(selectedPlayerNames.size) { false }
                                 totalFoxCount = MutableList(selectedPlayerNames.size) { 0 }
                                 totalPenalties = MutableList(selectedPlayerNames.size) { 0 }
+                                manuallyEnteredIndices = emptySet()
+                                autoFilledIndex = null
                                 currentRound = 1
                                 history.clear()
                                 isGameStarted = true
@@ -332,6 +338,40 @@ fun FiftyFiftyScreen(
             val scoresPairList = selectedPlayerNames.indices.map { i ->
                 val total = totalPenalties.getOrElse(i) { 0 } + roundPenalties.getOrElse(i) { 0 }
                 Pair(selectedPlayerNames[i], total)
+            }
+            val currentRoundTotal = roundPenalties.sum()
+            val isTotalValid = currentRoundTotal == 100
+
+            var editingPlayerIndex by remember { mutableStateOf<Int?>(null) }
+            var editingScoreText by remember { mutableStateOf("") }
+
+            fun updatePlayerPenalty(idx: Int, newScore: Int, isManual: Boolean = true) {
+                val clamped = newScore.coerceIn(0, 100)
+                val list = roundPenalties.toMutableList()
+                if (idx < list.size) {
+                    list[idx] = clamped
+                }
+                val updatedManual = manuallyEnteredIndices.toMutableSet()
+                if (isManual) {
+                    updatedManual.add(idx)
+                    if (autoFilledIndex == idx) {
+                        autoFilledIndex = null
+                    }
+                }
+                manuallyEnteredIndices = updatedManual
+
+                // Auto-fill check: als exact 1 speler nog niet handmatig is ingevuld
+                val unentered = selectedPlayerNames.indices.filter { !updatedManual.contains(it) }
+                if (unentered.size == 1) {
+                    val targetIdx = unentered[0]
+                    val sumOthers = selectedPlayerNames.indices.filter { it != targetIdx }.sumOf { list.getOrElse(it) { 0 } }
+                    val remainder = (100 - sumOthers).coerceAtLeast(0)
+                    if (targetIdx < list.size) {
+                        list[targetIdx] = remainder
+                        autoFilledIndex = targetIdx
+                    }
+                }
+                roundPenalties = list
             }
 
             Column(
@@ -407,6 +447,117 @@ fun FiftyFiftyScreen(
                         }
                     }
 
+                    // Fifty Fifty 100-Strafkaarten Controle Card
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = when {
+                                    isTotalValid -> SuccessGreen.copy(alpha = 0.12f)
+                                    currentRoundTotal > 100 -> WarningRed.copy(alpha = 0.12f)
+                                    else -> AccentOrange.copy(alpha = 0.12f)
+                                }
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.5.dp,
+                                when {
+                                    isTotalValid -> SuccessGreen.copy(alpha = 0.4f)
+                                    currentRoundTotal > 100 -> WarningRed.copy(alpha = 0.4f)
+                                    else -> AccentOrange.copy(alpha = 0.4f)
+                                }
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            when {
+                                                isTotalValid -> "✅"
+                                                currentRoundTotal > 100 -> "❌"
+                                                else -> "⚠️"
+                                            },
+                                            fontSize = 20.sp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                when {
+                                                    isTotalValid -> "Totaal: 100 / 100 strafkaarten"
+                                                    currentRoundTotal < 100 -> "Totaal: $currentRoundTotal / 100 strafkaarten"
+                                                    else -> "Totaal: $currentRoundTotal / 100 strafkaarten"
+                                                },
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
+                                                color = when {
+                                                    isTotalValid -> SuccessGreen
+                                                    currentRoundTotal > 100 -> WarningRed
+                                                    else -> AccentOrange
+                                                }
+                                            )
+                                            Text(
+                                                when {
+                                                    isTotalValid -> "Klopt exact! Alle 100 kaarten zijn verdeeld."
+                                                    currentRoundTotal < 100 -> "Nog ${100 - currentRoundTotal} strafkaarten te verdelen."
+                                                    else -> "${currentRoundTotal - 100} strafkaarten te veel ingevoerd!"
+                                                },
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                            )
+                                        }
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = when {
+                                            isTotalValid -> SuccessGreen.copy(alpha = 0.2f)
+                                            currentRoundTotal > 100 -> WarningRed.copy(alpha = 0.2f)
+                                            else -> AccentOrange.copy(alpha = 0.2f)
+                                        }
+                                    ) {
+                                        Text(
+                                            "$currentRoundTotal / 100",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = when {
+                                                isTotalValid -> SuccessGreen
+                                                currentRoundTotal > 100 -> WarningRed
+                                                else -> AccentOrange
+                                            }
+                                        )
+                                    }
+                                }
+
+                                // Quick actie als er 1 speler open staat
+                                val unentered = selectedPlayerNames.indices.filter { !manuallyEnteredIndices.contains(it) }
+                                if (unentered.size == 1 && currentRoundTotal != 100) {
+                                    val targetIdx = unentered[0]
+                                    val sumOthers = selectedPlayerNames.indices.filter { it != targetIdx }.sumOf { roundPenalties.getOrElse(it) { 0 } }
+                                    val remainder = (100 - sumOthers).coerceAtLeast(0)
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                        TextButton(
+                                            onClick = {
+                                                updatePlayerPenalty(targetIdx, remainder, isManual = true)
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                "⚡ Vul restant in bij ${selectedPlayerNames[targetIdx]} ($remainder pt)",
+                                                fontSize = 11.sp,
+                                                color = AccentOrange,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Live Lead Indicator
                     item {
                         LiveGameLeadCard(
@@ -438,10 +589,16 @@ fun FiftyFiftyScreen(
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        if (autoFilledIndex == idx) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(shape = RoundedCornerShape(4.dp), color = AccentOrange.copy(alpha = 0.2f)) {
+                                                Text("✨ Aangevuld", color = AccentOrange, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                            }
+                                        }
                                         if (hasFox) {
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Surface(shape = RoundedCornerShape(4.dp), color = WarningRed) {
-                                                Text("🦊 VOS (+10)", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                                Text("🦊 VOS", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                                             }
                                         } else if (totalFoxCount.getOrElse(idx) { 0 } > 0) {
                                             Spacer(modifier = Modifier.width(6.dp))
@@ -469,9 +626,7 @@ fun FiftyFiftyScreen(
                                         FilledTonalButton(
                                             onClick = {
                                                 if (roundVal > 0) {
-                                                    val list = roundPenalties.toMutableList()
-                                                    list[idx] = list[idx] - 1
-                                                    roundPenalties = list
+                                                    updatePlayerPenalty(idx, roundVal - 1, isManual = true)
                                                 }
                                             },
                                             contentPadding = PaddingValues(0.dp),
@@ -481,11 +636,28 @@ fun FiftyFiftyScreen(
                                             Text("-", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                                         }
 
+                                        Box(
+                                            modifier = Modifier
+                                                .width(44.dp)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .clickable {
+                                                    editingPlayerIndex = idx
+                                                    editingScoreText = roundVal.toString()
+                                                }
+                                                .padding(vertical = 4.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "$roundVal",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                        }
+
                                         FilledTonalButton(
                                             onClick = {
-                                                val list = roundPenalties.toMutableList()
-                                                list[idx] = list[idx] + 1
-                                                roundPenalties = list
+                                                updatePlayerPenalty(idx, roundVal + 1, isManual = true)
                                             },
                                             contentPadding = PaddingValues(0.dp),
                                             modifier = Modifier.size(32.dp),
@@ -496,9 +668,7 @@ fun FiftyFiftyScreen(
 
                                         FilledTonalButton(
                                             onClick = {
-                                                val list = roundPenalties.toMutableList()
-                                                list[idx] = list[idx] + 5
-                                                roundPenalties = list
+                                                updatePlayerPenalty(idx, roundVal + 5, isManual = true)
                                             },
                                             contentPadding = PaddingValues(0.dp),
                                             modifier = Modifier.size(32.dp),
@@ -514,21 +684,13 @@ fun FiftyFiftyScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Vos op hand (+10 kaarten & verlies):", fontSize = 12.sp, color = if (hasFox) WarningRed else Color.Unspecified)
+                                    Text("Vos op hand (verliest bij eindtelling):", fontSize = 12.sp, color = if (hasFox) WarningRed else Color.Unspecified)
                                     Switch(
                                         checked = hasFox,
                                         onCheckedChange = { checked ->
                                             val list = hasFoxInHand.toMutableList()
                                             list[idx] = checked
                                             hasFoxInHand = list
-
-                                            val penalties = roundPenalties.toMutableList()
-                                            if (checked) {
-                                                penalties[idx] = penalties[idx] + 10
-                                            } else {
-                                                penalties[idx] = (penalties[idx] - 10).coerceAtLeast(0)
-                                            }
-                                            roundPenalties = penalties
                                         }
                                     )
                                 }
@@ -577,20 +739,62 @@ fun FiftyFiftyScreen(
                             )
                             roundPenalties = MutableList(selectedPlayerNames.size) { 0 }
                             hasFoxInHand = MutableList(selectedPlayerNames.size) { false }
+                            manuallyEnteredIndices = emptySet()
+                            autoFilledIndex = null
                             currentRound++
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentOrange),
+                    enabled = isTotalValid,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isTotalValid) AccentOrange else Color.Gray.copy(alpha = 0.5f)
+                    ),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     val isFinal = (gameMode == "enkelePot") || (currentRound >= targetRounds)
                     Text(
-                        if (isFinal) "Spel Afronden & Uitslag Bekijken 🏆" else "Ronde $currentRound Afronden ➔",
+                        if (!isTotalValid) {
+                            if (currentRoundTotal < 100) "Totaal moet 100 zijn (nu: $currentRoundTotal, nog ${100 - currentRoundTotal} open)"
+                            else "Totaal moet 100 zijn (nu: $currentRoundTotal, ${currentRoundTotal - 100} te veel)"
+                        } else {
+                            if (isFinal) "Spel Afronden & Uitslag Bekijken 🏆" else "Ronde $currentRound Afronden ➔"
+                        },
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
+            }
+
+            if (editingPlayerIndex != null) {
+                val pIdx = editingPlayerIndex!!
+                AlertDialog(
+                    onDismissRequest = { editingPlayerIndex = null },
+                    title = { Text("Strafkaarten voor ${selectedPlayerNames[pIdx]}") },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = editingScoreText,
+                                onValueChange = { editingScoreText = it },
+                                label = { Text("Aantal strafkaarten (0..100)") },
+                                singleLine = true
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            val parsed = editingScoreText.toIntOrNull() ?: 0
+                            updatePlayerPenalty(pIdx, parsed, isManual = true)
+                            editingPlayerIndex = null
+                        }) {
+                            Text("Opslaan")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { editingPlayerIndex = null }) {
+                            Text("Annuleren")
+                        }
+                    }
+                )
             }
         }
     }
