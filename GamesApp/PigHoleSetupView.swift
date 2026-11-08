@@ -20,6 +20,7 @@ struct PigHoleSetupView: View {
     @State private var invoerModus: InvoerModus = .live
     @State private var aantalSpelers: Int = 4
     @State private var startVarkens: Int = 15
+    @State private var penaltyRule: PigHolePenaltyRule = .vakje
     @State private var spelers: [String] = Array(repeating: "", count: 6)
 
     private func defaultPigs(for playerCnt: Int) -> Int {
@@ -172,6 +173,26 @@ struct PigHoleSetupView: View {
                     }
                     .padding(.horizontal)
                 }
+
+                // Regel bij bezet vakje
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Regel bij bezet vakje")
+                        .font(.headline)
+                        .padding(.horizontal)
+
+                    Picker("Regel bij bezet vakje", selection: $penaltyRule) {
+                        ForEach(PigHolePenaltyRule.allCases) { regel in
+                            Text(regel.rawValue).tag(regel)
+                        }
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+
+                    Text(penaltyRule == .vakje ? "Standaard: je pakt alleen het varkentje van het gegooide vakje op (+1)." : "Variant: je pakt álle varkentjes van het hele speelbord op!")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
                 }
 
                 // Opgeslagen Spelers Quick Chips
@@ -252,7 +273,8 @@ struct PigHoleSetupView: View {
         } else {
             PigHoleGameView(
                 spelers: trimmed,
-                startVarkens: startVarkens
+                startVarkens: startVarkens,
+                penaltyRule: penaltyRule
             )
         }
     }

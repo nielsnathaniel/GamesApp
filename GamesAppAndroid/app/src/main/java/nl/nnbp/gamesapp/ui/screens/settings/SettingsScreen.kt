@@ -397,7 +397,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Versie 1.3.2 • Gebouwd met Kotlin & Jetpack Compose\nVolledig lokaal opgeslagen en geoptimaliseerd voor soepele prestaties.",
+                        text = "Versie 1.3.3 • Gebouwd met Kotlin & Jetpack Compose\nVolledig lokaal opgeslagen en geoptimaliseerd voor soepele prestaties.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
