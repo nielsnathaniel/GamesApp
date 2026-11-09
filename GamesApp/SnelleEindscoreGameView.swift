@@ -235,54 +235,101 @@ struct SnelleEindscoreGameView: View {
         .padding(.horizontal)
     }
 
+    private var fiftyFiftyControleKleur: Color {
+        if isFiftyFiftyGeldig {
+            return .green
+        } else if fiftyFiftyTotaal > 100 {
+            return .red
+        } else {
+            return .orange
+        }
+    }
+
+    private func restantVoorFiftyFiftySpeler(_ targetIdx: Int) -> Int {
+        let somAnderen = (0..<itemCount).filter { $0 != targetIdx }.reduce(0) { $0 + (scores[safe: $1] ?? 0) }
+        return max(0, 100 - somAnderen)
+    }
+
+    @ViewBuilder
+    private var fiftyFiftyStatusView: some View {
+        if isFiftyFiftyGeldig {
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundColor(.green)
+                .font(.title2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Totaal: 100 / 100 strafkaarten ✅")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+                Text("Klopt exact! Alle 100 kaarten zijn verdeeld.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        } else if fiftyFiftyTotaal < 100 {
+            let rest = 100 - fiftyFiftyTotaal
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+                .font(.title2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Totaal: \(fiftyFiftyTotaal) / 100 strafkaarten")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.orange)
+                Text("Nog \(rest) strafkaart\(rest == 1 ? "" : "en") te verdelen.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        } else {
+            let teVeel = fiftyFiftyTotaal - 100
+            Image(systemName: "xmark.octagon.fill")
+                .foregroundColor(.red)
+                .font(.title2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Totaal: \(fiftyFiftyTotaal) / 100 strafkaarten")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.red)
+                Text("\(teVeel) strafkaart\(teVeel == 1 ? "" : "en") te veel ingevoerd!")
+                    .font(.caption2)
+                    .foregroundColor(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var fiftyFiftyRestantAanvullenKnop: some View {
+        let nietIngevuld = Array(0..<itemCount).filter { !handmatigIngevuldFiftyFifty.contains($0) }
+        if nietIngevuld.count == 1, let targetIdx = nietIngevuld.first, fiftyFiftyTotaal != 100 {
+            let restant = restantVoorFiftyFiftySpeler(targetIdx)
+            HStack {
+                Spacer()
+                Button(action: {
+                    HapticManager.shared.light()
+                    updateScore(at: targetIdx, newScore: restant, isHandmatig: true)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "wand.and.stars")
+                        Text("Vul restant in bij \(itemName(at: targetIdx)) (\(restant) pt)")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 10)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+            }
+        }
+    }
+
     private var fiftyFiftyControleBanner: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                if isFiftyFiftyGeldig {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(.green)
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Totaal: 100 / 100 strafkaarten ✅")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                        Text("Klopt exact! Alle 100 kaarten zijn verdeeld.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                } else if fiftyFiftyTotaal < 100 {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Totaal: \(fiftyFiftyTotaal) / 100 strafkaarten")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.orange)
-                        let rest = 100 - fiftyFiftyTotaal
-                        Text("Nog \(rest) strafkaart\(rest == 1 ? "" : "en") te verdelen.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    Image(systemName: "xmark.octagon.fill")
-                        .foregroundColor(.red)
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Totaal: \(fiftyFiftyTotaal) / 100 strafkaarten")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.red)
-                        let teVeel = fiftyFiftyTotaal - 100
-                        Text("\(teVeel) strafkaart\(teVeel == 1 ? "" : "en") te veel ingevoerd!")
-                            .font(.caption2)
-                            .foregroundColor(.red)
-                    }
-                }
+                fiftyFiftyStatusView
 
                 Spacer()
 
@@ -291,53 +338,19 @@ struct SnelleEindscoreGameView: View {
                     .fontWeight(.black)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(
-                        isFiftyFiftyGeldig ? Color.green.opacity(0.18) :
-                        (fiftyFiftyTotaal > 100 ? Color.red.opacity(0.18) : Color.orange.opacity(0.18))
-                    )
-                    .foregroundColor(isFiftyFiftyGeldig ? .green : (fiftyFiftyTotaal > 100 ? .red : .orange))
+                    .background(fiftyFiftyControleKleur.opacity(0.18))
+                    .foregroundColor(fiftyFiftyControleKleur)
                     .clipShape(Capsule())
             }
 
-            // Quick actie als er nog 1 persoon niet handmatig is ingevuld
-            let nietIngevuld = Array(0..<itemCount).filter { !handmatigIngevuldFiftyFifty.contains($0) }
-            if nietIngevuld.count == 1, let targetIdx = nietIngevuld.first, fiftyFiftyTotaal != 100 {
-                let somAnderen = (0..<itemCount).filter { $0 != targetIdx }.reduce(0) { $0 + (scores[safe: $1] ?? 0) }
-                let restant = max(0, 100 - somAnderen)
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        HapticManager.shared.light()
-                        updateScore(at: targetIdx, newScore: restant, isHandmatig: true)
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "wand.and.stars")
-                            Text("Vul restant in bij \(itemName(at: targetIdx)) (\(restant) pt)")
-                                .fontWeight(.semibold)
-                        }
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 10)
-                        .background(Color.orange.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                }
-            }
+            fiftyFiftyRestantAanvullenKnop
         }
         .padding(12)
-        .background(
-            isFiftyFiftyGeldig ? Color.green.opacity(0.08) :
-            (fiftyFiftyTotaal > 100 ? Color.red.opacity(0.08) : Color.orange.opacity(0.08))
-        )
+        .background(fiftyFiftyControleKleur.opacity(0.08))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    isFiftyFiftyGeldig ? Color.green.opacity(0.3) :
-                    (fiftyFiftyTotaal > 100 ? Color.red.opacity(0.3) : Color.orange.opacity(0.3)),
-                    lineWidth: 1.5
-                )
+                .stroke(fiftyFiftyControleKleur.opacity(0.3), lineWidth: 1.5)
         )
         .padding(.horizontal)
     }
