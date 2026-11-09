@@ -47,11 +47,11 @@ struct PigHoleActionEntry: Identifiable {
 struct PigHoleGameView: View {
     let spelers: [String]
     let startVarkens: Int
-    var penaltyRule: PigHolePenaltyRule = .vakje
 
     @ObservedObject private var scoreManager = ScoreManager.shared
     private let activeGameManager = ActiveGameManager.shared
 
+    @State private var penaltyRule: PigHolePenaltyRule
     @State private var varkens: [Int]
     @State private var huidigeRonde: Int = 1
     @State private var beurtIndex: Int = 0
@@ -74,7 +74,7 @@ struct PigHoleGameView: View {
     init(spelers: [String], startVarkens: Int, penaltyRule: PigHolePenaltyRule = .vakje) {
         self.spelers = spelers
         self.startVarkens = startVarkens
-        self.penaltyRule = penaltyRule
+        _penaltyRule = State(initialValue: penaltyRule)
         _varkens = State(initialValue: Array(repeating: startVarkens, count: spelers.count))
     }
 
