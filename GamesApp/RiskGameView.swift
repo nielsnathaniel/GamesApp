@@ -160,12 +160,14 @@ struct RiskGameView: View {
                 gameName: "Risk",
                 isLowestScoreWins: false,
                 onReset: {
+                    ActiveGameManager.shared.clearActiveGame()
                     dismiss()
                 }
             )
         }
         .onAppear {
             assignSecretMissionsIfNeeded()
+            saveDraft()
         }
     }
 
@@ -1083,8 +1085,22 @@ struct RiskGameView: View {
         )
 
         winningPlayerObj = Player(name: winnerName)
+        ActiveGameManager.shared.clearActiveGame()
         showFinishDialog = false
         showWinnerScreen = true
+    }
+
+    private func saveDraft() {
+        let summary = "\(players.count) spelers • Risk (\(gameMode.rawValue))"
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Risk",
+            playerNames: players.map { $0.name },
+            currentRound: 1,
+            summary: summary,
+            state: [
+                "gameMode": gameMode.rawValue
+            ]
+        )
     }
 
     private func assignSecretMissionsIfNeeded() {

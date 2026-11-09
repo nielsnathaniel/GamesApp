@@ -43,13 +43,22 @@ data class LoveLetterRoundLog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoveLetterScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Love Letter"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var targetTokens by remember { mutableIntStateOf(4) }
 
     var currentRound by remember { mutableIntStateOf(1) }
@@ -66,6 +75,37 @@ fun LoveLetterScreen(
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var isQuickScoreMode by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${tokens.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Ronde $currentRound (doel $targetTokens) • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["currentRound"] = currentRound.toString()
+        state["targetTokens"] = targetTokens.toString()
+        state["tokens"] = tokens.joinToString(",")
+
+        activeGameManager.saveActiveGame(
+            gameName = "Love Letter",
+            playerNames = selectedPlayerNames,
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["targetTokens"]?.toIntOrNull()?.let { targetTokens = it }
+            session.stateData["tokens"]?.let { t ->
+                val list = t.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    tokens = list.toMutableList()
+                }
+            }
+        }
+    }
 
     if (startQuickScoreGame) {
         SnelleEindscoreScreen(
@@ -279,6 +319,7 @@ fun LoveLetterScreen(
                         } else {
                             tokens = MutableList(selectedPlayerNames.size) { 0 }
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = selectedPlayerNames.size >= 2,
@@ -430,6 +471,7 @@ fun LoveLetterScreen(
                             isGameOver = true
                         } else {
                             currentRound += 1
+                            saveDraft()
                         }
                     }
                 ) {
@@ -494,6 +536,7 @@ fun LoveLetterScreen(
             onDismiss = { showEditScoresDialog = false },
             onSave = { newScores ->
                 tokens = newScores.toMutableList()
+                saveDraft()
             }
         )
     }

@@ -146,6 +146,7 @@ struct QuickstopGameView: View {
                 )
                 rondeGeschiedenis.append(entry)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
+                saveDraft()
             }
         }
         .navigationDestination(isPresented: $showWinnaarView) {
@@ -168,6 +169,9 @@ struct QuickstopGameView: View {
             Button("Annuleer", role: .cancel) {}
         } message: {
             Text("De speler met de minste strafpunten (bliksems ⚡️) wint!")
+        }
+        .onAppear {
+            restoreDraftIfNeeded()
         }
     }
 
@@ -561,6 +565,7 @@ struct QuickstopGameView: View {
             if let random = themas.randomElement() {
                 huidigeThema = random
             }
+            saveDraft()
         }
     }
 
@@ -568,6 +573,7 @@ struct QuickstopGameView: View {
         guard let lowest = sortedPlayers.first else { return }
         winnaarPlayer = lowest
         showWinnaarView = true
+        ActiveGameManager.shared.clearActiveGame()
     }
 
     private var quickstopScoreProgression: [RoundScoreDataPoint] {
@@ -736,6 +742,7 @@ struct QuickstopGameView: View {
         huidigeRonde = entry.ronde
         rondeGeschiedenis.removeAll { $0.ronde >= entry.ronde }
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func herstelNaarEindeVanRonde(_ entry: QuickstopRondeEntry) {
@@ -745,6 +752,7 @@ struct QuickstopGameView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func resetGame() {
@@ -755,6 +763,58 @@ struct QuickstopGameView: View {
         startSpelerIndex = 0
         winnaarPlayer = Player(name: "")
         showWinnaarView = false
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    // MARK: - Active Game Draft
+
+    private func saveDraft() {
+        let scoreSummary = spelers.indices.map { "\(spelers[$0]):\(totaleScores[safe: $0] ?? 0)" }.joined(separator: ", ")
+        let summary = "\(spelers.count) spelers • Ronde \(huidigeRonde) (\(scoreSummary))"
+
+        var state: [String: String] = [:]
+        state["huidigeRonde"] = "\(huidigeRonde)"
+        state["limietStrafpunten"] = "\(limietStrafpunten)"
+        state["startSpelerIndex"] = "\(startSpelerIndex)"
+        state["totaleScores"] = totaleScores.map { "\($0)" }.joined(separator: ",")
+        state["rondeScores"] = rondeScores.map { "\($0)" }.joined(separator: ",")
+        state["huidigeThema"] = huidigeThema
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Quickstop",
+            playerNames: spelers,
+            currentRound: huidigeRonde,
+            summary: summary,
+            state: state
+        )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Quickstop",
+              draft.playerNames == spelers else { return }
+
+        if let r = draft.stateData["huidigeRonde"], let rInt = Int(r) {
+            self.huidigeRonde = rInt
+        }
+        if let s = draft.stateData["startSpelerIndex"], let sInt = Int(s) {
+            self.startSpelerIndex = sInt
+        }
+        if let t = draft.stateData["huidigeThema"] {
+            self.huidigeThema = t
+        }
+        if let tot = draft.stateData["totaleScores"] {
+            let parts = tot.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.totaleScores = parts
+            }
+        }
+        if let rs = draft.stateData["rondeScores"] {
+            let parts = rs.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.rondeScores = parts
+            }
+        }
     }
 }
 

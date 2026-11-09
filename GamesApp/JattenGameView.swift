@@ -190,6 +190,7 @@ struct JattenGameView: View {
                             let starterName = spelers[safe: huidigeStarterIndex]?.name ?? ""
                             rondeGeschiedenis.append(JattenRondeEntry(ronde: huidigeRonde, starter: starterName))
                             huidigeRonde += 1
+                            saveDraft()
                         }
                     }) {
                         Label("Volgende Beurt", systemImage: "arrow.right.circle.fill")
@@ -284,6 +285,9 @@ struct JattenGameView: View {
                 )
             }
         }
+        .onAppear {
+            restoreDraftIfNeeded()
+        }
     }
 
     private func spelerWintMetZesDezelfde(index: Int) {
@@ -293,6 +297,7 @@ struct JattenGameView: View {
         }
         scoreManager.saveGame(gameName: "Jatten", playerScores: detailed, winnerName: spelers[index].name)
         showWinnaarView = true
+        ActiveGameManager.shared.clearActiveGame()
     }
 
     // MARK: - Rondegeschiedenis & Herstel
@@ -371,6 +376,7 @@ struct JattenGameView: View {
         huidigeRonde = entry.ronde
         rondeGeschiedenis = Array(rondeGeschiedenis.prefix(idx))
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func resetGame() {
@@ -379,6 +385,38 @@ struct JattenGameView: View {
         rondeGeschiedenis = []
         winnaar = nil
         showWinnaarView = false
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    // MARK: - Active Game Draft
+
+    private func saveDraft() {
+        let summary = "\(spelers.count) spelers • Ronde \(huidigeRonde) • Starter: \(spelers[safe: huidigeStarterIndex]?.name ?? "")"
+
+        var state: [String: String] = [:]
+        state["huidigeRonde"] = "\(huidigeRonde)"
+        state["startSpelerIndex"] = "\(startSpelerIndex)"
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Jatten",
+            playerNames: spelers.map { $0.name },
+            currentRound: huidigeRonde,
+            summary: summary,
+            state: state
+        )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Jatten",
+              draft.playerNames == spelers.map({ $0.name }) else { return }
+
+        if let r = draft.stateData["huidigeRonde"], let rInt = Int(r) {
+            self.huidigeRonde = rInt
+        }
+        if let s = draft.stateData["startSpelerIndex"], let sInt = Int(s) {
+            self.startSpelerIndex = sInt
+        }
     }
 }
 

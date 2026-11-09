@@ -145,7 +145,7 @@ struct ContentView: View {
                                 Spacer()
 
                                 HStack(spacing: 8) {
-                                    NavigationLink(destination: destinationView(for: session.gameName)) {
+                                    NavigationLink(destination: resumeDestinationView(for: session)) {
                                         HStack(spacing: 4) {
                                             Image(systemName: "play.fill")
                                             Text("Hervatten")
@@ -481,6 +481,114 @@ struct ContentView: View {
             TafelschikkingView()
         default:
             Text("Onbekend Spel")
+        }
+    }
+
+    @ViewBuilder
+    private func resumeDestinationView(for session: ActiveGameSession) -> some View {
+        switch session.gameName {
+        case "Regenwormen":
+            RegenwormenGameView(
+                spelers: session.playerNames.map { Player(name: $0) },
+                initialTab: session.stateData["initialTab"] == "eindstand" ? .eindstand : .beurtInvoer
+            )
+        case "Pig Hole":
+            PigHoleGameView(
+                spelers: session.playerNames,
+                startVarkens: Int(session.stateData["startVarkens"] ?? "") ?? (60 / max(1, session.playerNames.count)),
+                penaltyRule: PigHolePenaltyRule(rawValue: session.stateData["penaltyRule"] ?? "") ?? .vakje
+            )
+        case "Fifty Fifty":
+            FiftyFiftyGameView(
+                spelers: session.playerNames,
+                gameMode: FiftyFiftyWhiteGoblinMode(rawValue: session.stateData["gameMode"] ?? "") ?? .rondes,
+                aantalRondesDoel: Int(session.stateData["aantalRondesDoel"] ?? "3") ?? 3,
+                gebruikLimiet: session.stateData["gebruikLimiet"] == "1",
+                limietStrafkaarten: Int(session.stateData["limietStrafkaarten"] ?? "25") ?? 25
+            )
+        case "Duizenden":
+            DuizendenGameView(
+                spelers: session.playerNames.map { Player(name: $0) },
+                aantalSpellenKaarten: Int(session.stateData["aantalSpellenKaarten"] ?? "2") ?? 2,
+                eindscore: Int(session.stateData["eindscore"] ?? "1000") ?? 1000
+            )
+        case "Ticket to Ride":
+            TicketToRideGameView(
+                spelers: session.playerNames,
+                initialMode: TicketToRideSetupView.TTRScoreMode(rawValue: session.stateData["currentMode"] ?? "") ?? .categorieen
+            )
+        case "Quickstop":
+            QuickstopGameView(
+                spelers: session.playerNames,
+                limietStrafpunten: Int(session.stateData["limietStrafpunten"] ?? "40") ?? 40
+            )
+        case "Qwixx":
+            QwixxGameView(
+                spelers: session.playerNames,
+                initialMode: session.stateData["currentMode"] == "Directe Score" ? .direct : .formulier
+            )
+        case "Balzakken":
+            BalzakkenGameView(
+                spelers: session.playerNames.map { Player(name: $0) },
+                eindscore: Int(session.stateData["eindscore"] ?? "100") ?? 100
+            )
+        case "Beverbende":
+            BeverbendeScoreView(
+                aantalRondes: Int(session.stateData["aantalRondes"] ?? "5") ?? 5,
+                spelers: session.playerNames.map { Player(name: $0) }
+            )
+        case "Jatten":
+            JattenGameView(
+                spelers: session.playerNames.map { Player(name: $0) }
+            )
+        case "Love Letter":
+            LoveLetterGameView(
+                spelers: session.playerNames,
+                doelFiches: Int(session.stateData["doelFiches"] ?? "4") ?? 4
+            )
+        case "Nmbr9":
+            CurrentGameView(
+                gameName: "Nmbr9",
+                imageName: "Nmbr9",
+                spelers: session.playerNames.map { Player(name: $0) },
+                rekenversie: .totaalwaardePerLaag,
+                speelwijze: .aantalRondes,
+                aantalRondes: 4,
+                totaleScore: 150
+            )
+        case "Risk":
+            RiskGameView(
+                players: session.playerNames.enumerated().map { (idx, name) in
+                    RiskPlayer(name: name, armyColor: RiskArmyColor.allCases[idx % RiskArmyColor.allCases.count])
+                },
+                gameMode: RiskGameMode(rawValue: session.stateData["gameMode"] ?? "") ?? .worldDomination,
+                progressiveCards: true
+            )
+        case "30 Seconds":
+            ThirtySecondsGameView(
+                teams: session.playerNames.enumerated().map { (idx, name) in
+                    let colors: [Color] = [.orange, .blue, .green, .purple]
+                    return ThirtySecondsTeam(name: name, playerNames: [name], color: colors[idx % colors.count])
+                },
+                doelScore: 30,
+                timerDuur: 30
+            )
+        case "Cranium":
+            CraniumGameView(
+                teams: session.playerNames.enumerated().map { (idx, name) in
+                    let colors: [Color] = [.yellow, .blue, .red, .green]
+                    return CraniumTeam(name: name, playerNames: [name], color: colors[idx % colors.count])
+                },
+                doelScore: 16,
+                timerDuur: 60,
+                vereisAlleCategorieen: true
+            )
+        case "Crockinole":
+            CrockinoleGameView(
+                spelers: session.playerNames
+            )
+        default:
+            destinationView(for: session.gameName)
         }
     }
 }

@@ -30,13 +30,22 @@ import nl.nnbp.gamesapp.ui.theme.PrimaryBlue
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Nmbr9Screen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Nmbr9"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
 
     // Per speler: scores per verdieping/laag (Laag 1 = 1x, Laag 2 = 2x, Laag 3 = 3x, Laag 4 = 4x)
     // Waarde op Laag 0 telt voor 0 pt volgens officiële spelregels
@@ -68,6 +77,46 @@ fun Nmbr9Screen(
             val l3 = levels.getOrElse(2) { 0 } * 3
             val l4 = levels.getOrElse(3) { 0 } * 4
             l1 + l2 + l3 + l4
+        }
+    }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${computedScores.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        for (i in selectedPlayerNames.indices) {
+            val levels = playerLevelPoints.getOrNull(i) ?: listOf(0, 0, 0, 0)
+            state["p_${i}_levels"] = levels.joinToString(",")
+        }
+
+        activeGameManager.saveActiveGame(
+            gameName = "Nmbr9",
+            playerNames = selectedPlayerNames,
+            currentRound = 1,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            val list = mutableListOf<MutableList<Int>>()
+            for (i in selectedPlayerNames.indices) {
+                val str = session.stateData["p_${i}_levels"] ?: "0,0,0,0"
+                val levels = str.split(",").mapNotNull { it.toIntOrNull() }.toMutableList()
+                while (levels.size < 4) levels.add(0)
+                list.add(levels)
+            }
+            if (list.size == selectedPlayerNames.size) {
+                playerLevelPoints = list
+            }
+        }
+    }
+
+    LaunchedEffect(playerLevelPoints) {
+        if (isGameStarted && playerLevelPoints.isNotEmpty()) {
+            saveDraft()
         }
     }
 
@@ -223,6 +272,7 @@ fun Nmbr9Screen(
                         } else {
                             playerLevelPoints = MutableList(selectedPlayerNames.size) { mutableListOf(0, 0, 0, 0) }
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = selectedPlayerNames.isNotEmpty(),

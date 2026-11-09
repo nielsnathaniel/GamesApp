@@ -486,6 +486,9 @@ struct BalzakkenGameView: View {
                 )
             }
         }
+        .onAppear {
+            restoreDraftIfNeeded()
+        }
     }
 
     // MARK: - Puntengeschiedenis Modal van het huidige spel
@@ -644,6 +647,7 @@ struct BalzakkenGameView: View {
         huidigeRonde = entry.ronde
         rondeGeschiedenis.removeAll { $0.ronde >= entry.ronde }
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func herstelNaarEindeVanRonde(_ entry: BalzakkenRondeEntry) {
@@ -654,6 +658,7 @@ struct BalzakkenGameView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func volgendeRonde() {
@@ -711,6 +716,7 @@ struct BalzakkenGameView: View {
         withAnimation {
             isExpanded = Array(repeating: false, count: spelers.count)
         }
+        saveDraft()
 
         if !specialEvents.isEmpty {
             specialRuleMessage = specialEvents.joined(separator: "\n\n")
@@ -725,6 +731,7 @@ struct BalzakkenGameView: View {
         if let maxPenalty = totaleScores.max(), maxPenalty >= 100 {
             bepaalWinnaar()
             showWinnaarView = true
+            ActiveGameManager.shared.clearActiveGame()
         }
     }
 
@@ -748,6 +755,61 @@ struct BalzakkenGameView: View {
         rondeGeschiedenis = []
         winnaar = nil
         showWinnaarView = false
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    // MARK: - Active Game Draft
+
+    private func saveDraft() {
+        let scoreSummary = spelers.indices.map { "\(spelers[$0].name):\(totaleScores[safe: $0] ?? 0)" }.joined(separator: ", ")
+        let summary = "\(spelers.count) spelers • Ronde \(huidigeRonde) (\(scoreSummary))"
+
+        var state: [String: String] = [:]
+        state["huidigeRonde"] = "\(huidigeRonde)"
+        state["eindscore"] = "\(eindscore)"
+        state["startSpelerIndex"] = "\(startSpelerIndex)"
+        state["totaleScores"] = totaleScores.map { "\($0)" }.joined(separator: ",")
+        state["juisteBalzakken"] = juisteBalzakken.map { "\($0)" }.joined(separator: ",")
+        state["fouteBalzakken"] = fouteBalzakken.map { "\($0)" }.joined(separator: ",")
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Balzakken",
+            playerNames: spelers.map { $0.name },
+            currentRound: huidigeRonde,
+            summary: summary,
+            state: state
+        )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Balzakken",
+              draft.playerNames == spelers.map({ $0.name }) else { return }
+
+        if let r = draft.stateData["huidigeRonde"], let rInt = Int(r) {
+            self.huidigeRonde = rInt
+        }
+        if let s = draft.stateData["startSpelerIndex"], let sInt = Int(s) {
+            self.startSpelerIndex = sInt
+        }
+        if let tot = draft.stateData["totaleScores"] {
+            let parts = tot.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.totaleScores = parts
+            }
+        }
+        if let jb = draft.stateData["juisteBalzakken"] {
+            let parts = jb.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.juisteBalzakken = parts
+            }
+        }
+        if let fb = draft.stateData["fouteBalzakken"] {
+            let parts = fb.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.fouteBalzakken = parts
+            }
+        }
     }
 
     private var balzakkenScoreProgression: [RoundScoreDataPoint] {

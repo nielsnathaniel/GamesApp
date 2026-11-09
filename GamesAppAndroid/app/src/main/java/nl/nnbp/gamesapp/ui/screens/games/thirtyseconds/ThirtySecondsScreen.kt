@@ -42,13 +42,17 @@ data class TeamSetup(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThirtySecondsScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
     val soundManager = remember { SoundManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "30 Seconds"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
     var targetScore by remember { mutableIntStateOf(35) }
 
     // 2 tot 4 teams
@@ -98,6 +102,47 @@ fun ThirtySecondsScreen(
     }
     val team2Name = remember(team2Players) {
         if (team2Players.isEmpty()) "Team 2" else team2Players.joinToString(" & ")
+    }
+
+    fun saveDraft() {
+        if (!isGameStarted) return
+        val summary = "$team1Name: ${teamScores.getOrElse(0){0}} vs $team2Name: ${teamScores.getOrElse(1){0}}"
+        val state = mutableMapOf<String, String>()
+        state["targetScore"] = targetScore.toString()
+        state["team1Players"] = team1Players.joinToString(",")
+        state["team2Players"] = team2Players.joinToString(",")
+        state["teamScores"] = teamScores.joinToString(",")
+        state["turnsPlayed"] = turnsPlayedPerTeam.joinToString(",")
+        state["activeTeamIndex"] = activeTeamIndex.toString()
+
+        activeGameManager.saveActiveGame(
+            gameName = "30 Seconds",
+            playerNames = listOf(team1Name, team2Name),
+            currentRound = turnsPlayedPerTeam.sum(),
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["targetScore"]?.toIntOrNull()?.let { targetScore = it }
+            session.stateData["team1Players"]?.let {
+                team1Players = it.split(",").filter { s -> s.isNotBlank() }.toMutableList()
+            }
+            session.stateData["team2Players"]?.let {
+                team2Players = it.split(",").filter { s -> s.isNotBlank() }.toMutableList()
+            }
+            session.stateData["teamScores"]?.let {
+                val sc = it.split(",").mapNotNull { s -> s.toIntOrNull() }
+                if (sc.size == 2) teamScores = sc.toMutableList()
+            }
+            session.stateData["turnsPlayed"]?.let {
+                val tp = it.split(",").mapNotNull { s -> s.toIntOrNull() }
+                if (tp.size == 2) turnsPlayedPerTeam = tp.toMutableList()
+            }
+            session.stateData["activeTeamIndex"]?.toIntOrNull()?.let { activeTeamIndex = it }
+        }
     }
 
     if (startQuickScoreGame) {
@@ -268,6 +313,7 @@ fun ThirtySecondsScreen(
                             teamScores = mutableListOf(0, 0)
                             turnsPlayedPerTeam = mutableListOf(0, 0)
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = team1Players.size >= 2 && team2Players.size >= 2,
@@ -502,6 +548,7 @@ fun ThirtySecondsScreen(
                             isTimerRunning = false
                             diceRoll = 0
                             correctCount = 0
+                            saveDraft()
                         }
                     },
                     modifier = Modifier
@@ -533,6 +580,7 @@ fun ThirtySecondsScreen(
             onDismiss = { showEditScoresDialog = false },
             onSave = { newScores ->
                 teamScores = newScores.toMutableList()
+                saveDraft()
             }
         )
     }

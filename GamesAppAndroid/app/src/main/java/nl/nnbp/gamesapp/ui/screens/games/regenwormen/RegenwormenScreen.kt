@@ -71,14 +71,23 @@ data class RegenwormenTurnRecord(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegenwormenScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
     val haptic = LocalHapticFeedback.current
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Regenwormen"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var selectedPlayerCount by remember { mutableIntStateOf(3) }
     var gameMode by remember { mutableStateOf("beurt") } // "beurt", "stenen", "snel"
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
@@ -115,6 +124,52 @@ fun RegenwormenScreen(
     fun calculateWormsFor(index: Int): Int {
         val stack = playerStacks.getOrNull(index) ?: return 0
         return stack.sumOf { getStoneWorms(it) }
+    }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${calculateWormsFor(it)}" }
+        val summary = "${selectedPlayerNames.size} spelers • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["turnNumber"] = turnNumber.toString()
+        state["activePlayerIndex"] = activePlayerIndex.toString()
+        state["gameMode"] = gameMode
+        state["tableStones"] = tableStones.joinToString(",")
+        state["flippedStones"] = flippedStones.joinToString(",")
+        for (i in selectedPlayerNames.indices) {
+            state["stack_$i"] = (playerStacks.getOrNull(i) ?: emptyList()).joinToString(",")
+        }
+
+        activeGameManager.saveActiveGame(
+            gameName = "Regenwormen",
+            playerNames = selectedPlayerNames,
+            currentRound = turnNumber,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["turnNumber"]?.toIntOrNull()?.let { turnNumber = it }
+            session.stateData["activePlayerIndex"]?.toIntOrNull()?.let { activePlayerIndex = it }
+            session.stateData["gameMode"]?.let { gameMode = it }
+            session.stateData["tableStones"]?.let { t ->
+                tableStones = t.split(",").mapNotNull { it.toIntOrNull() }.toMutableList()
+            }
+            session.stateData["flippedStones"]?.let { f ->
+                flippedStones = f.split(",").mapNotNull { it.toIntOrNull() }.toMutableSet()
+            }
+            val restoredStacks = mutableListOf<MutableList<Int>>()
+            for (i in selectedPlayerNames.indices) {
+                val st = session.stateData["stack_$i"] ?: ""
+                val list = st.split(",").mapNotNull { it.toIntOrNull() }.toMutableList()
+                restoredStacks.add(list)
+            }
+            if (restoredStacks.size == selectedPlayerNames.size) {
+                playerStacks = restoredStacks
+            }
+        }
     }
 
     if (isGameOver && winnerPlayer != null) {
@@ -318,6 +373,7 @@ fun RegenwormenScreen(
                                 turnNumber = 1
                                 turnHistory.clear()
                                 isGameStarted = true
+                                saveDraft()
                             }
                         },
                         enabled = selectedPlayerNames.size >= 2,
@@ -507,6 +563,7 @@ fun RegenwormenScreen(
                                                             statusFeedback = "$activePlayerName pakt steen $stone!"
                                                             activePlayerIndex = (activePlayerIndex + 1) % selectedPlayerNames.size
                                                             turnNumber++
+                                                            saveDraft()
                                                         }
                                                         .padding(vertical = 8.dp),
                                                     contentAlignment = Alignment.Center
@@ -580,6 +637,7 @@ fun RegenwormenScreen(
                                                         statusFeedback = "$activePlayerName steelt steen $topStone van $otherName!"
                                                         activePlayerIndex = (activePlayerIndex + 1) % selectedPlayerNames.size
                                                         turnNumber++
+                                                        saveDraft()
                                                     },
                                                     colors = ButtonDefaults.buttonColors(containerColor = AccentOrange.copy(alpha = 0.85f)),
                                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -747,6 +805,7 @@ fun RegenwormenScreen(
                         statusFeedback = "Mislukte beurt van $activeName afgehandeld."
                         activePlayerIndex = (activePlayerIndex + 1) % selectedPlayerNames.size
                         turnNumber++
+                        saveDraft()
                         showMissedRollConfirm = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = WarningRed)

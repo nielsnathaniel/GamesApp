@@ -65,13 +65,22 @@ data class TTRLiveTurn(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TicketToRideScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Ticket to Ride"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var selectedPlayerCount by remember { mutableIntStateOf(4) }
     var gameMode by remember { mutableStateOf("categorieen") } // "categorieen", "live", "snel"
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
@@ -100,6 +109,58 @@ fun TicketToRideScreen(
 
     val calculatedTotals = remember(playerScores) {
         playerScores.map { it.calculatedTotal() }
+    }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${calculatedTotals.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["gameMode"] = gameMode
+        for (i in selectedPlayerNames.indices) {
+            val p = playerScores.getOrNull(i) ?: TTRPlayerData()
+            state["p_${i}_routePoints"] = p.routePoints.toString()
+            state["p_${i}_completedTickets"] = p.completedTickets.toString()
+            state["p_${i}_failedTickets"] = p.failedTickets.toString()
+            state["p_${i}_hasLongestRoute"] = if (p.hasLongestRoute) "1" else "0"
+            state["p_${i}_hasGlobetrotter"] = if (p.hasGlobetrotter) "1" else "0"
+            state["p_${i}_unusedStations"] = p.unusedStations.toString()
+        }
+
+        activeGameManager.saveActiveGame(
+            gameName = "Ticket to Ride",
+            playerNames = selectedPlayerNames,
+            currentRound = 1,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["gameMode"]?.let { gameMode = it }
+            val list = mutableListOf<TTRPlayerData>()
+            for (i in selectedPlayerNames.indices) {
+                val data = TTRPlayerData(
+                    routePoints = session.stateData["p_${i}_routePoints"]?.toIntOrNull() ?: 0,
+                    completedTickets = session.stateData["p_${i}_completedTickets"]?.toIntOrNull() ?: 0,
+                    failedTickets = session.stateData["p_${i}_failedTickets"]?.toIntOrNull() ?: 0,
+                    hasLongestRoute = session.stateData["p_${i}_hasLongestRoute"] == "1",
+                    hasGlobetrotter = session.stateData["p_${i}_hasGlobetrotter"] == "1",
+                    unusedStations = session.stateData["p_${i}_unusedStations"]?.toIntOrNull() ?: 0
+                )
+                list.add(data)
+            }
+            if (list.size == selectedPlayerNames.size) {
+                playerScores = list
+            }
+        }
+    }
+
+    LaunchedEffect(playerScores) {
+        if (isGameStarted && playerScores.isNotEmpty()) {
+            saveDraft()
+        }
     }
 
     if (isGameOver && winnerPlayer != null) {
@@ -299,6 +360,7 @@ fun TicketToRideScreen(
                                 selectedPlayerTab = 0
                                 liveTurnHistory.clear()
                                 isGameStarted = true
+                                saveDraft()
                             }
                         },
                         enabled = selectedPlayerNames.size >= 2,

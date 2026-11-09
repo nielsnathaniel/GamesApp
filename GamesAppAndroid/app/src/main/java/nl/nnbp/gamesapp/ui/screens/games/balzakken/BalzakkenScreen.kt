@@ -53,15 +53,24 @@ enum class BalzakStatus {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BalzakkenScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
     val soundManager = remember { SoundManager.getInstance() }
 
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Balzakken"
+
     // Game states
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var showStartspelerDialog by remember { mutableStateOf(false) }
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
     var showDisputeDialog by remember { mutableStateOf(false) }
@@ -91,6 +100,59 @@ fun BalzakkenScreen(
     var expandedPlayerIndex by remember { mutableStateOf<Int?>(null) }
     var history by remember { mutableStateOf(mutableListOf<BalzakkenRoundRecord>()) }
     var showHistorySheet by remember { mutableStateOf(false) }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${totalScores.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Ronde $currentRound • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["currentRound"] = currentRound.toString()
+        state["startPlayerIndex"] = startPlayerIndex.toString()
+        state["totalScores"] = totalScores.joinToString(",")
+        state["roundScores"] = roundScores.joinToString(",")
+        state["juisteBalzakken"] = juisteBalzakken.joinToString(",")
+        state["fouteBalzakken"] = fouteBalzakken.joinToString(",")
+
+        activeGameManager.saveActiveGame(
+            gameName = "Balzakken",
+            playerNames = selectedPlayerNames,
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["startPlayerIndex"]?.toIntOrNull()?.let { startPlayerIndex = it }
+            session.stateData["totalScores"]?.let { t ->
+                val list = t.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    totalScores = list.toMutableList()
+                }
+            }
+            session.stateData["roundScores"]?.let { r ->
+                val list = r.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    roundScores = list.toMutableList()
+                }
+            }
+            session.stateData["juisteBalzakken"]?.let { j ->
+                val list = j.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    juisteBalzakken = list.toMutableList()
+                }
+            }
+            session.stateData["fouteBalzakken"]?.let { f ->
+                val list = f.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    fouteBalzakken = list.toMutableList()
+                }
+            }
+            roundStatus = MutableList(selectedPlayerNames.size) { BalzakStatus.GEEN }
+        }
+    }
 
     // Special rule alerts
     var specialRuleMessage by remember { mutableStateOf<String?>(null) }
@@ -283,6 +345,7 @@ fun BalzakkenScreen(
                             roundStatus = MutableList(selectedPlayerNames.size) { BalzakStatus.GEEN }
                             startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = selectedPlayerNames.size >= 2,
@@ -653,6 +716,7 @@ fun BalzakkenScreen(
                             roundScores = MutableList(selectedPlayerNames.size) { 0 }
                             roundStatus = MutableList(selectedPlayerNames.size) { BalzakStatus.GEEN }
                             expandedPlayerIndex = null
+                            saveDraft()
                         }
                     },
                     modifier = Modifier
@@ -763,6 +827,7 @@ fun BalzakkenScreen(
             onDismiss = { showEditScoresDialog = false },
             onSave = { newScores ->
                 totalScores = newScores.toMutableList()
+                saveDraft()
             }
         )
     }

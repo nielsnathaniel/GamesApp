@@ -245,6 +245,9 @@ struct TicketToRideGameView: View {
         } message: {
             Text("Voer het aantal punten in voor de gelegde route van \(activePlayerName).")
         }
+        .onAppear {
+            restoreDraftIfNeeded()
+        }
     }
 
     // MARK: - Header
@@ -1488,12 +1491,47 @@ struct TicketToRideGameView: View {
             "\(spelers[i]): \(effectiveScore(for: i)) pt"
         }.joined(separator: " • ")
 
+        var state: [String: String] = [:]
+        state["currentRound"] = "\(currentRound)"
+        state["turnIndexInRound"] = "\(turnIndexInRound)"
+        state["selectedPlayerIndex"] = "\(selectedPlayerIndex)"
+        state["currentMode"] = currentMode.rawValue
+        state["directScores"] = playerScores.map { "\($0.directScore)" }.joined(separator: ",")
+
         ActiveGameManager.shared.saveActiveGame(
             gameName: "Ticket to Ride",
             playerNames: spelers,
             currentRound: currentRound,
-            summary: summary
+            summary: summary,
+            state: state
         )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Ticket to Ride",
+              draft.playerNames == spelers else { return }
+
+        if let r = draft.stateData["currentRound"], let rInt = Int(r) {
+            self.currentRound = rInt
+        }
+        if let t = draft.stateData["turnIndexInRound"], let tInt = Int(t) {
+            self.turnIndexInRound = tInt
+        }
+        if let s = draft.stateData["selectedPlayerIndex"], let sInt = Int(s) {
+            self.selectedPlayerIndex = sInt
+        }
+        if let m = draft.stateData["currentMode"], let mode = TicketToRideSetupView.TTRScoreMode(rawValue: m) {
+            self.currentMode = mode
+        }
+        if let ds = draft.stateData["directScores"] {
+            let scList = ds.split(separator: ",").compactMap { Int($0) }
+            if scList.count == spelers.count {
+                for (idx, score) in scList.enumerated() {
+                    playerScores[idx].directScore = score
+                }
+            }
+        }
     }
 
     private var ttrChartData: [RoundScoreDataPoint] {

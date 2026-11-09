@@ -43,13 +43,22 @@ data class BeverbendeRoundEntry(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BeverbendeScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Beverbende"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var targetRounds by remember { mutableIntStateOf(5) }
 
     // In-game states
@@ -69,6 +78,40 @@ fun BeverbendeScreen(
     var showEditScoresDialog by remember { mutableStateOf(false) }
     var isQuickScoreMode by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${totalScores.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Ronde $currentRound van $targetRounds • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["currentRound"] = currentRound.toString()
+        state["targetRounds"] = targetRounds.toString()
+        state["startPlayerIndex"] = startPlayerIndex.toString()
+        state["totalScores"] = totalScores.joinToString(",")
+
+        activeGameManager.saveActiveGame(
+            gameName = "Beverbende",
+            playerNames = selectedPlayerNames,
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["targetRounds"]?.toIntOrNull()?.let { targetRounds = it }
+            session.stateData["startPlayerIndex"]?.toIntOrNull()?.let { startPlayerIndex = it }
+            session.stateData["totalScores"]?.let { t ->
+                val list = t.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    totalScores = list.toMutableList()
+                }
+            }
+            playerCards = MutableList(selectedPlayerNames.size) { mutableListOf(0, 0, 0, 0) }
+        }
+    }
 
     if (startQuickScoreGame) {
         SnelleEindscoreScreen(
@@ -301,6 +344,7 @@ fun BeverbendeScreen(
                             totalScores = MutableList(selectedPlayerNames.size) { 0 }
                             startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = selectedPlayerNames.size >= 2,
@@ -541,6 +585,7 @@ fun BeverbendeScreen(
                         } else {
                             currentRound += 1
                             playerCards = MutableList(selectedPlayerNames.size) { mutableListOf(0, 0, 0, 0) }
+                            saveDraft()
                         }
                     },
                     modifier = Modifier
@@ -623,6 +668,7 @@ fun BeverbendeScreen(
             onDismiss = { showEditScoresDialog = false },
             onSave = { newScores ->
                 totalScores = newScores.toMutableList()
+                saveDraft()
             }
         )
     }

@@ -248,6 +248,7 @@ struct BeverbendeScoreView: View {
                 )
                 rondeGeschiedenis.append(entry)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
+                saveDraft()
             }
         }
         .onAppear {
@@ -259,6 +260,7 @@ struct BeverbendeScoreView: View {
                     startSpelerIndex = Int.random(in: 0..<spelers.count)
                 }
             }
+            restoreDraftIfNeeded()
         }
         .sheet(isPresented: $toonGeschiedenisSheet) {
             NavigationStack {
@@ -392,6 +394,7 @@ struct BeverbendeScoreView: View {
         huidigeRonde = entry.ronde
         rondeGeschiedenis.removeAll { $0.ronde >= entry.ronde }
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func herstelNaarEindeVanRonde(_ entry: BeverbendeRondeEntry) {
@@ -401,6 +404,7 @@ struct BeverbendeScoreView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func validateScores() -> Bool {
@@ -446,11 +450,13 @@ struct BeverbendeScoreView: View {
         withAnimation {
             isExpanded = Array(repeating: false, count: spelers.count)
         }
+        saveDraft()
     }
 
     private func bepaalWinnaar() {
         if let winnaarIndex = totaleScores.enumerated().min(by: { $0.element < $1.element })?.offset {
             winnaar = spelers[winnaarIndex]
+            ActiveGameManager.shared.clearActiveGame()
         }
     }
 
@@ -464,6 +470,47 @@ struct BeverbendeScoreView: View {
         showWinnaarView = false
         if !spelers.isEmpty {
             startSpelerIndex = Int.random(in: 0..<spelers.count)
+        }
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    // MARK: - Active Game Draft
+
+    private func saveDraft() {
+        let scoreSummary = spelers.indices.map { "\(spelers[$0].name):\(totaleScores[safe: $0] ?? 0)" }.joined(separator: ", ")
+        let summary = "\(spelers.count) spelers • Ronde \(huidigeRonde)/\(aantalRondes) (\(scoreSummary))"
+
+        var state: [String: String] = [:]
+        state["huidigeRonde"] = "\(huidigeRonde)"
+        state["aantalRondes"] = "\(aantalRondes)"
+        state["startSpelerIndex"] = "\(startSpelerIndex)"
+        state["totaleScores"] = totaleScores.map { "\($0)" }.joined(separator: ",")
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Beverbende",
+            playerNames: spelers.map { $0.name },
+            currentRound: huidigeRonde,
+            summary: summary,
+            state: state
+        )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Beverbende",
+              draft.playerNames == spelers.map({ $0.name }) else { return }
+
+        if let r = draft.stateData["huidigeRonde"], let rInt = Int(r) {
+            self.huidigeRonde = rInt
+        }
+        if let s = draft.stateData["startSpelerIndex"], let sInt = Int(s) {
+            self.startSpelerIndex = sInt
+        }
+        if let tot = draft.stateData["totaleScores"] {
+            let parts = tot.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.totaleScores = parts
+            }
         }
     }
 

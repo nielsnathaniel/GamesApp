@@ -906,6 +906,7 @@ struct PigHoleGameView: View {
         state["worpenDezeBeurt"] = "\(worpenDezeBeurt)"
         state["varkensgatTotaal"] = "\(varkensgatTotaal)"
         state["penaltyRule"] = penaltyRule.rawValue
+        state["startVarkens"] = "\(startVarkens)"
         state["varkens"] = varkens.map { "\($0)" }.joined(separator: ",")
         state["bordStatus"] = (1...5).map { "\($0):\(bordStatus[$0] ?? 0)" }.joined(separator: ",")
         if let melding = laatsteWorpMelding {

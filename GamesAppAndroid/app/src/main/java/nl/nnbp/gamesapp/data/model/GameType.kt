@@ -156,7 +156,11 @@ enum class GameType(
 
     companion object {
         fun fromId(id: String): GameType? {
-            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
+            return entries.firstOrNull {
+                it.id.equals(id, ignoreCase = true) ||
+                it.displayName.equals(id, ignoreCase = true) ||
+                it.name.equals(id, ignoreCase = true)
+            }
         }
     }
 }

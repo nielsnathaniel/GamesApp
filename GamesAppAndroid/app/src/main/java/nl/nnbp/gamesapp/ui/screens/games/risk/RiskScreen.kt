@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nl.nnbp.gamesapp.data.ActiveGameManager
 import nl.nnbp.gamesapp.data.ScoreManager
 import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.data.model.PlayerScore
@@ -86,18 +87,24 @@ data class RiskBlitzResult(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RiskScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val context = LocalContext.current
     val scoreManager = remember { ScoreManager.getInstance(context) }
+    val activeGameManager = remember { ActiveGameManager.getInstance(context) }
     val savedPlayerNames by scoreManager.savedPlayerNames.collectAsState()
 
-    var isGameStarted by remember { mutableStateOf(false) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Risk"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
 
     // Setup state
     var selectedPlayers by remember {
         mutableStateOf(
-            if (savedPlayerNames.size >= 2) savedPlayerNames.take(3).toMutableList()
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else if (savedPlayerNames.size >= 2) savedPlayerNames.take(3).toMutableList()
             else mutableListOf("Speler 1", "Speler 2", "Speler 3")
         )
     }
@@ -150,6 +157,38 @@ fun RiskScreen(
     var winningPlayerIndex by remember { mutableIntStateOf(0) }
     var showWinnerScreen by remember { mutableStateOf(false) }
 
+    fun saveDraft() {
+        if (selectedPlayers.isEmpty() || !isGameStarted) return
+        val modeStr = if (isSecretMissionsMode) "Geheime Missies" else "Wereldheerschappij"
+        val summary = "${selectedPlayers.size} spelers • $modeStr"
+        val state = mutableMapOf<String, String>()
+        state["isSecretMissionsMode"] = if (isSecretMissionsMode) "1" else "0"
+        state["progressiveCards"] = if (progressiveCards) "1" else "0"
+
+        activeGameManager.saveActiveGame(
+            gameName = "Risk",
+            playerNames = selectedPlayers,
+            currentRound = 1,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["isSecretMissionsMode"]?.let { isSecretMissionsMode = it == "1" }
+            session.stateData["progressiveCards"]?.let { progressiveCards = it == "1" }
+            val missions = if (isSecretMissionsMode) generateMissions().shuffled() else emptyList()
+            gamePlayers = selectedPlayers.mapIndexed { idx, name ->
+                RiskPlayer(
+                    name = name,
+                    armyColor = playerColors[idx % playerColors.size],
+                    mission = missions.getOrNull(idx)
+                )
+            }
+        }
+    }
+
     if (showWinnerScreen) {
         val winnerName = gamePlayers.getOrNull(winningPlayerIndex)?.name ?: "Speler"
         val scores = gamePlayers.map { p ->
@@ -164,6 +203,7 @@ fun RiskScreen(
             winnerName = winnerName,
             scores = scores,
             onFinish = {
+                activeGameManager.clearActiveGame()
                 showWinnerScreen = false
                 isGameStarted = false
                 onNavigateBack()
@@ -414,6 +454,7 @@ fun RiskScreen(
                                 )
                             }
                             isGameStarted = true
+                            saveDraft()
                         },
                         modifier = Modifier
                             .fillMaxWidth()

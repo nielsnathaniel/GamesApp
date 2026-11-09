@@ -47,14 +47,23 @@ data class PigHoleTurnSnapshot(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PigHoleScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
     val haptic = LocalHapticFeedback.current
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Pig Hole"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var penaltyRuleByBoard by remember { mutableStateOf(false) } // false = alleen dit vakje (+1), true = hele bord
 
     var currentRound by remember { mutableIntStateOf(1) }
@@ -72,6 +81,59 @@ fun PigHoleScreen(
     var showEditScoresDialog by remember { mutableStateOf(false) }
     var isQuickScoreMode by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${pigsPerPlayer.getOrElse(it) { 0 }}" }
+        val activeName = selectedPlayerNames.getOrElse(turnIndex) { "" }
+        val summary = "Ronde $currentRound • $activeName • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["currentRound"] = currentRound.toString()
+        state["turnIndex"] = turnIndex.toString()
+        state["rollsInCurrentTurn"] = rollsInCurrentTurn.toString()
+        state["pigholeCount"] = pigholeCount.toString()
+        state["penaltyRuleByBoard"] = if (penaltyRuleByBoard) "1" else "0"
+        state["pigs"] = pigsPerPlayer.joinToString(",")
+        state["board"] = boardHoles.entries.joinToString(",") { "${it.key}:${it.value}" }
+        lastRollMessage?.let { state["lastRollMessage"] = it }
+
+        activeGameManager.saveActiveGame(
+            gameName = "Pig Hole",
+            playerNames = selectedPlayerNames,
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["turnIndex"]?.toIntOrNull()?.let { turnIndex = it }
+            session.stateData["rollsInCurrentTurn"]?.toIntOrNull()?.let { rollsInCurrentTurn = it }
+            session.stateData["pigholeCount"]?.toIntOrNull()?.let { pigholeCount = it }
+            session.stateData["penaltyRuleByBoard"]?.let { penaltyRuleByBoard = it == "1" }
+            session.stateData["pigs"]?.let { pStr ->
+                val list = pStr.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    pigsPerPlayer = list.toMutableList()
+                }
+            }
+            session.stateData["board"]?.let { bStr ->
+                val map = boardHoles.toMutableMap()
+                bStr.split(",").forEach { pair ->
+                    val parts = pair.split(":")
+                    if (parts.size == 2) {
+                        val k = parts[0].toIntOrNull()
+                        val v = parts[1].toIntOrNull()
+                        if (k != null && v != null) map[k] = v
+                    }
+                }
+                boardHoles = map
+            }
+            session.stateData["lastRollMessage"]?.let { lastRollMessage = it }
+        }
+    }
 
     if (startQuickScoreGame) {
         SnelleEindscoreScreen(
@@ -110,6 +172,7 @@ fun PigHoleScreen(
             currentRound += 1
         }
         turnIndex = nextIdx
+        saveDraft()
     }
 
     fun rollDice(number: Int) {
@@ -216,6 +279,7 @@ fun PigHoleScreen(
                 advanceToNextPlayer()
             }
         }
+        saveDraft()
     }
 
     fun undoLastRoll() {
@@ -228,6 +292,7 @@ fun PigHoleScreen(
         boardHoles = last.board.toMutableMap()
         pigholeCount = last.pigholeCount
         lastRollMessage = "Worp ongedaan gemaakt."
+        saveDraft()
     }
 
     if (isGameOver && winnerPlayer != null) {
@@ -432,6 +497,7 @@ fun PigHoleScreen(
                         } else {
                             pigsPerPlayer = MutableList(selectedPlayerNames.size) { defaultPigsPerPlayer }
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = selectedPlayerNames.size >= 2,

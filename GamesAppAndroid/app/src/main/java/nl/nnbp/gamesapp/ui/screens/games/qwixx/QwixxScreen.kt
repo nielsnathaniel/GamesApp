@@ -55,13 +55,22 @@ data class QwixxPlayerSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QwixxScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Qwixx"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var selectedPlayerCount by remember { mutableIntStateOf(3) }
     var gameMode by remember { mutableStateOf("formulier") } // "formulier", "snel"
     var showTafelschikkingDialog by remember { mutableStateOf(false) }
@@ -88,6 +97,56 @@ fun QwixxScreen(
 
     val calculatedTotals = remember(sheets) {
         sheets.map { it.total() }
+    }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${calculatedTotals.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["gameMode"] = gameMode
+        for (i in selectedPlayerNames.indices) {
+            val s = sheets.getOrNull(i) ?: QwixxPlayerSheet()
+            state["s_${i}_red"] = s.redCrosses.toString()
+            state["s_${i}_yellow"] = s.yellowCrosses.toString()
+            state["s_${i}_green"] = s.greenCrosses.toString()
+            state["s_${i}_blue"] = s.blueCrosses.toString()
+            state["s_${i}_misworpen"] = s.misworpen.toString()
+        }
+
+        activeGameManager.saveActiveGame(
+            gameName = "Qwixx",
+            playerNames = selectedPlayerNames,
+            currentRound = 1,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["gameMode"]?.let { gameMode = it }
+            val list = mutableListOf<QwixxPlayerSheet>()
+            for (i in selectedPlayerNames.indices) {
+                val data = QwixxPlayerSheet(
+                    redCrosses = session.stateData["s_${i}_red"]?.toIntOrNull() ?: 0,
+                    yellowCrosses = session.stateData["s_${i}_yellow"]?.toIntOrNull() ?: 0,
+                    greenCrosses = session.stateData["s_${i}_green"]?.toIntOrNull() ?: 0,
+                    blueCrosses = session.stateData["s_${i}_blue"]?.toIntOrNull() ?: 0,
+                    misworpen = session.stateData["s_${i}_misworpen"]?.toIntOrNull() ?: 0
+                )
+                list.add(data)
+            }
+            if (list.size == selectedPlayerNames.size) {
+                sheets = list
+            }
+        }
+    }
+
+    LaunchedEffect(sheets) {
+        if (isGameStarted && sheets.isNotEmpty()) {
+            saveDraft()
+        }
     }
 
     if (isGameOver && winnerPlayer != null) {
@@ -261,6 +320,7 @@ fun QwixxScreen(
                                 sheets = MutableList(selectedPlayerNames.size) { QwixxPlayerSheet() }
                                 selectedPlayerTab = 0
                                 isGameStarted = true
+                                saveDraft()
                             }
                         },
                         enabled = selectedPlayerNames.size >= 2,

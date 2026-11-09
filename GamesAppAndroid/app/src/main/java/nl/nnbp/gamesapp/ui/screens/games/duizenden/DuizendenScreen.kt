@@ -39,13 +39,22 @@ data class DuizendenRoundEntry(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DuizendenScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Duizenden"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var targetScore by remember { mutableIntStateOf(1000) }
 
     var currentRound by remember { mutableIntStateOf(1) }
@@ -62,6 +71,44 @@ fun DuizendenScreen(
     var showEditScoresDialog by remember { mutableStateOf(false) }
     var isQuickScoreMode by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${totalScores.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Ronde $currentRound • Stand: $scoreSummary"
+        val state = mutableMapOf<String, String>()
+        state["currentRound"] = currentRound.toString()
+        state["targetScore"] = targetScore.toString()
+        state["totalScores"] = totalScores.joinToString(",")
+        state["roundScores"] = roundScores.joinToString(",")
+
+        activeGameManager.saveActiveGame(
+            gameName = "Duizenden",
+            playerNames = selectedPlayerNames,
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["targetScore"]?.toIntOrNull()?.let { targetScore = it }
+            session.stateData["totalScores"]?.let { t ->
+                val list = t.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    totalScores = list.toMutableList()
+                }
+            }
+            session.stateData["roundScores"]?.let { r ->
+                val list = r.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    roundScores = list.toMutableList()
+                }
+            }
+        }
+    }
 
     if (startQuickScoreGame) {
         SnelleEindscoreScreen(
@@ -274,6 +321,7 @@ fun DuizendenScreen(
                             roundScores = MutableList(selectedPlayerNames.size) { 0 }
                             totalScores = MutableList(selectedPlayerNames.size) { 0 }
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = selectedPlayerNames.size >= 2,
@@ -516,6 +564,7 @@ fun DuizendenScreen(
                             currentRound += 1
                             roundScores = MutableList(selectedPlayerNames.size) { 0 }
                             expandedPlayerIndex = null
+                            saveDraft()
                         }
                     },
                     modifier = Modifier
@@ -595,6 +644,7 @@ fun DuizendenScreen(
             onDismiss = { showEditScoresDialog = false },
             onSave = { newScores ->
                 totalScores = newScores.toMutableList()
+                saveDraft()
             }
         )
     }

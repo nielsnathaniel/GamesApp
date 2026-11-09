@@ -50,13 +50,17 @@ enum class CraniumCat(val displayName: String, val subtitle: String, val color: 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CraniumScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
     val soundManager = remember { SoundManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Cranium"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
 
     var team1Players by remember { mutableStateOf(mutableListOf<String>()) }
     var team2Players by remember { mutableStateOf(mutableListOf<String>()) }
@@ -82,6 +86,62 @@ fun CraniumScreen(
     var winnerTeamName by remember { mutableStateOf<String?>(null) }
     var isQuickScoreMode by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    val team1Name = remember(team1Players) {
+        if (team1Players.isEmpty()) "Team 1" else team1Players.joinToString(" & ")
+    }
+    val team2Name = remember(team2Players) {
+        if (team2Players.isEmpty()) "Team 2" else team2Players.joinToString(" & ")
+    }
+
+    fun saveDraft() {
+        if (!isGameStarted) return
+        val summary = "$team1Name: ${teamScores.getOrElse(0){0}} vs $team2Name: ${teamScores.getOrElse(1){0}}"
+        val state = mutableMapOf<String, String>()
+        state["team1Players"] = team1Players.joinToString(",")
+        state["team2Players"] = team2Players.joinToString(",")
+        state["teamScores"] = teamScores.joinToString(",")
+        state["turnsPlayed"] = turnsPlayedPerTeam.joinToString(",")
+        state["activeTeamIndex"] = activeTeamIndex.toString()
+        state["team1Categories"] = team1Categories.joinToString(",") { it.name }
+        state["team2Categories"] = team2Categories.joinToString(",") { it.name }
+
+        activeGameManager.saveActiveGame(
+            gameName = "Cranium",
+            playerNames = listOf(team1Name, team2Name),
+            currentRound = turnsPlayedPerTeam.sum(),
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["team1Players"]?.let {
+                team1Players = it.split(",").filter { s -> s.isNotBlank() }.toMutableList()
+            }
+            session.stateData["team2Players"]?.let {
+                team2Players = it.split(",").filter { s -> s.isNotBlank() }.toMutableList()
+            }
+            session.stateData["teamScores"]?.let {
+                val sc = it.split(",").mapNotNull { s -> s.toIntOrNull() }
+                if (sc.size == 2) teamScores = sc.toMutableList()
+            }
+            session.stateData["turnsPlayed"]?.let {
+                val tp = it.split(",").mapNotNull { s -> s.toIntOrNull() }
+                if (tp.size == 2) turnsPlayedPerTeam = tp.toMutableList()
+            }
+            session.stateData["activeTeamIndex"]?.toIntOrNull()?.let { activeTeamIndex = it }
+            session.stateData["team1Categories"]?.let {
+                val cats = it.split(",").mapNotNull { name -> runCatching { CraniumCat.valueOf(name) }.getOrNull() }
+                team1Categories = cats.toMutableSet()
+            }
+            session.stateData["team2Categories"]?.let {
+                val cats = it.split(",").mapNotNull { name -> runCatching { CraniumCat.valueOf(name) }.getOrNull() }
+                team2Categories = cats.toMutableSet()
+            }
+        }
+    }
 
     if (startQuickScoreGame) {
         SnelleEindscoreScreen(
@@ -109,13 +169,6 @@ fun CraniumScreen(
             isTimerRunning = false
             soundManager.playBuzzer()
         }
-    }
-
-    val team1Name = remember(team1Players) {
-        if (team1Players.isEmpty()) "Team 1" else team1Players.joinToString(" & ")
-    }
-    val team2Name = remember(team2Players) {
-        if (team2Players.isEmpty()) "Team 2" else team2Players.joinToString(" & ")
     }
 
     if (isGameOver && winnerTeamName != null) {
@@ -252,6 +305,7 @@ fun CraniumScreen(
                             teamScores = mutableListOf(0, 0)
                             turnsPlayedPerTeam = mutableListOf(0, 0)
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = (isQuickScoreMode && (team1Players.isNotEmpty() || team2Players.isNotEmpty())) || (team1Players.size >= 2 && team2Players.size >= 2),
@@ -460,6 +514,7 @@ fun CraniumScreen(
                             activeTeamIndex = (activeTeamIndex + 1) % 2
                             remainingSeconds = 60
                             isTimerRunning = false
+                            saveDraft()
                         }
                     },
                     modifier = Modifier
@@ -491,6 +546,7 @@ fun CraniumScreen(
             onDismiss = { showEditScoresDialog = false },
             onSave = { newScores ->
                 teamScores = newScores.toMutableList()
+                saveDraft()
             }
         )
     }

@@ -895,6 +895,10 @@ struct FiftyFiftyGameView: View {
         state["totaleStrafkaarten"] = totaleStrafkaarten.map { "\($0)" }.joined(separator: ",")
         state["rondeStrafkaarten"] = rondeStrafkaarten.map { "\($0)" }.joined(separator: ",")
         state["heeftVosOpHand"] = heeftVosOpHand.map { $0 ? "1" : "0" }.joined(separator: ",")
+        state["gameMode"] = gameMode.rawValue
+        state["aantalRondesDoel"] = "\(aantalRondesDoel)"
+        state["gebruikLimiet"] = gebruikLimiet ? "1" : "0"
+        state["limietStrafkaarten"] = "\(limietStrafkaarten)"
 
         activeGameManager.saveActiveGame(
             gameName: "Fifty Fifty",

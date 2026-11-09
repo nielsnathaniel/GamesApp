@@ -9,7 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import nl.nnbp.gamesapp.data.model.GameType
 import nl.nnbp.gamesapp.ui.navigation.Screen
 import nl.nnbp.gamesapp.ui.screens.games.GamesOverviewScreen
@@ -110,10 +112,10 @@ fun GamesAppMainShell() {
             composable(Screen.Games.route) {
                 GamesOverviewScreen(
                     onGameSelected = { game ->
-                        navController.navigate(Screen.GameSetup.createRoute(game.id))
+                        navController.navigate(Screen.GameSetup.createRoute(game.id, resume = false))
                     },
                     onResumeActiveGame = { gameId ->
-                        navController.navigate(Screen.GameSetup.createRoute(gameId))
+                        navController.navigate(Screen.GameSetup.createRoute(gameId, resume = true))
                     }
                 )
             }
@@ -170,28 +172,38 @@ fun GamesAppMainShell() {
                 )
             }
 
-            // Route handler voor elk van de 15 spellen
-            composable(Screen.GameSetup.route) { backStackEntry ->
+            // Route handler voor elk van de 16 spellen
+            composable(
+                route = Screen.GameSetup.route,
+                arguments = listOf(
+                    navArgument("gameId") { type = NavType.StringType },
+                    navArgument("resume") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStackEntry ->
                 val gameId = backStackEntry.arguments?.getString("gameId") ?: ""
+                val resume = backStackEntry.arguments?.getBoolean("resume") ?: false
                 val gameType = GameType.fromId(gameId) ?: GameType.BALZAKKEN
 
                 when (gameType) {
-                    GameType.BALZAKKEN -> BalzakkenScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.BEVERBENDE -> BeverbendeScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.DUIZENDEN -> DuizendenScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.CROCKINOLE -> CrockinoleScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.NMBR9 -> Nmbr9Screen(onNavigateBack = { navController.popBackStack() })
-                    GameType.REGENWORMEN -> RegenwormenScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.JATTEN -> JattenScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.LOVE_LETTER -> LoveLetterScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.QWIXX -> QwixxScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.PIG_HOLE -> PigHoleScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.TICKET_TO_RIDE -> TicketToRideScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.QUICKSTOP -> QuickstopScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.THIRTY_SECONDS -> ThirtySecondsScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.CRANIUM -> CraniumScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.FIFTY_FIFTY -> FiftyFiftyScreen(onNavigateBack = { navController.popBackStack() })
-                    GameType.RISK -> RiskScreen(onNavigateBack = { navController.popBackStack() })
+                    GameType.BALZAKKEN -> BalzakkenScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.BEVERBENDE -> BeverbendeScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.DUIZENDEN -> DuizendenScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.CROCKINOLE -> CrockinoleScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.NMBR9 -> Nmbr9Screen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.REGENWORMEN -> RegenwormenScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.JATTEN -> JattenScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.LOVE_LETTER -> LoveLetterScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.QWIXX -> QwixxScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.PIG_HOLE -> PigHoleScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.TICKET_TO_RIDE -> TicketToRideScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.QUICKSTOP -> QuickstopScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.THIRTY_SECONDS -> ThirtySecondsScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.CRANIUM -> CraniumScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.FIFTY_FIFTY -> FiftyFiftyScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
+                    GameType.RISK -> RiskScreen(onNavigateBack = { navController.popBackStack() }, autoResume = resume)
                 }
             }
         }

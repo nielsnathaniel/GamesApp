@@ -45,12 +45,16 @@ import nl.nnbp.gamesapp.ui.theme.SuccessGreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CrockinoleScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && (session.gameName == "Crockinole" || session.gameName == "Crokinole")
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
     var isTeamMode by remember { mutableStateOf(false) } // false = 1v1, true = 2v2
 
     // Team Wit & Zwart spelers
@@ -116,6 +120,49 @@ fun CrockinoleScreen(
     }
     val teamZwartDisplayName = remember(teamZwartSpelers) {
         if (teamZwartSpelers.isEmpty()) "Team Zwart" else teamZwartSpelers.joinToString(" & ")
+    }
+
+    fun saveDraft() {
+        if (!isGameStarted) return
+        val summary = "$teamWitDisplayName: $setsWonWit sets ($setPointsWit pt) vs $teamZwartDisplayName: $setsWonZwart sets ($setPointsZwart pt)"
+        val state = mutableMapOf<String, String>()
+        state["isTeamMode"] = if (isTeamMode) "1" else "0"
+        state["teamWitSpelers"] = teamWitSpelers.joinToString(",")
+        state["teamZwartSpelers"] = teamZwartSpelers.joinToString(",")
+        state["currentRound"] = currentRound.toString()
+        state["currentSet"] = currentSet.toString()
+        state["setsWonWit"] = setsWonWit.toString()
+        state["setsWonZwart"] = setsWonZwart.toString()
+        state["setPointsWit"] = setPointsWit.toString()
+        state["setPointsZwart"] = setPointsZwart.toString()
+        state["targetSets"] = targetSets.toString()
+
+        activeGameManager.saveActiveGame(
+            gameName = "Crockinole",
+            playerNames = listOf(teamWitDisplayName, teamZwartDisplayName),
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["isTeamMode"]?.let { isTeamMode = it == "1" }
+            session.stateData["teamWitSpelers"]?.let {
+                teamWitSpelers = it.split(",").filter { s -> s.isNotBlank() }.toMutableList()
+            }
+            session.stateData["teamZwartSpelers"]?.let {
+                teamZwartSpelers = it.split(",").filter { s -> s.isNotBlank() }.toMutableList()
+            }
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["currentSet"]?.toIntOrNull()?.let { currentSet = it }
+            session.stateData["setsWonWit"]?.toIntOrNull()?.let { setsWonWit = it }
+            session.stateData["setsWonZwart"]?.toIntOrNull()?.let { setsWonZwart = it }
+            session.stateData["setPointsWit"]?.toIntOrNull()?.let { setPointsWit = it }
+            session.stateData["setPointsZwart"]?.toIntOrNull()?.let { setPointsZwart = it }
+            session.stateData["targetSets"]?.toIntOrNull()?.let { targetSets = it }
+        }
     }
 
     if (startQuickScoreGame) {
@@ -339,6 +386,7 @@ fun CrockinoleScreen(
                             startQuickScoreGame = true
                         } else {
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = canStart,
@@ -737,6 +785,7 @@ fun CrockinoleScreen(
                             discsZwart15 = 0
                             discsZwart10 = 0
                             discsZwart5 = 0
+                            saveDraft()
                         }
                     },
                     modifier = Modifier
@@ -814,6 +863,7 @@ fun CrockinoleScreen(
             onSave = { newScores ->
                 setPointsWit = newScores.getOrElse(0) { setPointsWit }
                 setPointsZwart = newScores.getOrElse(1) { setPointsZwart }
+                saveDraft()
             }
         )
     }

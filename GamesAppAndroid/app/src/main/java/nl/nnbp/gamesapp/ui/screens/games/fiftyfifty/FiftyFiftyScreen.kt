@@ -43,13 +43,22 @@ data class FiftyFiftyRoundRecord(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FiftyFiftyScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Fifty Fifty"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var selectedPlayerCount by remember { mutableIntStateOf(4) }
     var gameMode by remember { mutableStateOf("rondes") } // "rondes", "enkelePot", "snel"
     var targetRounds by remember { mutableIntStateOf(3) }
@@ -71,6 +80,53 @@ fun FiftyFiftyScreen(
     var winnerPlayer by remember { mutableStateOf<String?>(null) }
     var showEditScoresDialog by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val scoreSummary = selectedPlayerNames.indices.joinToString(", ") { "${selectedPlayerNames[it]}:${totalPenalties.getOrElse(it) { 0 }}" }
+        val summary = "${selectedPlayerNames.size} spelers • Ronde $currentRound ($scoreSummary)"
+        val state = mutableMapOf<String, String>()
+        state["currentRound"] = currentRound.toString()
+        state["gameMode"] = gameMode
+        state["targetRounds"] = targetRounds.toString()
+        state["totalPenalties"] = totalPenalties.joinToString(",")
+        state["roundPenalties"] = roundPenalties.joinToString(",")
+        state["hasFoxInHand"] = hasFoxInHand.joinToString(",") { if (it) "1" else "0" }
+
+        activeGameManager.saveActiveGame(
+            gameName = "Fifty Fifty",
+            playerNames = selectedPlayerNames,
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["gameMode"]?.let { gameMode = it }
+            session.stateData["targetRounds"]?.toIntOrNull()?.let { targetRounds = it }
+            session.stateData["totalPenalties"]?.let { t ->
+                val list = t.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    totalPenalties = list.toMutableList()
+                }
+            }
+            session.stateData["roundPenalties"]?.let { r ->
+                val list = r.split(",").mapNotNull { it.toIntOrNull() }
+                if (list.size == selectedPlayerNames.size) {
+                    roundPenalties = list.toMutableList()
+                }
+            }
+            session.stateData["hasFoxInHand"]?.let { f ->
+                val list = f.split(",").map { it == "1" }
+                if (list.size == selectedPlayerNames.size) {
+                    hasFoxInHand = list.toMutableList()
+                }
+            }
+        }
+    }
 
     if (startQuickScoreGame) {
         SnelleEindscoreScreen(
@@ -315,6 +371,7 @@ fun FiftyFiftyScreen(
                                 currentRound = 1
                                 history.clear()
                                 isGameStarted = true
+                                saveDraft()
                             }
                         },
                         enabled = selectedPlayerNames.size >= 2,
@@ -742,6 +799,7 @@ fun FiftyFiftyScreen(
                             manuallyEnteredIndices = emptySet()
                             autoFilledIndex = null
                             currentRound++
+                            saveDraft()
                         }
                     },
                     enabled = isTotalValid,

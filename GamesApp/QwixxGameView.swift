@@ -134,6 +134,9 @@ struct QwixxGameView: View {
                 Text("Wil je het spel terugzetten naar: \(entry.beschrijving)?")
             }
         }
+        .onAppear {
+            restoreDraftIfNeeded()
+        }
     }
 
     // MARK: - Header
@@ -536,6 +539,7 @@ struct QwixxGameView: View {
         }
         scoreManager.saveGame(gameName: "Qwixx", playerScores: detailed, winnerName: highest.name)
         showWinnaarView = true
+        ActiveGameManager.shared.clearActiveGame()
     }
 
     private var sortedPlayers: [Player] {
@@ -560,6 +564,7 @@ struct QwixxGameView: View {
             return
         }
         geschiedenis.append(entry)
+        saveDraft()
     }
 
     private var historySheetView: some View {
@@ -654,6 +659,7 @@ struct QwixxGameView: View {
         }
         geschiedenis = kept
         toonGeschiedenisSheet = false
+        saveDraft()
     }
 
     private func resetGame() {
@@ -662,6 +668,57 @@ struct QwixxGameView: View {
         geschiedenis = []
         winnaarPlayer = Player(name: "")
         showWinnaarView = false
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    // MARK: - Active Game Draft
+
+    private func saveDraft() {
+        let scoreSummary = spelers.indices.map { "\(spelers[$0]):\(effectiveScore(for: $0))" }.joined(separator: ", ")
+        let summary = "\(spelers.count) spelers • Stand: \(scoreSummary)"
+
+        var state: [String: String] = [:]
+        state["currentMode"] = currentMode == .direct ? "Directe Score" : "Formulier"
+        state["selectedPlayerIndex"] = "\(selectedPlayerIndex)"
+        for (i, p) in playerScores.enumerated() {
+            state["player_\(i)"] = "\(p.red),\(p.yellow),\(p.green),\(p.blue),\(p.misworpen),\(p.directScore)"
+        }
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Qwixx",
+            playerNames: spelers,
+            currentRound: 1,
+            summary: summary,
+            state: state
+        )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Qwixx",
+              draft.playerNames == spelers else { return }
+
+        if let m = draft.stateData["currentMode"] {
+            self.currentMode = (m == "Directe Score") ? .direct : .formulier
+        }
+        if let s = draft.stateData["selectedPlayerIndex"], let sInt = Int(s) {
+            self.selectedPlayerIndex = sInt
+        }
+        for i in spelers.indices {
+            if let pStr = draft.stateData["player_\(i)"] {
+                let parts = pStr.split(separator: ",").compactMap { Int($0) }
+                if parts.count == 6 {
+                    playerScores[i] = QwixxPlayerScore(
+                        red: parts[0],
+                        yellow: parts[1],
+                        green: parts[2],
+                        blue: parts[3],
+                        misworpen: parts[4],
+                        directScore: parts[5]
+                    )
+                }
+            }
+        }
     }
 }
 

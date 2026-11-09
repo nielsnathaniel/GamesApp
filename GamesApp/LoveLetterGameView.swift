@@ -226,6 +226,7 @@ struct LoveLetterGameView: View {
             if huidigeRonde == 1 && !spelers.isEmpty {
                 huidigeStarterIndex = Int.random(in: 0..<spelers.count)
             }
+            restoreDraftIfNeeded()
         }
         .sheet(isPresented: $showRoundCompletionSheet) {
             LoveLetterRoundInputSheet(
@@ -877,6 +878,7 @@ struct LoveLetterGameView: View {
             finalizeGame(winnerName: spelers[bestIdx])
         } else {
             huidigeRonde += 1
+            saveDraft()
         }
     }
 
@@ -910,11 +912,13 @@ struct LoveLetterGameView: View {
            let wIdx = spelers.firstIndex(where: { $0.caseInsensitiveCompare(last.winnerName) == .orderedSame }) {
             huidigeStarterIndex = wIdx
         }
+        saveDraft()
     }
 
     private func finalizeGame(winnerName: String) {
         winnaarPlayer = Player(name: winnerName)
         showWinnaarView = true
+        ActiveGameManager.shared.clearActiveGame()
     }
 
     private var loveLetterScoreProgression: [RoundScoreDataPoint] {
@@ -986,6 +990,47 @@ struct LoveLetterGameView: View {
         rondeGeschiedenis = []
         winnaarPlayer = Player(name: "")
         showWinnaarView = false
+        ActiveGameManager.shared.clearActiveGame()
+    }
+
+    // MARK: - Active Game Draft
+
+    private func saveDraft() {
+        let scoreSummary = spelers.indices.map { "\(spelers[$0]):\(fichesPerSpeler[safe: $0] ?? 0)" }.joined(separator: ", ")
+        let summary = "\(spelers.count) spelers • Ronde \(huidigeRonde) • Fiches: \(scoreSummary)"
+
+        var state: [String: String] = [:]
+        state["huidigeRonde"] = "\(huidigeRonde)"
+        state["doelFiches"] = "\(doelFiches)"
+        state["startSpelerIndex"] = "\(huidigeStarterIndex)"
+        state["fiches"] = fichesPerSpeler.map { "\($0)" }.joined(separator: ",")
+
+        ActiveGameManager.shared.saveActiveGame(
+            gameName: "Love Letter",
+            playerNames: spelers,
+            currentRound: huidigeRonde,
+            summary: summary,
+            state: state
+        )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Love Letter",
+              draft.playerNames == spelers else { return }
+
+        if let r = draft.stateData["huidigeRonde"], let rInt = Int(r) {
+            self.huidigeRonde = rInt
+        }
+        if let s = draft.stateData["startSpelerIndex"], let sInt = Int(s) {
+            self.huidigeStarterIndex = sInt
+        }
+        if let f = draft.stateData["fiches"] {
+            let parts = f.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.fichesPerSpeler = parts
+            }
+        }
     }
 }
 

@@ -216,6 +216,7 @@ struct DuizendenGameView: View {
             if handScores.isEmpty {
                 handScores = Array(repeating: Array(repeating: 0, count: kaartSymbolen.count), count: spelers.count)
             }
+            restoreDraftIfNeeded()
         }
     }
 
@@ -491,6 +492,7 @@ struct DuizendenGameView: View {
         huidigeRonde = entry.ronde
         rondeGeschiedenis.removeAll { $0.ronde >= entry.ronde }
         toonGeschiedenisSheet = false
+        saveActiveDraft()
     }
 
     private func herstelNaarEindeVanRonde(_ entry: DuizendenRondeEntry) {
@@ -499,6 +501,7 @@ struct DuizendenGameView: View {
         huidigeRonde = entry.ronde + 1
         rondeGeschiedenis.removeAll { $0.ronde > entry.ronde }
         toonGeschiedenisSheet = false
+        saveActiveDraft()
     }
 
     private func resetGame() {
@@ -524,9 +527,28 @@ struct DuizendenGameView: View {
             currentRound: huidigeRonde,
             summary: summary,
             state: [
-                "scores": scores.map { String($0) }.joined(separator: ",")
+                "scores": scores.map { String($0) }.joined(separator: ","),
+                "huidigeRonde": "\(huidigeRonde)",
+                "aantalSpellenKaarten": "\(aantalSpellenKaarten)",
+                "eindscore": "\(eindscore)"
             ]
         )
+    }
+
+    private func restoreDraftIfNeeded() {
+        guard let draft = ActiveGameManager.shared.activeSession,
+              draft.gameName == "Duizenden",
+              draft.playerNames == spelers.map({ $0.name }) else { return }
+
+        if let r = draft.stateData["huidigeRonde"], let rInt = Int(r) {
+            self.huidigeRonde = rInt
+        }
+        if let sc = draft.stateData["scores"] {
+            let parts = sc.split(separator: ",").compactMap { Int($0) }
+            if parts.count == spelers.count {
+                self.scores = parts
+            }
+        }
     }
 }
 

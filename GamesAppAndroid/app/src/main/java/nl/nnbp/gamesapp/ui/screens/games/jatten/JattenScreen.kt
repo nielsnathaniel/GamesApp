@@ -36,13 +36,22 @@ import nl.nnbp.gamesapp.ui.theme.RoyalPurple
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun JattenScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    autoResume: Boolean = false
 ) {
     val scoreManager = remember { ScoreManager.getInstance() }
     val activeGameManager = remember { ActiveGameManager.getInstance() }
 
-    var isGameStarted by remember { mutableStateOf(false) }
-    var selectedPlayerNames by remember { mutableStateOf(mutableListOf<String>()) }
+    val session = remember { activeGameManager.activeSession.value }
+    val isResumeActive = autoResume && session != null && session.gameName == "Jatten"
+
+    var isGameStarted by remember { mutableStateOf(isResumeActive) }
+    var selectedPlayerNames by remember {
+        mutableStateOf(
+            if (isResumeActive && session != null) session.playerNames.toMutableList()
+            else mutableListOf<String>()
+        )
+    }
     var startPlayerIndex by remember { mutableIntStateOf(0) }
     var currentRound by remember { mutableIntStateOf(1) }
     var showStartspelerDialog by remember { mutableStateOf(false) }
@@ -53,6 +62,34 @@ fun JattenScreen(
     var isQuickScoreMode by remember { mutableStateOf(false) }
     var startQuickScoreGame by remember { mutableStateOf(false) }
 
+    val currentStarterIndex = remember(startPlayerIndex, currentRound, selectedPlayerNames) {
+        if (selectedPlayerNames.isEmpty()) 0 else (startPlayerIndex + (currentRound - 1)) % selectedPlayerNames.size
+    }
+
+    fun saveDraft() {
+        if (selectedPlayerNames.isEmpty() || !isGameStarted) return
+        val activeName = selectedPlayerNames.getOrElse(currentStarterIndex) { "" }
+        val summary = "${selectedPlayerNames.size} spelers • Ronde $currentRound • Aan de beurt: $activeName"
+        val state = mutableMapOf<String, String>()
+        state["currentRound"] = currentRound.toString()
+        state["startPlayerIndex"] = startPlayerIndex.toString()
+
+        activeGameManager.saveActiveGame(
+            gameName = "Jatten",
+            playerNames = selectedPlayerNames,
+            currentRound = currentRound,
+            summary = summary,
+            state = state
+        )
+    }
+
+    LaunchedEffect(isResumeActive) {
+        if (isResumeActive && session != null) {
+            session.stateData["currentRound"]?.toIntOrNull()?.let { currentRound = it }
+            session.stateData["startPlayerIndex"]?.toIntOrNull()?.let { startPlayerIndex = it }
+        }
+    }
+
     if (startQuickScoreGame) {
         SnelleEindscoreScreen(
             gameName = "Jatten",
@@ -62,10 +99,6 @@ fun JattenScreen(
             onNavigateBack = { startQuickScoreGame = false }
         )
         return
-    }
-
-    val currentStarterIndex = remember(startPlayerIndex, currentRound, selectedPlayerNames) {
-        if (selectedPlayerNames.isEmpty()) 0 else (startPlayerIndex + (currentRound - 1)) % selectedPlayerNames.size
     }
 
     if (isGameOver && winnerPlayer != null) {
@@ -224,6 +257,7 @@ fun JattenScreen(
                         } else {
                             startPlayerIndex = if (selectedPlayerNames.isNotEmpty()) (0 until selectedPlayerNames.size).random() else 0
                             isGameStarted = true
+                            saveDraft()
                         }
                     },
                     enabled = selectedPlayerNames.size >= 2,
@@ -276,6 +310,7 @@ fun JattenScreen(
                                 TextButton(
                                     onClick = {
                                         currentRound += 1
+                                        saveDraft()
                                     }
                                 ) {
                                     Text("Volgende beurt ➡️")
