@@ -326,109 +326,121 @@ struct FiftyFiftyGameView: View {
         saveDraft()
     }
 
+    private var scoreControleKleur: Color {
+        if isTotaalGeldig {
+            return .green
+        } else if huidigeRondeTotaal > 100 {
+            return .red
+        } else {
+            return .orange
+        }
+    }
+
+    private func restantVoorSpeler(_ targetIdx: Int) -> Int {
+        let somAnderen = spelers.indices.filter { $0 != targetIdx }.reduce(0) { $0 + rondeStrafkaarten[$1] }
+        return max(0, 100 - somAnderen)
+    }
+
+    @ViewBuilder
+    private var scoreControleStatusView: some View {
+        if isTotaalGeldig {
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundColor(.green)
+                .font(.title2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Totaal: 100 / 100 strafkaarten ✅")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+                Text("Klopt exact! Alle 100 kaarten zijn verdeeld.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        } else if huidigeRondeTotaal < 100 {
+            let rest = 100 - huidigeRondeTotaal
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+                .font(.title2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Totaal: \(huidigeRondeTotaal) / 100 strafkaarten")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.orange)
+                Text("Nog \(rest) strafkaart\(rest == 1 ? "" : "en") te verdelen.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        } else {
+            let teVeel = huidigeRondeTotaal - 100
+            Image(systemName: "xmark.octagon.fill")
+                .foregroundColor(.red)
+                .font(.title2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Totaal: \(huidigeRondeTotaal) / 100 strafkaarten")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.red)
+                Text("\(teVeel) strafkaart\(teVeel == 1 ? "" : "en") te veel ingevoerd!")
+                    .font(.caption2)
+                    .foregroundColor(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var restantAanvullenKnop: some View {
+        if let targetIdx = overgeblevenNietIngevuldeSpelerIndex, huidigeRondeTotaal != 100 {
+            let restant = restantVoorSpeler(targetIdx)
+            HStack {
+                Spacer()
+                Button(action: {
+                    HapticManager.shared.light()
+                    pasRestantHandmatigToe(targetIdx: targetIdx, restant: restant)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "wand.and.stars")
+                        Text("Vul restant in bij \(spelers[targetIdx]) (\(restant) pt)")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 10)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+            }
+        }
+    }
+
     private var scoreControleBanner: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                if isTotaalGeldig {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(.green)
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Totaal: 100 / 100 strafkaarten ✅")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                        Text("Klopt exact! Alle 100 kaarten zijn verdeeld.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                } else if huidigeRondeTotaal < 100 {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Totaal: \(huidigeRondeTotaal) / 100 strafkaarten")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.orange)
-                        let rest = 100 - huidigeRondeTotaal
-                        Text("Nog \(rest) strafkaart\(rest == 1 ? "" : "en") te verdelen.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    Image(systemName: "xmark.octagon.fill")
-                        .foregroundColor(.red)
-                        .font(.title2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Totaal: \(huidigeRondeTotaal) / 100 strafkaarten")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.red)
-                        let teVeel = huidigeRondeTotaal - 100
-                        Text("\(teVeel) strafkaart\(teVeel == 1 ? "" : "en") te veel ingevoerd!")
-                            .font(.caption2)
-                            .foregroundColor(.red)
-                    }
-                }
+                scoreControleStatusView
 
                 Spacer()
 
-                // Badge
                 Text("\(huidigeRondeTotaal)/100")
                     .font(.subheadline)
                     .fontWeight(.black)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(
-                        isTotaalGeldig ? Color.green.opacity(0.18) :
-                        (huidigeRondeTotaal > 100 ? Color.red.opacity(0.18) : Color.orange.opacity(0.18))
-                    )
-                    .foregroundColor(isTotaalGeldig ? .green : (huidigeRondeTotaal > 100 ? .red : .orange))
+                    .background(scoreControleKleur.opacity(0.18))
+                    .foregroundColor(scoreControleKleur)
                     .clipShape(Capsule())
             }
 
-            // Quick button als er nog 1 persoon niet is ingevuld of om restant toe te passen
-            if let targetIdx = overgeblevenNietIngevuldeSpelerIndex, huidigeRondeTotaal != 100 {
-                let somAnderen = spelers.indices.filter { $0 != targetIdx }.reduce(0) { $0 + rondeStrafkaarten[$1] }
-                let restant = max(0, 100 - somAnderen)
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        HapticManager.shared.light()
-                        pasRestantHandmatigToe(targetIdx: targetIdx, restant: restant)
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "wand.and.stars")
-                            Text("Vul restant in bij \(spelers[targetIdx]) (\(restant) pt)")
-                                .fontWeight(.semibold)
-                        }
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 10)
-                        .background(Color.orange.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                }
-            }
+            restantAanvullenKnop
         }
         .padding(12)
-        .background(
-            isTotaalGeldig ? Color.green.opacity(0.08) :
-            (huidigeRondeTotaal > 100 ? Color.red.opacity(0.08) : Color.orange.opacity(0.08))
-        )
+        .background(scoreControleKleur.opacity(0.08))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    isTotaalGeldig ? Color.green.opacity(0.3) :
-                    (huidigeRondeTotaal > 100 ? Color.red.opacity(0.3) : Color.orange.opacity(0.3)),
-                    lineWidth: 1.5
-                )
+                .stroke(scoreControleKleur.opacity(0.3), lineWidth: 1.5)
         )
         .padding(.horizontal)
     }
