@@ -221,20 +221,25 @@ fun PigHoleScreen(
                 advanceToNextPlayer()
             }
         } else if (number in 1..5) {
-            val isOccupied = (boardHoles[number] ?: 0) > 0
-            if (!isOccupied) {
+            val count = boardHoles[number] ?: 0
+            val maxCap = number
+            val isFull = count >= maxCap
+
+            if (!isFull) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 val list = pigsPerPlayer.toMutableList()
                 list[turnIndex] = maxOf(0, list[turnIndex] - 1)
                 pigsPerPlayer = list
 
                 val newBoard = boardHoles.toMutableMap()
-                newBoard[number] = 1
+                val newCount = count + 1
+                newBoard[number] = newCount
                 boardHoles = newBoard
                 rollsInCurrentTurn += 1
 
                 val remaining = list[turnIndex]
-                lastRollMessage = "$playerName gooit $number. Vakje was vrij: varkentje geplaatst ($remaining over)!"
+                val fullInfo = if (newCount >= maxCap) " Vak $number is nu vol ($newCount/$maxCap)!" else " ($newCount/$maxCap geplaatst)"
+                lastRollMessage = "$playerName gooit $number. Varkentje geplaatst$fullInfo ($remaining over)!"
 
                 if (remaining == 0) {
                     winnerPlayer = playerName
@@ -254,7 +259,7 @@ fun PigHoleScreen(
                     advanceToNextPlayer()
                 }
             } else {
-                // BEZET -> PECH!
+                // VOL -> PECH!
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 val newBoard = boardHoles.toMutableMap()
                 val pigsToTake: Int
@@ -264,7 +269,7 @@ fun PigHoleScreen(
                         newBoard[k] = 0
                     }
                 } else {
-                    pigsToTake = newBoard[number] ?: 1
+                    pigsToTake = count
                     newBoard[number] = 0
                 }
                 boardHoles = newBoard
@@ -274,7 +279,7 @@ fun PigHoleScreen(
                 pigsPerPlayer = list
 
                 val remaining = list[turnIndex]
-                lastRollMessage = "⚠️ Pech! Vakje $number was bezet. $playerName pakt $pigsToTake varken(s) ($remaining totaal)! Beurt voorbij."
+                lastRollMessage = "⚠️ Pech! Vakje $number was vol ($count/$maxCap). $playerName pakt $pigsToTake varken(s) ($remaining totaal)! Beurt voorbij."
 
                 advanceToNextPlayer()
             }
@@ -405,7 +410,7 @@ fun PigHoleScreen(
                                             shape = RoundedCornerShape(8.dp)
                                         ) {
                                             Text(
-                                                "Dit vakje (+1)",
+                                                "Dit vakje",
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (!penaltyRuleByBoard) Color.White else MaterialTheme.colorScheme.onSurface
                                             )
@@ -428,7 +433,7 @@ fun PigHoleScreen(
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = if (!penaltyRuleByBoard) "Standaard: pak alleen het varkentje van het gegooide vakje op (+1)." else "Variant: pak alle varkentjes van het hele bord op!",
+                                        text = if (!penaltyRuleByBoard) "Standaard: als een vakje vol is (bijv. 2 op vak 2, 3 op vak 3), pak je alle varkentjes van dat vakje." else "Variant: pak alle varkentjes van het hele bord op!",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color.Gray
                                     )
@@ -576,25 +581,36 @@ fun PigHoleScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     (1..3).forEach { num ->
-                                        val isOccupied = (boardHoles[num] ?: 0) > 0
+                                        val count = boardHoles[num] ?: 0
+                                        val maxCap = num
+                                        val isFull = count >= maxCap
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isOccupied) AccentOrange.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface)
-                                                .border(1.dp, if (isOccupied) AccentOrange else Color.Gray.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                                                .background(if (isFull) WarningRed.copy(alpha = 0.18f) else if (count > 0) AccentOrange.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface)
+                                                .border(1.dp, if (isFull) WarningRed else if (count > 0) AccentOrange else Color.Gray.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
                                                 .clickable {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     val nb = boardHoles.toMutableMap()
-                                                    nb[num] = if (isOccupied) 0 else 1
+                                                    val cur = nb[num] ?: 0
+                                                    nb[num] = (cur + 1) % (num + 1)
                                                     boardHoles = nb
+                                                    saveDraft()
                                                 }
                                                 .padding(vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(getDiceGlyph(num) + " Vak $num", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                Text(if (isOccupied) "🐷 Bezet" else "⚪️ Vrij", fontSize = 10.sp, color = if (isOccupied) AccentOrange else Color.Gray)
+                                                Text(
+                                                    if (isFull) "🐷 Vol ($count/$maxCap)"
+                                                    else if (count > 0) "🐷 $count/$maxCap"
+                                                    else "⚪️ Vrij (0/$maxCap)",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (count > 0) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isFull) WarningRed else if (count > 0) AccentOrange else Color.Gray
+                                                )
                                             }
                                         }
                                     }
@@ -607,25 +623,36 @@ fun PigHoleScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     (4..5).forEach { num ->
-                                        val isOccupied = (boardHoles[num] ?: 0) > 0
+                                        val count = boardHoles[num] ?: 0
+                                        val maxCap = num
+                                        val isFull = count >= maxCap
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .background(if (isOccupied) AccentOrange.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surface)
-                                                .border(1.dp, if (isOccupied) AccentOrange else Color.Gray.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                                                .background(if (isFull) WarningRed.copy(alpha = 0.18f) else if (count > 0) AccentOrange.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface)
+                                                .border(1.dp, if (isFull) WarningRed else if (count > 0) AccentOrange else Color.Gray.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
                                                 .clickable {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     val nb = boardHoles.toMutableMap()
-                                                    nb[num] = if (isOccupied) 0 else 1
+                                                    val cur = nb[num] ?: 0
+                                                    nb[num] = (cur + 1) % (num + 1)
                                                     boardHoles = nb
+                                                    saveDraft()
                                                 }
                                                 .padding(vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(getDiceGlyph(num) + " Vak $num", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                Text(if (isOccupied) "🐷 Bezet" else "⚪️ Vrij", fontSize = 10.sp, color = if (isOccupied) AccentOrange else Color.Gray)
+                                                Text(
+                                                    if (isFull) "🐷 Vol ($count/$maxCap)"
+                                                    else if (count > 0) "🐷 $count/$maxCap"
+                                                    else "⚪️ Vrij (0/$maxCap)",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (count > 0) FontWeight.Bold else FontWeight.Normal,
+                                                    color = if (isFull) WarningRed else if (count > 0) AccentOrange else Color.Gray
+                                                )
                                             }
                                         }
                                     }
@@ -711,9 +738,14 @@ fun PigHoleScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     (1..3).forEach { num ->
+                                        val count = boardHoles[num] ?: 0
+                                        val maxCap = num
+                                        val isFull = count >= maxCap
                                         DiceRollButton(
                                             number = num,
-                                            isOccupied = (boardHoles[num] ?: 0) > 0,
+                                            currentCount = count,
+                                            maxCapacity = maxCap,
+                                            isFull = isFull,
                                             penaltyByBoard = penaltyRuleByBoard,
                                             onClick = { rollDice(num) },
                                             modifier = Modifier.weight(1f)
@@ -729,9 +761,14 @@ fun PigHoleScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     (4..6).forEach { num ->
+                                        val count = boardHoles[num] ?: 0
+                                        val maxCap = num
+                                        val isFull = if (num == 6) false else count >= maxCap
                                         DiceRollButton(
                                             number = num,
-                                            isOccupied = if (num == 6) false else ((boardHoles[num] ?: 0) > 0),
+                                            currentCount = count,
+                                            maxCapacity = maxCap,
+                                            isFull = isFull,
                                             penaltyByBoard = penaltyRuleByBoard,
                                             onClick = { rollDice(num) },
                                             modifier = Modifier.weight(1f)
@@ -948,14 +985,16 @@ fun PigHoleScreen(
 @Composable
 fun DiceRollButton(
     number: Int,
-    isOccupied: Boolean,
+    currentCount: Int,
+    maxCapacity: Int,
+    isFull: Boolean,
     penaltyByBoard: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isSix = number == 6
-    val borderCol = if (isSix) Color(0xFF9C27B0) else if (isOccupied) WarningRed else AccentOrange
-    val bgCol = if (isSix) Color(0xFF9C27B0).copy(alpha = 0.12f) else if (isOccupied) WarningRed.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
+    val borderCol = if (isSix) Color(0xFF9C27B0) else if (isFull) WarningRed else if (currentCount > 0) AccentOrange else Color.Gray.copy(alpha = 0.35f)
+    val bgCol = if (isSix) Color(0xFF9C27B0).copy(alpha = 0.12f) else if (isFull) WarningRed.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
 
     Box(
         modifier = modifier
@@ -971,13 +1010,16 @@ fun DiceRollButton(
                 text = "${getDiceGlyph(number)} $number",
                 fontWeight = FontWeight.Black,
                 fontSize = 15.sp,
-                color = if (isSix) Color(0xFF9C27B0) else if (isOccupied) WarningRed else AccentOrange
+                color = if (isSix) Color(0xFF9C27B0) else if (isFull) WarningRed else AccentOrange
             )
             Text(
-                text = if (isSix) "Gat (-1)" else if (isOccupied) (if (penaltyByBoard) "Pak bord!" else "Pakken (+1)") else "Leg neer (-1)",
+                text = if (isSix) "Gat (-1)"
+                else if (isFull) (if (penaltyByBoard) "Pak bord!" else "Pakken (+$currentCount)")
+                else if (currentCount > 0) "Plaats ($currentCount/$maxCapacity)"
+                else "Neerleggen (-1)",
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isSix) Color(0xFF9C27B0) else if (isOccupied) WarningRed else Color.Gray
+                color = if (isSix) Color(0xFF9C27B0) else if (isFull) WarningRed else if (currentCount > 0) AccentOrange else Color.Gray
             )
         }
     }

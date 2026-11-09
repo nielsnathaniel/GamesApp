@@ -91,6 +91,10 @@ struct PigHoleGameView: View {
         bordStatus.values.reduce(0, +)
     }
 
+    private func maxCapacity(for nummer: Int) -> Int {
+        return nummer
+    }
+
     private var rondeRegelTekst: String {
         switch huidigeRonde {
         case 1: return "Ronde 1 • Maximaal 1x gooien per speler"
@@ -304,13 +308,15 @@ struct PigHoleGameView: View {
             // Raster van de 6 posities (1 t/m 5 + Gat 6)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                 ForEach(1...5, id: \.self) { nummer in
-                    let isBezet = (bordStatus[nummer] ?? 0) > 0
+                    let count = bordStatus[nummer] ?? 0
+                    let maxCap = maxCapacity(for: nummer)
+                    let isVol = count >= maxCap
 
                     Button(action: {
-                        // Manuele toggle voor uitzonderingen
+                        // Manuele toggle / ophoging voor uitzonderingen
                         HapticManager.shared.light()
                         withAnimation {
-                            bordStatus[nummer] = isBezet ? 0 : 1
+                            bordStatus[nummer] = (count + 1) % (maxCap + 1)
                             saveDraft()
                         }
                     }) {
@@ -322,23 +328,23 @@ struct PigHoleGameView: View {
                                     .font(.caption)
                                     .fontWeight(.bold)
                             }
-                            .foregroundColor(isBezet ? .pink : .primary)
+                            .foregroundColor(isVol ? .orange : (count > 0 ? .pink : .primary))
 
-                            Text(isBezet ? "🐷 Bezet" : "⚪️ Vrij")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(isBezet ? .white : .secondary)
-                                .padding(.horizontal, 8)
+                            Text(isVol ? "🐷 Vol (\(count)/\(maxCap))" : (count > 0 ? "🐷 \(count)/\(maxCap)" : "⚪️ Vrij (0/\(maxCap))"))
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(isVol ? .white : (count > 0 ? .white : .secondary))
+                                .padding(.horizontal, 6)
                                 .padding(.vertical, 3)
-                                .background(isBezet ? Color.pink : Color(UIColor.tertiarySystemGroupedBackground))
+                                .background(isVol ? Color.orange : (count > 0 ? Color.pink : Color(UIColor.tertiarySystemGroupedBackground)))
                                 .clipShape(Capsule())
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(isBezet ? Color.pink.opacity(0.12) : Color(UIColor.secondarySystemGroupedBackground))
+                        .background(isVol ? Color.orange.opacity(0.12) : (count > 0 ? Color.pink.opacity(0.08) : Color(UIColor.secondarySystemGroupedBackground)))
                         .cornerRadius(10)
                         .overlay(
                             RoundedRectangle(cornerRadius: 10)
-                                .stroke(isBezet ? Color.pink : Color.pink.opacity(0.2), lineWidth: isBezet ? 1.5 : 1)
+                                .stroke(isVol ? Color.orange : (count > 0 ? Color.pink.opacity(0.6) : Color.pink.opacity(0.2)), lineWidth: isVol ? 1.5 : 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -509,7 +515,9 @@ struct PigHoleGameView: View {
 
     private func diceButton(for getal: Int) -> some View {
         let isHole6 = getal == 6
-        let isBezet = (bordStatus[getal] ?? 0) > 0
+        let count = bordStatus[getal] ?? 0
+        let maxCap = maxCapacity(for: getal)
+        let isVol = count >= maxCap
 
         return Button(action: {
             voerWorpIn(getal)
@@ -522,17 +530,21 @@ struct PigHoleGameView: View {
                         .font(.headline)
                         .fontWeight(.black)
                 }
-                .foregroundColor(isHole6 ? .purple : (isBezet ? .orange : .pink))
+                .foregroundColor(isHole6 ? .purple : (isVol ? .orange : .pink))
 
                 // Status Badge
                 if isHole6 {
                     Text("Gat in (-1)")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.purple)
-                } else if isBezet {
-                    Text(penaltyRule == .bord ? "Pak bord!" : "Pakken (+1)")
+                } else if isVol {
+                    Text(penaltyRule == .bord ? "Pak bord!" : "Pakken (+\(count))")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.orange)
+                } else if count > 0 {
+                    Text("Plaats (\(count)/\(maxCap))")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.pink)
                 } else {
                     Text("Neerleggen (-1)")
                         .font(.system(size: 9, weight: .medium))
@@ -541,11 +553,11 @@ struct PigHoleGameView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(isHole6 ? Color.purple.opacity(0.08) : (isBezet ? Color.orange.opacity(0.12) : Color(UIColor.systemBackground)))
+            .background(isHole6 ? Color.purple.opacity(0.08) : (isVol ? Color.orange.opacity(0.12) : Color(UIColor.systemBackground)))
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isHole6 ? Color.purple.opacity(0.4) : (isBezet ? Color.orange.opacity(0.6) : Color.pink.opacity(0.2)), lineWidth: isBezet ? 1.5 : 1)
+                    .stroke(isHole6 ? Color.purple.opacity(0.4) : (isVol ? Color.orange.opacity(0.6) : Color.pink.opacity(0.2)), lineWidth: isVol ? 1.5 : 1)
             )
         }
         .buttonStyle(.plain)
@@ -600,17 +612,21 @@ struct PigHoleGameView: View {
             controleerRondeLimiet()
 
         } else if (1...5).contains(getal) {
-            let isBezet = (bordStatus[getal] ?? 0) > 0
+            let count = bordStatus[getal] ?? 0
+            let maxCap = maxCapacity(for: getal)
+            let isVol = count >= maxCap
 
-            if !isBezet {
-                // Vrij vakje: varkentje neerleggen (-1)
+            if !isVol {
+                // Vrij / nog plek: varkentje neerleggen (-1)
                 HapticManager.shared.medium()
                 varkens[beurtIndex] = max(0, varkens[beurtIndex] - 1)
-                bordStatus[getal] = 1
+                let newCount = count + 1
+                bordStatus[getal] = newCount
                 worpenDezeBeurt += 1
 
                 let over = varkens[beurtIndex]
-                let omschrijving = "\(spelerNaam) gooit \(getal). Vakje was vrij: varkentje geplaatst (\(over) over)!"
+                let volTekst = newCount >= maxCap ? " Vakje \(getal) is nu vol (\(newCount)/\(maxCap))!" : " (\(newCount)/\(maxCap) geplaatst)"
+                let omschrijving = "\(spelerNaam) gooit \(getal). Varkentje geplaatst\(volTekst) (\(over) over)!"
                 laatsteWorpMelding = omschrijving
                 recordAction(player: spelerNaam, actie: omschrijving)
                 saveDraft()
@@ -624,7 +640,7 @@ struct PigHoleGameView: View {
                 controleerRondeLimiet()
 
             } else {
-                // Bezet vakje: PECH! Pak varkens op en beurt is voorbij
+                // Vakje is VOL: PECH! Pak varkens op en beurt is voorbij
                 HapticManager.shared.warning()
 
                 let aantalTePakken: Int
@@ -635,13 +651,13 @@ struct PigHoleGameView: View {
                         bordStatus[k] = 0
                     }
                 } else {
-                    aantalTePakken = bordStatus[getal] ?? 1
+                    aantalTePakken = count
                     bordStatus[getal] = 0
                 }
 
                 varkens[beurtIndex] += aantalTePakken
                 let over = varkens[beurtIndex]
-                let omschrijving = "⚠️ Pech! Vakje \(getal) was bezet. \(spelerNaam) moet \(aantalTePakken) \(aantalTePakken == 1 ? "varkentje" : "varkentjes") pakken (\(over) totaal)! Beurt voorbij."
+                let omschrijving = "⚠️ Pech! Vakje \(getal) was vol (\(count)/\(maxCap)). \(spelerNaam) moet \(aantalTePakken) \(aantalTePakken == 1 ? "varkentje" : "varkentjes") pakken (\(over) totaal)! Beurt voorbij."
                 laatsteWorpMelding = omschrijving
                 recordAction(player: spelerNaam, actie: omschrijving)
                 saveDraft()

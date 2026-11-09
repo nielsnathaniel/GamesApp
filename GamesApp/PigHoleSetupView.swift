@@ -188,7 +188,7 @@ struct PigHoleSetupView: View {
                     .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
 
-                    Text(penaltyRule == .vakje ? "Standaard: je pakt alleen het varkentje van het gegooide vakje op (+1)." : "Variant: je pakt álle varkentjes van het hele speelbord op!")
+                    Text(penaltyRule == .vakje ? "Standaard: als een vakje vol is (bijv. 2 op vak 2, 3 op vak 3), pak je alle varkentjes van dat vakje." : "Variant: je pakt álle varkentjes van het hele speelbord op!")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.horizontal)
