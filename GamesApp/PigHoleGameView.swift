@@ -1,5 +1,12 @@
 import SwiftUI
 
+enum PigHolePenaltyRule: String, CaseIterable, Identifiable, Codable {
+    case vakje = "Alleen dit vakje (+1)"
+    case bord = "Hele bord leegmaken"
+
+    var id: String { rawValue }
+}
+
 struct PigHoleActionEntry: Identifiable {
     let id: UUID
     let timestamp: Date
